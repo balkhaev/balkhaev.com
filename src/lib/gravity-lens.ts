@@ -18,7 +18,7 @@ function measureTargets() {
   for (const element of document.querySelectorAll<HTMLElement>(TARGETS)) {
     if (
       element.closest(
-        "[data-gravity-source], [data-gravity-infall], [data-nextjs-dialog], [role=dialog]"
+        "[data-gravity-source], [data-nextjs-dialog], [role=dialog]"
       ) ||
       element.parentElement?.closest(TARGETS)
     ) {
@@ -65,20 +65,16 @@ export function createGravityLens(
       element: starSurface,
     });
   }
-  const infall = document.querySelector<HTMLElement>("[data-gravity-infall]");
-  if (infall) {
-    targets.push({ box: infall.getBoundingClientRect(), element: infall });
-  }
   const filters = targets.map(({ element, box }, index) => {
     const id = `${prefix}-${index}`;
     const margin = displacement + 4;
     const filter = svgElement("filter", {
       "color-interpolation-filters": "sRGB",
       filterUnits: "userSpaceOnUse",
-      height: box.height + margin * 2,
+      height: element.offsetHeight + margin * 2,
       id,
       primitiveUnits: "userSpaceOnUse",
-      width: box.width + margin * 2,
+      width: element.offsetWidth + margin * 2,
       x: -margin,
       y: -margin,
     });
@@ -131,8 +127,12 @@ export function createGravityLens(
       if (!box) {
         continue;
       }
-      image.setAttribute("x", String(-box.left));
-      image.setAttribute("y", String(-box.top));
+      const scaleX = box.width / (element.offsetWidth || box.width);
+      const scaleY = box.height / (element.offsetHeight || box.height);
+      image.setAttribute("x", String(-box.left / scaleX));
+      image.setAttribute("y", String(-box.top / scaleY));
+      image.setAttribute("width", String(width / scaleX));
+      image.setAttribute("height", String(height / scaleY));
       image.setAttribute("href", decoded.src);
       if (!ready) {
         element.style.filter = applied;

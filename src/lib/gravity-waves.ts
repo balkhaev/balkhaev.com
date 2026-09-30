@@ -1,9 +1,6 @@
-import {
-  createInfallImages,
-  type GravitySource,
-  infallField,
-} from "./gravity-infall";
+import { type GravitySource, infallField } from "./gravity-infall";
 import { createGravityLens } from "./gravity-lens";
+import { createElementOrbits } from "./gravity-orbits";
 
 interface Wave {
   birth: number;
@@ -107,10 +104,11 @@ export function createGravityWaves(
   const context = map.getContext("2d");
   let pixels: ImageData | null = null;
   let lens: ReturnType<typeof createGravityLens> | null = null;
-  let images: ReturnType<typeof createInfallImages> | null = null;
+  let orbits: ReturnType<typeof createElementOrbits> | null = null;
   let waves: Wave[] = [];
   let frame = 0;
   let last = 0;
+  let lastOrbit = 0;
   let width = 0;
   let height = 0;
   let time = 0;
@@ -124,11 +122,14 @@ export function createGravityWaves(
     cancelAnimationFrame(frame);
     frame = 0;
     last = 0;
+    lastOrbit = 0;
     clear();
     lens?.dispose();
     lens = null;
-    images?.dispose();
-    images = null;
+    if (reducedMotion.matches) {
+      orbits?.dispose();
+      orbits = null;
+    }
     pixels = null;
     detail = "";
   };
@@ -154,6 +155,18 @@ export function createGravityWaves(
       return;
     }
     frame = requestAnimationFrame(tick);
+    const orbitSeconds = lastOrbit
+      ? Math.min(0.05, (now - lastOrbit) / 1000)
+      : 0;
+    lastOrbit = now;
+    const box = scene.getBoundingClientRect();
+    const image = canvas?.getBoundingClientRect() ?? box;
+    const source = {
+      radius: Math.min(image.width, image.height) * size,
+      x: box.left + box.width / 2,
+      y: box.top + box.height / 2,
+    };
+    const anchors = orbits?.update(source, orbitSeconds) ?? [];
     const next = canvas?.dataset.holeQuality ?? "balanced";
     const interval = next === "high" ? 1000 / 30 : 1000 / 20;
     if (now - last < interval - 1 || !context) {
@@ -168,15 +181,7 @@ export function createGravityWaves(
     if (!pixels) {
       return;
     }
-    const box = scene.getBoundingClientRect();
-    const image = canvas?.getBoundingClientRect() ?? box;
-    const source = {
-      radius: Math.min(image.width, image.height) * size,
-      x: box.left + box.width / 2,
-      y: box.top + box.height / 2,
-    };
     waves = waves.filter((wave) => now - wave.birth < WAVE_LIFETIME_MS);
-    const anchors = images?.update(source, time, next === "low") ?? [];
     drawDisplacement(
       context,
       pixels,
@@ -194,7 +199,7 @@ export function createGravityWaves(
     if (frame || reducedMotion.matches || document.hidden || !context) {
       return;
     }
-    images = createInfallImages();
+    orbits ??= createElementOrbits();
     frame = requestAnimationFrame(tick);
   };
   const reset = () => {
@@ -213,6 +218,8 @@ export function createGravityWaves(
     clear,
     dispose() {
       stop();
+      orbits?.dispose();
+      orbits = null;
       window.removeEventListener("resize", reset);
       window.removeEventListener("blur", stop);
       window.removeEventListener("focus", wake);

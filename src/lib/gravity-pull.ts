@@ -20,7 +20,7 @@ export function createGravityPull(
       (element) =>
         !(
           element.closest(
-            "[data-gravity-source], [data-gravity-infall], [data-nextjs-dialog], [role=dialog], [data-film-transition]"
+            ".contacts, [data-gravity-source], [data-nextjs-dialog], [role=dialog], [data-film-transition]"
           ) || element.parentElement?.closest(TARGETS)
         ) && getComputedStyle(element).translate === "none"
     )
