@@ -4,7 +4,7 @@ export const HOLE_QUALITY = {
   balanced: {
     atlasHeight: 192,
     atlasWidth: 768,
-    bloom: 2,
+    bloom: 4,
     detail: 0.55,
     images: 3,
     particles: 12_000,
@@ -12,7 +12,7 @@ export const HOLE_QUALITY = {
   high: {
     atlasHeight: 256,
     atlasWidth: 1024,
-    bloom: 3,
+    bloom: 5,
     detail: 1,
     images: 3,
     particles: 28_000,
@@ -20,7 +20,7 @@ export const HOLE_QUALITY = {
   low: {
     atlasHeight: 128,
     atlasWidth: 512,
-    bloom: 1,
+    bloom: 3,
     detail: 0.25,
     images: 2,
     particles: 4500,

@@ -2,22 +2,29 @@ import { CRITICAL_B, type GeodesicTable } from "./geodesics";
 
 export const OBSERVER_RADIUS = 60;
 export const CLOCK_RATE = 3.8;
+export const CONTACT_TILT = (70 * Math.PI) / 180;
+export const CONTACT_UP = [
+  0,
+  Math.cos(CONTACT_TILT),
+  Math.sin(CONTACT_TILT),
+] as const;
+export const CONTACT_NORMAL = [0, -CONTACT_UP[2], CONTACT_UP[1]] as const;
 export const CONTACTS = [
   {
-    height: 3.2,
+    height: 3.3,
     href: "https://t.me/balkhaev",
     label: "@balkhaev",
-    phase: 1.68,
-    radius: 15.5,
-    width: 7.8,
+    phase: 1.88,
+    radius: 14.5,
+    width: 5.2,
   },
   {
-    height: 3.2,
+    height: 3.3,
     href: "mailto:m.balkhaev@gmail.com",
     label: "Email ↗",
-    phase: -1.65,
-    radius: 25,
-    width: 6.5,
+    phase: 1.2,
+    radius: 20.5,
+    width: 4.5,
   },
 ] as const;
 
@@ -35,10 +42,14 @@ export const orbitRate = (radius: number) => Math.sqrt(0.5 / radius ** 3);
 export function contactPosition(index: number, time: number) {
   const body = CONTACTS[index];
   if (!body) {
-    return { x: 0, y: 0 };
+    return { x: 0, y: 0, z: 0 };
   }
   const angle = body.phase + orbitRate(body.radius) * time;
-  return { x: body.radius * Math.cos(angle), y: body.radius * Math.sin(angle) };
+  return {
+    x: body.radius * Math.cos(angle),
+    y: body.radius * Math.sin(angle) * CONTACT_UP[1],
+    z: body.radius * Math.sin(angle) * CONTACT_UP[2],
+  };
 }
 
 /** Stationary Schwarzschild observer. Changing the viewpoint selects another observer;
@@ -90,23 +101,35 @@ export function fittedSize(
       for (const sx of [-1, 1]) {
         for (const sy of [-1, 1]) {
           const x = point.x + (sx * body.width) / 2;
-          const y = point.y + (sy * body.height) / 2;
+          const y = point.y + (sy * body.height * CONTACT_UP[1]) / 2;
+          const z = point.z + (sy * body.height * CONTACT_UP[2]) / 2;
           const depth =
-            OBSERVER_RADIUS - (x * eye[0] + y * eye[1]) / OBSERVER_RADIUS;
+            OBSERVER_RADIUS -
+            (x * eye[0] + y * eye[1] + z * eye[2]) / OBSERVER_RADIUS;
           extentX = Math.max(
             extentX,
-            Math.abs((x * (basis[0] ?? 0) + y * (basis[1] ?? 0)) / depth) * 1.06
+            Math.abs(
+              (x * (basis[0] ?? 0) +
+                y * (basis[1] ?? 0) +
+                z * (basis[2] ?? 0)) /
+                depth
+            ) * 1.06
           );
           extentY = Math.max(
             extentY,
-            Math.abs((x * (basis[3] ?? 0) + y * (basis[4] ?? 0)) / depth) * 1.06
+            Math.abs(
+              (x * (basis[3] ?? 0) +
+                y * (basis[4] ?? 0) +
+                z * (basis[5] ?? 0)) /
+                depth
+            ) * 1.06
           );
         }
       }
     }
   }
   const size =
-    (Math.min(width / 24, height / 47) * CRITICAL_B) / Math.min(width, height);
+    (Math.min(width / 22, height / 25) * CRITICAL_B) / Math.min(width, height);
   const focal = focalLength({ ...view, size }, width, height);
   return (
     size *
@@ -198,8 +221,11 @@ export function contactHit(
   if (!ray) {
     return -1;
   }
+  const planeDot = (v: number[]) =>
+    (v[1] ?? 0) * CONTACT_NORMAL[1] + (v[2] ?? 0) * CONTACT_NORMAL[2];
   const first =
-    (((Math.atan2(ray.e2[2] ?? 0, ray.e1[2] ?? 0) + Math.PI / 2) % Math.PI) +
+    (((Math.atan2(planeDot(ray.e2), planeDot(ray.e1)) + Math.PI / 2) %
+      Math.PI) +
       Math.PI) %
     Math.PI;
   for (let image = 0; image < images; image += 1) {
@@ -215,14 +241,19 @@ export function contactHit(
       (Math.cos(phi) * (ray.e1[0] ?? 0) + Math.sin(phi) * (ray.e2[0] ?? 0)) /
       inverse;
     const hy =
-      (Math.cos(phi) * (ray.e1[1] ?? 0) + Math.sin(phi) * (ray.e2[1] ?? 0)) /
+      (Math.cos(phi) *
+        ((ray.e1[1] ?? 0) * CONTACT_UP[1] + (ray.e1[2] ?? 0) * CONTACT_UP[2]) +
+        Math.sin(phi) *
+          ((ray.e2[1] ?? 0) * CONTACT_UP[1] +
+            (ray.e2[2] ?? 0) * CONTACT_UP[2])) /
       inverse;
     const delay = tableSample(table, table.times, ray.row, phi);
     for (const [index, body] of CONTACTS.entries()) {
       const center = contactPosition(index, time - delay + OBSERVER_RADIUS);
       if (
         Math.abs(hx - center.x) <= body.width / 2 &&
-        Math.abs(hy - center.y) <= body.height / 2
+        Math.abs(hy - center.y * CONTACT_UP[1] - center.z * CONTACT_UP[2]) <=
+          body.height / 2
       ) {
         return index;
       }

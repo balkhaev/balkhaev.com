@@ -24,19 +24,20 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
   const view: HoleView = {
     azimuth: 0,
-    inclination: 78,
-    roll: 0,
+    inclination: 76,
+    roll: -8,
     size: 0.06,
     spin: -1,
-    stars: 0.55,
+    stars: 0.9,
     x: 0.5,
-    y: 0.45,
+    y: 0.5,
   };
   const quality = createHoleQuality();
   let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
   let time = 0;
+  let framingTime = 0;
   let zoom = 1;
   let selected = -1;
   let tracking = -1;
@@ -52,24 +53,31 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
 
   const frameView = () => {
     const { width, height } = surface.getBoundingClientRect();
-    view.size = fittedSize(view, width, height, time) * zoom;
+    view.size = fittedSize(view, width, height, framingTime) * zoom;
     view.x = 0.5;
-    view.y = 0.45;
+    view.y = 0.5;
     if (tracking >= 0) {
       const point = contactPosition(tracking, time);
       const { basis, eye } = cameraOf(view);
       const distance =
         OBSERVER_RADIUS -
-        (point.x * eye[0] + point.y * eye[1]) / OBSERVER_RADIUS;
+        (point.x * eye[0] + point.y * eye[1] + point.z * eye[2]) /
+          OBSERVER_RADIUS;
       const focal = focalLength(view, width, height);
       view.x =
         0.5 -
-        (focal * (point.x * (basis[0] ?? 0) + point.y * (basis[1] ?? 0))) /
+        (focal *
+          (point.x * (basis[0] ?? 0) +
+            point.y * (basis[1] ?? 0) +
+            point.z * (basis[2] ?? 0))) /
           distance /
           width;
       view.y =
         0.5 +
-        (focal * (point.x * (basis[3] ?? 0) + point.y * (basis[4] ?? 0))) /
+        (focal *
+          (point.x * (basis[3] ?? 0) +
+            point.y * (basis[4] ?? 0) +
+            point.z * (basis[5] ?? 0))) /
           distance /
           height;
     }
@@ -143,7 +151,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     hint?.classList.add("dismissed");
   };
   const reset = () => {
-    view.inclination = 78;
+    framingTime = time;
+    view.inclination = 76;
     view.azimuth = 0;
     zoom = 1;
     tracking = -1;

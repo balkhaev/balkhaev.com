@@ -18,11 +18,11 @@ const table = geodesicTable({
 });
 const view: SceneView = {
   azimuth: 0,
-  inclination: 78,
-  roll: 0,
-  size: 2.598 / 47,
+  inclination: 76,
+  roll: -8,
+  size: 2.598 / 25,
   x: 0.5,
-  y: 0.45,
+  y: 0.5,
 };
 
 describe("one Schwarzschild scene", () => {
@@ -52,7 +52,10 @@ describe("one Schwarzschild scene", () => {
       const period = (2 * Math.PI) / orbitRate(body.radius);
       for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
         const point = contactPosition(index, period * fraction);
-        expect(Math.hypot(point.x, point.y)).toBeCloseTo(body.radius, 10);
+        expect(Math.hypot(point.x, point.y, point.z)).toBeCloseTo(
+          body.radius,
+          10
+        );
       }
       const start = contactPosition(index, 0),
         end = contactPosition(index, period);
@@ -117,13 +120,13 @@ describe("one Schwarzschild scene", () => {
       }
       expect([...found].sort()).toEqual([0, 1]);
       expect(
-        contactHit(table, framed, width, height, width * 0.5, height * 0.45, 0)
+        contactHit(table, framed, width, height, width * 0.5, height * 0.5, 0)
       ).toBe(-1);
       expect(contactHit(table, framed, width, height, 0, 0, 0)).toBe(-1);
     }
   });
 
-  test("optical framing keeps both moving primary surfaces reachable on a narrow screen", () => {
+  test("explicit optical reframing finds both moving primary surfaces on a narrow screen", () => {
     const width = 390,
       height = 844;
     for (const time of [40, 100, 180, 270, 400, 550, 720]) {

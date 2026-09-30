@@ -11,11 +11,15 @@ import {
 import { contactAtlas } from "./contact-atlas";
 import { CRITICAL_B, type GeodesicTable, geodesicTable } from "./geodesics";
 import {
+  CONTACT_NORMAL,
+  CONTACT_UP,
   CONTACTS,
   cameraOf,
   contactHit,
   OBSERVER_RADIUS,
 } from "./scene-geometry";
+import { createStellarOrbit, STAR_SAMPLES } from "./stellar-orbit";
+import { STELLAR_SHADER } from "./stellar-shader";
 
 /**
  * The black hole drawn in WebGL 2 as light would show it. Every pixel's ray is followed back through the curved space
@@ -127,7 +131,9 @@ const float FLUX_PEAK = 0.00011458947;
 // Planck's law at the three primaries for 6500 K: the white the colours are balanced to.
 const vec3 WHITE = vec3(0.32205, 0.36152, 0.39627);
 // The hottest gas, kelvin, before any shift.
-const float T_PEAK = 6800.0;
+const float T_PEAK = 5400.0;
+const vec3 CONTACT_UP = vec3(${CONTACT_UP.join(", ")});
+const vec3 CONTACT_NORMAL = vec3(${CONTACT_NORMAL.join(", ")});
 
 
 float rowOf(float b) {
@@ -165,6 +171,7 @@ float travelTime(float row, float phi) {
 }
 
 vec3 blackbody(float t);
+${STELLAR_SHADER}
 
 vec4 beacon(vec3 hit, float time, vec3 photonCovector, float facing) {
   const vec4 bodies[2] = vec4[2](
@@ -176,11 +183,11 @@ vec4 beacon(vec3 hit, float time, vec3 photonCovector, float facing) {
     float omega = sqrt(0.5 / (body.x * body.x * body.x));
     float angle = body.y + omega * time;
     vec2 center = body.x * vec2(cos(angle), sin(angle));
-    vec2 uv = (hit.xy - center) / body.zw;
+    vec2 uv = (vec2(hit.x, dot(hit, CONTACT_UP)) - center) / body.zw;
     if (abs(uv.x) > 0.5 || abs(uv.y) > 0.5) continue;
     uv = vec2(0.5 - uv.x * facing, 0.5 - uv.y);
     vec4 ink = texture(uContacts, vec2(uv.x, (float(index) + uv.y) * 0.5));
-    vec3 velocity = body.x * omega * vec3(-sin(angle), cos(angle), 0.0);
+    vec3 velocity = body.x * omega * (vec3(-sin(angle), 0.0, 0.0) + CONTACT_UP * cos(angle));
     float lapse = 1.0 - 1.0 / length(hit);
     float radialVelocity = dot(velocity, normalize(hit));
     float properRate = sqrt(max(0.0, lapse - dot(velocity, velocity) - (1.0 / lapse - 1.0) * radialVelocity * radialVelocity));
@@ -228,6 +235,14 @@ vec3 blackbody(float t) {
 	return radiance / WHITE;
 }
 
+float densityNoise(vec2 p) {
+  vec2 cell = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  vec4 corners = fract(sin(vec4(dot(cell, vec2(127.1, 311.7)), dot(cell + vec2(1.0, 0.0), vec2(127.1, 311.7)), dot(cell + vec2(0.0, 1.0), vec2(127.1, 311.7)), dot(cell + vec2(1.0), vec2(127.1, 311.7)))) * 43758.5453);
+  return mix(mix(corners.x, corners.y, f.x), mix(corners.z, corners.w, f.x), f.y);
+}
+
 /** The disk where a ray crosses it: its light (rgb) and how opaque it is (a). */
 vec4 disk(float r, float psi, float lambda, float delay) {
 	float x = sqrt(2.0 * r);
@@ -239,9 +254,15 @@ vec4 disk(float r, float psi, float lambda, float delay) {
 	float g = sqrt(max(0.0, 1.0 - 1.5 / r)) / (sqrt(1.0 - 1.0 / D) * (1.0 - omega * lambda * uSpin));
 	vec3 matter = textureLod(uParticles, vec2((psi - omega * uSpin * delay) / TAU + 0.5, (r - DISK_IN) / (DISK_OUT - DISK_IN)), 0.0).rgb;
 	float n = 1.0 - exp(-matter.r * 3.0);
+	// Advected density filaments: each annulus keeps its own Keplerian angular rate.
+	float phase = psi + omega * uSpin * (uTime - delay + D);
+	vec2 flow = vec2(cos(phase), sin(phase)) * 9.0;
+	float clouds = densityNoise(flow + vec2(r * 8.0, 0.0));
+	float fine = densityNoise(flow * 3.0 + vec2(r * 29.0, r * 7.0));
+	float bands = sin(r * 23.0 + 3.0 * clouds) * (1.0 - smoothstep(0.3, 1.5, fwidth(r * 23.0)));
 	float t = T_PEAK * pow(flux, 0.25) * g;
-	float edge = smoothstep(DISK_IN, DISK_IN + 0.9, r) * (1.0 - smoothstep(DISK_OUT * 0.4, DISK_OUT, r));
-	float alpha = edge * (0.72 + 0.28 * n);
+	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
+	float alpha = edge * (0.38 + 0.16 * n + 0.05 * bands + 0.29 * clouds + 0.12 * fine);
 	return vec4(blackbody(t) * uAccretion, alpha);
 }
 
@@ -297,15 +318,20 @@ void main() {
 	if (inTable) {
 		vec3 normal = cross(e1, e2);
 		float diskPhi = mod(atan(e2.y, e1.y) + 0.5 * PI, PI);
-		float beaconPhi = mod(atan(e2.z, e1.z) + 0.5 * PI, PI);
+		float beaconPhi = mod(atan(dot(e2, CONTACT_NORMAL), dot(e1, CONTACT_NORMAL)) + 0.5 * PI, PI);
+		float starImageA = starIntersection(row, b, phiEnd, e1, e2, 0.0);
+		float starImageB = starIntersection(row, b, phiEnd, e1, e2, TAU);
+		float starPhi = min(starImageA, starImageB);
+		float starSecond = max(starImageA, starImageB);
 		int diskCount = 0;
 		int beaconCount = 0;
-		for (int k = 0; k < 6; k++) {
+		for (int k = 0; k < 8; k++) {
 			bool surface = beaconPhi < diskPhi;
 			float phi = min(beaconPhi, diskPhi);
-			if (surface) { beaconPhi += PI; beaconCount++; }
-			else { diskPhi += PI; diskCount++; }
-			if ((surface && beaconCount > uImages) || (!surface && diskCount > uImages)) continue;
+			bool stellar = starPhi < phi;
+			if (stellar) { phi = starPhi; starPhi = starSecond; starSecond = 1e5; }
+			else if (surface) { beaconCount++; beaconPhi = beaconCount >= uImages ? 1e5 : beaconPhi + PI; }
+			else { diskCount++; diskPhi = diskCount >= uImages ? 1e5 : diskPhi + PI; }
 			if (phi >= phiEnd || through < 0.01) {
 				break;
 			}
@@ -317,12 +343,12 @@ void main() {
 			vec3 hit = r * (cos(phi) * e1 + sin(phi) * e2);
 			float delay = travelTime(row, phi);
 			vec4 emission;
-			if (surface) {
+			if (surface || stellar) {
 				vec3 radial = normalize(hit);
 				vec3 tangent = -sin(phi) * e1 + cos(phi) * e2;
 				float slope = (inverseRadius(row, phi + 0.002) - inverseRadius(row, max(0.0, phi - 0.002))) / 0.004;
 				vec3 photonCovector = b * slope / (1.0 - u) * radial - b * u * tangent;
-				emission = beacon(hit, uTime - delay + D, photonCovector, sign(tangent.z));
+				emission = stellar ? photosphere(hit, uTime - delay + D, photonCovector) : beacon(hit, uTime - delay + D, photonCovector, sign(dot(tangent, CONTACT_NORMAL)));
 			} else {
 				if (r < DISK_IN || r > DISK_OUT) continue;
 				emission = disk(r, atan(hit.z, hit.x), -b * normal.y, delay);
@@ -371,6 +397,8 @@ uniform sampler2D uScene;
 uniform sampler2D uGlow0;
 uniform sampler2D uGlow1;
 uniform sampler2D uGlow2;
+uniform sampler2D uGlow3;
+uniform sampler2D uGlow4;
 uniform float uExposure;
 in vec2 vUv;
 out vec4 outColor;
@@ -385,8 +413,8 @@ vec3 encode(vec3 linear) {
 
 void main() {
 	vec4 scene = texture(uScene, vUv);
-	vec3 glow = texture(uGlow0, vUv).rgb * 0.5 + texture(uGlow1, vUv).rgb * 0.3 + texture(uGlow2, vUv).rgb * 0.2;
-	vec3 light = mix(scene.rgb, glow, 0.14) * uExposure;
+	vec3 glow = texture(uGlow0, vUv).rgb * 0.18 + texture(uGlow1, vUv).rgb * 0.2 + texture(uGlow2, vUv).rgb * 0.22 + texture(uGlow3, vUv).rgb * 0.22 + texture(uGlow4, vUv).rgb * 0.18;
+	vec3 light = mix(scene.rgb, glow, 0.24) * uExposure;
 	vec3 colour = encode(aces(light));
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);
@@ -458,7 +486,8 @@ function dataTexture(
   gl: WebGL2RenderingContext,
   width: number,
   height: number,
-  data: Float32Array
+  data: Float32Array,
+  rgba = false
 ): WebGLTexture {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -466,11 +495,11 @@ function dataTexture(
   gl.texImage2D(
     gl.TEXTURE_2D,
     0,
-    gl.R32F,
+    rgba ? gl.RGBA32F : gl.R32F,
     width,
     height,
     0,
-    gl.RED,
+    rgba ? gl.RGBA : gl.RED,
     gl.FLOAT,
     data
   );
@@ -510,6 +539,8 @@ export function createHoleRenderer(
       "uParticles",
       "uTimes",
       "uContacts",
+      "uOrbit",
+      "uOrbitClock",
       "uSelected",
       "uImages",
       "uCenter",
@@ -530,6 +561,8 @@ export function createHoleRenderer(
       "uGlow0",
       "uGlow1",
       "uGlow2",
+      "uGlow3",
+      "uGlow4",
       "uExposure",
     ]);
     particleProgram = compile(gl, PARTICLE_FRAGMENT, [], PARTICLE_VERTEX);
@@ -544,6 +577,8 @@ export function createHoleRenderer(
   const tableTexture = dataTexture(gl, table.phiCount, table.rows, table.u);
   const endsTexture = dataTexture(gl, table.rows, 1, table.ends);
   const timesTexture = dataTexture(gl, table.phiCount, table.rows, table.times);
+  const orbit = createStellarOrbit();
+  const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
   const contactsTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, contactsTexture);
   gl.texImage2D(
@@ -637,6 +672,7 @@ export function createHoleRenderer(
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
+      gl.deleteTexture(orbitTexture);
       gl.deleteTexture(contactsTexture);
       particles.dispose();
       gpu.dispose();
@@ -664,6 +700,7 @@ export function createHoleRenderer(
       texture(1, endsTexture);
       texture(2, particles.texture);
       texture(4, timesTexture);
+      texture(6, orbitTexture);
       if (contactsTexture) {
         texture(5, contactsTexture);
       }
@@ -672,6 +709,14 @@ export function createHoleRenderer(
       gl.uniform1i(at("uParticles"), 2);
       gl.uniform1i(at("uTimes"), 4);
       gl.uniform1i(at("uContacts"), 5);
+      gl.uniform1i(at("uOrbit"), 6);
+      gl.uniform4f(
+        at("uOrbitClock"),
+        orbit.period,
+        orbit.advance,
+        orbit.offset,
+        orbit.orientation
+      );
       gl.uniform1i(at("uSelected"), selected);
       gl.uniform1i(at("uImages"), HOLE_QUALITY[quality].images);
       gl.uniform2f(at("uCenter"), view.x * width, (1 - view.y) * height);
@@ -712,7 +757,7 @@ export function createHoleRenderer(
 
       const finish = bind(compose);
       texture(0, sceneTarget.texture);
-      for (let level = 0; level < 3; level += 1) {
+      for (let level = 0; level < 5; level += 1) {
         const down = glow[Math.min(level, glow.length - 1)]?.[0];
         if (down) {
           texture(level + 1, down.texture);
@@ -722,7 +767,9 @@ export function createHoleRenderer(
       gl.uniform1i(finish("uGlow0"), 1);
       gl.uniform1i(finish("uGlow1"), 2);
       gl.uniform1i(finish("uGlow2"), 3);
-      gl.uniform1f(finish("uExposure"), 0.95);
+      gl.uniform1i(finish("uGlow3"), 4);
+      gl.uniform1i(finish("uGlow4"), 5);
+      gl.uniform1f(finish("uExposure"), 1.65);
       pass(null);
       gpu.end();
     },
