@@ -21,42 +21,25 @@
     <title>Balkhaev</title>
   </head>
   <body>
-    <div aria-hidden="true" class="sky" data-gravity-sky>
-      <svg
-        aria-hidden="true"
-        focusable="false"
-        preserveAspectRatio="xMidYMid slice"
-        viewBox="0 0 1440 1000"
-      >
-        <g id="montage-stars"></g>
-      </svg>
-    </div>
     <main aria-label="Balkhaev">
-      <div class="orbit">
-        <div class="scene" data-gravity-source>
-          <div aria-hidden="true" class="fallback"></div>
-          <canvas aria-hidden="true" id="hole"></canvas>
-          <button
-            aria-label="Переместить чёрную дыру. Тяните диск или используйте стрелки. Home — вернуть на место."
-            id="grab"
-            title="Потяните диск · стрелки — двигать · Home — вернуть"
-            type="button"
-          ></button>
-        </div>
-      </div>
+      <div aria-hidden="true" class="fallback"></div>
+      <canvas aria-hidden="true" id="hole"></canvas>
+      <button
+        aria-label="Осмотреть сцену. Потяните или используйте стрелки для смены ракурса. Колесо, жест двумя пальцами или плюс и минус — масштаб. Home — исходный вид. Tab — контакты."
+        id="observer"
+        type="button"
+      ></button>
       <nav aria-label="Связаться" class="contacts">
         <a
           href="https://t.me/balkhaev"
           rel="noopener noreferrer"
           target="_blank"
-          >@balkhaev<span aria-hidden="true">↗</span></a
+          >@balkhaev</a
         >
-        <a href="mailto:m.balkhaev@gmail.com"
-          >m.balkhaev@gmail.com<span aria-hidden="true">↗</span></a
-        >
+        <a href="mailto:m.balkhaev@gmail.com">m.balkhaev@gmail.com</a>
       </nav>
+      <p aria-hidden="true" id="hint">Потяните, чтобы осмотреться</p>
     </main>
-    <div aria-hidden="true" class="disk-glow" data-disk-glow></div>
     <script src="/app.js" type="module"></script>
   </body>
 </html>

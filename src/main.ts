@@ -1,77 +1,97 @@
-import { createHoleDrag } from "./lib/black-hole-drag";
 import {
   createHoleRenderer,
   type HoleRenderer,
   type HoleView,
 } from "./lib/black-hole-gl";
-import { createHoleInteraction } from "./lib/black-hole-interaction";
 import { createHoleQuality, HOLE_QUALITY } from "./lib/black-hole-quality";
+import {
+  CLOCK_RATE,
+  cameraOf,
+  contactPosition,
+  fittedSize,
+  focalLength,
+  OBSERVER_RADIUS,
+} from "./lib/scene-geometry";
 
-const VIEW: HoleView = {
-  inclination: 84,
-  roll: 0,
-  size: 0.2,
-  spin: -1,
-  stars: 0,
-  x: 0.5,
-  y: 0.5,
-};
-const SVG_NS = "http://www.w3.org/2000/svg";
-const STAR_COLORS = ["#e8efff", "#fff1d9", "#ffffff"] as const;
+const canvas = document.querySelector<HTMLCanvasElement>("#hole");
+const control = document.querySelector<HTMLButtonElement>("#observer");
+const links = Array.from(
+  document.querySelectorAll<HTMLAnchorElement>(".contacts a")
+);
+const hint = document.querySelector<HTMLElement>("#hint");
 
-function fillSky() {
-  const group = document.getElementById("montage-stars");
-  if (!group) {
-    return;
-  }
-  const fragment = document.createDocumentFragment();
-  for (let id = 0; id < 360; id += 1) {
-    const random = (salt: number) => {
-      const value = Math.sin(id * 127.1 + salt * 311.7) * 43_758.5453;
-      return value - Math.floor(value);
-    };
-    const star = document.createElementNS(SVG_NS, "circle");
-    star.setAttribute("cx", String(random(1) * 1440));
-    star.setAttribute("cy", String(random(2) * 1000));
-    star.setAttribute("r", String(0.35 + random(4) ** 4 * 0.85));
-    star.setAttribute("opacity", String(0.16 + random(3) ** 3 * 0.55));
-    star.setAttribute("fill", STAR_COLORS[id % STAR_COLORS.length] ?? "#fff");
-    fragment.append(star);
-  }
-  group.append(fragment);
-}
-
-function animateHole(
-  canvas: HTMLCanvasElement,
-  renderer: HoleRenderer,
-  glow: HTMLDivElement
-) {
+function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
-  const interaction = createHoleInteraction(
-    canvas,
-    document.body,
-    still,
-    () => glow,
-    () => VIEW
-  );
+  const view: HoleView = {
+    azimuth: 0,
+    inclination: 78,
+    roll: 0,
+    size: 0.06,
+    spin: -1,
+    stars: 0.55,
+    x: 0.5,
+    y: 0.45,
+  };
   const quality = createHoleQuality();
-  renderer.quality(quality.level);
+  let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
-  let time = 1200;
+  let time = 0;
+  let zoom = 1;
+  let selected = -1;
+  let tracking = -1;
+  let pointer: { x: number; y: number } | null = null;
+  const touches = new Map<number, { x: number; y: number }>();
+  let gesture: {
+    x: number;
+    y: number;
+    distance: number;
+    dragged: boolean;
+    contact: number;
+  } | null = null;
 
-  const draw = (seconds = 0) => {
-    renderer.draw({
-      accretion: 1,
-      pointer: interaction.update(seconds, false),
-      time,
-    });
-    canvas.classList.add("ready");
-    canvas.parentElement?.classList.add("rendered");
+  const frameView = () => {
+    const { width, height } = surface.getBoundingClientRect();
+    view.size = fittedSize(view, width, height, time) * zoom;
+    view.x = 0.5;
+    view.y = 0.45;
+    if (tracking >= 0) {
+      const point = contactPosition(tracking, time);
+      const { basis, eye } = cameraOf(view);
+      const distance =
+        OBSERVER_RADIUS -
+        (point.x * eye[0] + point.y * eye[1]) / OBSERVER_RADIUS;
+      const focal = focalLength(view, width, height);
+      view.x =
+        0.5 -
+        (focal * (point.x * (basis[0] ?? 0) + point.y * (basis[1] ?? 0))) /
+          distance /
+          width;
+      view.y =
+        0.5 +
+        (focal * (point.x * (basis[3] ?? 0) + point.y * (basis[4] ?? 0))) /
+          distance /
+          height;
+    }
+    renderer?.view(view);
   };
+
+  const draw = () => {
+    if (!renderer) {
+      return;
+    }
+    frameView();
+    if (pointer && !gesture && tracking < 0) {
+      selected = renderer.hit(pointer.x, pointer.y, time);
+    }
+    input.dataset.overContact = String(selected >= 0);
+    renderer.draw({ accretion: 1, selected, time });
+    document.documentElement.classList.add("rendered");
+  };
+
   const fit = () => {
-    const box = canvas.getBoundingClientRect();
-    renderer.resize(
+    const box = surface.getBoundingClientRect();
+    renderer?.resize(
       box.width,
       box.height,
       Math.min(devicePixelRatio || 1, 2),
@@ -79,31 +99,30 @@ function animateHole(
     );
     draw();
   };
+
   const tick = (now: number) => {
     frame = requestAnimationFrame(tick);
     if (now - last < 1000 / 30 - 1) {
       return;
     }
-    const gap = last ? (now - last) / 1000 : 0;
+    const seconds = last ? (now - last) / 1000 : 0;
     last = now;
-    if (quality.sample(gap, renderer.gpuTime())) {
-      renderer.quality(quality.level);
+    time += seconds * CLOCK_RATE;
+    if (quality.sample(seconds, renderer?.gpuTime() ?? null)) {
+      renderer?.quality(quality.level);
       fit();
     }
-    const seconds = Math.min(0.1, gap);
-    time += seconds * 3.8;
-    draw(seconds);
+    draw();
   };
+
   const stop = () => {
     cancelAnimationFrame(frame);
     frame = 0;
     last = 0;
-    interaction.reset();
-    renderer.clearTrail();
   };
   const resume = () => {
     stop();
-    if (document.hidden) {
+    if (document.hidden || !renderer) {
       return;
     }
     draw();
@@ -111,66 +130,209 @@ function animateHole(
       frame = requestAnimationFrame(tick);
     }
   };
-  const observer = new ResizeObserver(fit);
-  observer.observe(canvas);
+  const mount = () => {
+    renderer = createHoleRenderer(surface, view);
+    if (!renderer) {
+      return;
+    }
+    renderer.quality(quality.level);
+    fit();
+    resume();
+  };
+  const dismissHint = () => {
+    hint?.classList.add("dismissed");
+  };
+  const reset = () => {
+    view.inclination = 78;
+    view.azimuth = 0;
+    zoom = 1;
+    tracking = -1;
+    selected = -1;
+    draw();
+  };
+  const contactAt = (event: PointerEvent) =>
+    renderer?.hit(event.clientX, event.clientY, time) ?? -1;
+
+  input.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    dismissHint();
+    input.focus({ preventScroll: true });
+    tracking = -1;
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    input.setPointerCapture(event.pointerId);
+    const points = [...touches.values()];
+    const [a, b] = points;
+    gesture = {
+      contact: contactAt(event),
+      distance: a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0,
+      dragged: points.length > 1,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    input.dataset.dragging = "true";
+  });
+  input.addEventListener("pointermove", (event) => {
+    pointer = { x: event.clientX, y: event.clientY };
+    if (gesture && touches.has(event.pointerId)) {
+      touches.set(event.pointerId, pointer);
+      const points = [...touches.values()];
+      const [a, b] = points;
+      if (a && b) {
+        const distance = Math.hypot(a.x - b.x, a.y - b.y);
+        if (gesture.distance > 0) {
+          zoom = Math.max(
+            0.55,
+            Math.min(2, (zoom * distance) / gesture.distance)
+          );
+        }
+        gesture.distance = distance;
+        gesture.dragged = true;
+      } else {
+        const dx = event.clientX - gesture.x,
+          dy = event.clientY - gesture.y;
+        if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
+          gesture.dragged = true;
+          view.azimuth = Math.max(
+            -65,
+            Math.min(65, (view.azimuth ?? 0) - dx * 0.16)
+          );
+          view.inclination = Math.max(
+            28,
+            Math.min(152, view.inclination + dy * 0.16)
+          );
+          gesture.x = event.clientX;
+          gesture.y = event.clientY;
+        }
+      }
+    }
+    if (still.matches || gesture) {
+      draw();
+    }
+  });
+  const release = (event: PointerEvent) => {
+    const click =
+      event.type === "pointerup" &&
+      gesture &&
+      !gesture.dragged &&
+      gesture.contact >= 0 &&
+      gesture.contact === contactAt(event);
+    const index = gesture?.contact ?? -1;
+    touches.delete(event.pointerId);
+    if (input.hasPointerCapture(event.pointerId)) {
+      input.releasePointerCapture(event.pointerId);
+    }
+    const [remaining] = [...touches.values()];
+    gesture = remaining
+      ? { ...remaining, contact: -1, distance: 0, dragged: true }
+      : null;
+    if (!gesture) {
+      delete input.dataset.dragging;
+    }
+    if (click) {
+      links[index]?.click();
+    }
+  };
+  input.addEventListener("pointerup", release);
+  input.addEventListener("pointercancel", release);
+  input.addEventListener("lostpointercapture", (event) => {
+    if (touches.has(event.pointerId)) {
+      release(event);
+    }
+  });
+  input.addEventListener("pointerleave", () => {
+    pointer = null;
+    if (tracking < 0) {
+      selected = -1;
+    }
+  });
+  input.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      dismissHint();
+      zoom = Math.max(
+        0.55,
+        Math.min(2, zoom * Math.exp(-event.deltaY * 0.001))
+      );
+      draw();
+    },
+    { passive: false }
+  );
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Home" || event.key === "Escape") {
+      reset();
+    } else if (event.key === "ArrowLeft") {
+      view.azimuth = Math.max(-65, (view.azimuth ?? 0) - 4);
+    } else if (event.key === "ArrowRight") {
+      view.azimuth = Math.min(65, (view.azimuth ?? 0) + 4);
+    } else if (event.key === "ArrowUp") {
+      view.inclination = Math.max(28, view.inclination - 4);
+    } else if (event.key === "ArrowDown") {
+      view.inclination = Math.min(152, view.inclination + 4);
+    } else if (event.key === "+" || event.key === "=") {
+      zoom = Math.min(2, zoom * 1.1);
+    } else if (event.key === "-") {
+      zoom = Math.max(0.55, zoom / 1.1);
+    } else {
+      return;
+    }
+    event.preventDefault();
+    dismissHint();
+    draw();
+  });
+  for (const [index, link] of links.entries()) {
+    link.addEventListener("focus", () => {
+      selected = index;
+      tracking = index;
+      pointer = null;
+      dismissHint();
+      draw();
+    });
+    link.addEventListener("blur", () => {
+      tracking = -1;
+      selected = -1;
+      draw();
+    });
+    link.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        input.focus();
+        reset();
+      }
+    });
+  }
+  const resize = new ResizeObserver(fit);
+  resize.observe(surface);
   still.addEventListener("change", resume);
   document.addEventListener("visibilitychange", resume);
-  fit();
-  resume();
-  return () => {
-    stop();
-    observer.disconnect();
-    interaction.dispose();
-    renderer.dispose();
-    still.removeEventListener("change", resume);
-    document.removeEventListener("visibilitychange", resume);
-  };
-}
-
-function start() {
-  const canvas = document.getElementById("hole");
-  const handle = document.getElementById("grab");
-  const scene = document.querySelector("[data-gravity-source]");
-  const glow = document.querySelector("[data-disk-glow]");
-  if (
-    !(
-      canvas instanceof HTMLCanvasElement &&
-      handle instanceof HTMLButtonElement &&
-      scene instanceof HTMLDivElement &&
-      glow instanceof HTMLDivElement
-    )
-  ) {
-    return;
-  }
-  fillSky();
-  const disposeDrag = createHoleDrag(scene, handle, VIEW.size);
-  let disposeRenderer: () => void = () => undefined;
-  const mount = () => {
-    const renderer = createHoleRenderer(canvas, VIEW);
-    if (renderer) {
-      disposeRenderer = animateHole(canvas, renderer, glow);
-    }
-  };
-  canvas.addEventListener("webglcontextlost", (event) => {
+  surface.addEventListener("webglcontextlost", (event) => {
     event.preventDefault();
-    disposeRenderer();
-    canvas.classList.remove("ready");
-    scene.classList.remove("rendered");
+    stop();
+    renderer?.dispose();
+    renderer = null;
+    document.documentElement.classList.remove("rendered");
   });
-  canvas.addEventListener("webglcontextrestored", mount);
-  // BFCache restores this document and its animation; only dispose when it is really leaving.
+  surface.addEventListener("webglcontextrestored", mount);
   window.addEventListener("pagehide", (event) => {
+    stop();
     if (!event.persisted) {
-      disposeRenderer();
-      disposeDrag();
+      resize.disconnect();
+      renderer?.dispose();
+      renderer = null;
     }
   });
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) {
-      document.dispatchEvent(new Event("visibilitychange"));
-    }
+  window.addEventListener("pageshow", resume);
+  window.addEventListener("blur", () => {
+    gesture = null;
+    touches.clear();
+    delete input.dataset.dragging;
+    pointer = null;
   });
+  window.setTimeout(dismissHint, 10_000);
   mount();
 }
 
-start();
+if (canvas && control) {
+  start(canvas, control);
+}

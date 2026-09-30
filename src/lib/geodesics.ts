@@ -31,6 +31,8 @@ export interface GeodesicTable {
   phiMax: number;
   /** Rows: impact parameters, dense near the photon sphere. */
   rows: number;
+  /** Coordinate light-travel time from the observer, in r_s/c. */
+  times: Float32Array;
   /** u(b, φ), row by row; 0 once a ray has escaped, 1 once it has fallen in. */
   u: Float32Array;
 }
@@ -59,12 +61,14 @@ function trace(
   count: number,
   step: number,
   out: Float32Array,
-  offset: number
+  offset: number,
+  times: Float32Array
 ): number {
   const u0 = 1 / distance;
   let u = u0;
   let v = Math.sqrt(Math.max(0, 1 / (b * b) - u0 * u0 + u0 * u0 * u0));
   const h = step / STEPS_PER_SAMPLE;
+  let time = 0;
   out[offset] = u;
   const accel = (x: number) => -x + 1.5 * x * x;
   for (let sample = 1; sample < count; sample += 1) {
@@ -77,20 +81,34 @@ function trace(
       const k3v = accel(u + 0.5 * h * k2u);
       const k4u = v + h * k3v;
       const k4v = accel(u + h * k3u);
+      const clock = (inverse: number) =>
+        1 /
+        (Math.max(b, 1e-6) *
+          Math.max(inverse, 1e-8) ** 2 *
+          Math.max(1 - inverse, 1e-5));
+      time +=
+        (h / 6) *
+        (clock(u) +
+          2 * clock(u + 0.5 * h * k1u) +
+          2 * clock(u + 0.5 * h * k2u) +
+          clock(u + h * k3u));
       const next = u + (h / 6) * (k1u + 2 * k2u + 2 * k3u + k4u);
       v += (h / 6) * (k1v + 2 * k2v + 2 * k3v + k4v);
       const phi = (sample - 1) * step + (sub + 1) * h;
       if (next >= 1) {
         out.fill(1, offset + sample, offset + count);
+        times.fill(time, offset + sample, offset + count);
         return -(phi - (h * (next - 1)) / (next - u));
       }
       if (next <= 0) {
         out.fill(0, offset + sample, offset + count);
+        times.fill(time, offset + sample, offset + count);
         return phi - (h * -next) / (u - next);
       }
       u = next;
     }
     out[offset + sample] = u;
+    times[offset + sample] = time;
   }
   // Still winding at the end: close enough to the photon sphere to count as falling in.
   return -count * step;
@@ -113,10 +131,11 @@ export function geodesicTable({
   const phiMax = 3.3 * Math.PI;
   const step = phiMax / (phiCount - 1);
   const u = new Float32Array(rows * phiCount);
+  const times = new Float32Array(rows * phiCount);
   const ends = new Float32Array(rows);
   for (let row = 0; row < rows; row += 1) {
     const b = Math.max(rowImpact(row, rows, below, bMax), 1e-4);
-    ends[row] = trace(b, distance, phiCount, step, u, row * phiCount);
+    ends[row] = trace(b, distance, phiCount, step, u, row * phiCount, times);
   }
-  return { below, bMax, distance, ends, phiCount, phiMax, rows, u };
+  return { below, bMax, distance, ends, phiCount, phiMax, rows, times, u };
 }

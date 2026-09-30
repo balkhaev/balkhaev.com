@@ -8,7 +8,6 @@ export const HOLE_QUALITY = {
     detail: 0.55,
     images: 3,
     particles: 12_000,
-    trails: 9,
   },
   high: {
     atlasHeight: 256,
@@ -17,7 +16,6 @@ export const HOLE_QUALITY = {
     detail: 1,
     images: 3,
     particles: 28_000,
-    trails: 12,
   },
   low: {
     atlasHeight: 128,
@@ -26,7 +24,6 @@ export const HOLE_QUALITY = {
     detail: 0.25,
     images: 2,
     particles: 4500,
-    trails: 6,
   },
 } as const;
 
