@@ -1,8 +1,10 @@
 import type { GravitySource } from "./gravity-infall";
 
 const TAU = Math.PI * 2;
-const ECCENTRICITY = 0.22;
-const CAPTURE_SECONDS = 7;
+const ECCENTRICITY = 0.12;
+const INCLINATION = (84 * Math.PI) / 180;
+const SHADOW_RADII = 2.598_076_211;
+const OBSERVER_DISTANCE = 60;
 
 /** Kepler's equation: equal areas in equal times, so the close pass is faster. */
 export function orbitalState(meanAnomaly: number, eccentricity = ECCENTRICITY) {
@@ -24,70 +26,38 @@ export function orbitalState(meanAnomaly: number, eccentricity = ECCENTRICITY) {
   };
 }
 
-/** A capture arc joins the orbit with matching tangent velocity, without a reset or fade. */
-export function captureOrbit(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  velocity: { x: number; y: number },
-  elapsed: number
-) {
-  const t = Math.max(0, Math.min(1, elapsed / CAPTURE_SECONDS));
-  const blend = t * t * (3 - 2 * t);
-  const tangent = (t * t * t - t * t) * CAPTURE_SECONDS;
+/** Same camera and orbital clock as the gas. A thin-lens primary image lifts the far-side pass over the shadow. */
+export function projectOrbit(phase: number, radius: number, index: number) {
+  const orbit = orbitalState(phase);
+  const major = radius * (3.25 + index * 0.9);
+  const schwarzschild = radius / SHADOW_RADII;
+  const distance = schwarzschild * OBSERVER_DISTANCE;
+  const z = orbit.y * major;
+  const perspective = distance / (distance + z * Math.sin(INCLINATION));
+  const x = -orbit.x * major * perspective;
+  const y = -z * Math.cos(INCLINATION) * perspective;
+  const beta = Math.max(0.001, Math.hypot(x, y));
+  const einsteinSquared = 2 * schwarzschild * Math.max(0, z) * perspective;
+  const imageRadius = (beta + Math.sqrt(beta * beta + 4 * einsteinSquared)) / 2;
+  const magnification = imageRadius / beta;
   return {
-    x: start.x + (end.x - start.x) * blend + velocity.x * tangent,
-    y: start.y + (end.y - start.y) * blend + velocity.y * tangent,
+    back: Math.max(0, orbit.depth),
+    scale: perspective,
+    x: x * magnification,
+    y: y * magnification,
   };
 }
 
-function orbitGeometry(source: GravitySource, index: number, width: number) {
-  const portrait = innerWidth < 600;
-  const horizontal = Math.max(28, (innerWidth - width - 44) / 2);
-  const vertical = Math.max(
-    60,
-    Math.min(source.y - 70, innerHeight - source.y - 70)
-  );
-  const outer = 1 + ECCENTRICITY;
-  const major = portrait
-    ? Math.min(source.radius * (3.0 + index * 0.45), vertical / outer)
-    : Math.min(source.radius * (3.1 + index * 0.55), horizontal / outer);
-  const minor = portrait
-    ? Math.min(major * 0.38, horizontal / outer)
-    : Math.min(major * 0.48, vertical / outer);
-  return { major, minor, portrait };
-}
-
-interface OrbitTrack {
-  elapsed: number;
-  index: number;
-  phase: number;
-  speed: number;
-  start: { x: number; y: number };
-}
-
-function orbitPose(track: OrbitTrack, source: GravitySource, width: number) {
-  const { major, minor, portrait } = orbitGeometry(source, track.index, width);
-  const elapsed = Math.max(0, track.elapsed - CAPTURE_SECONDS);
-  const orbit = orbitalState(track.phase + elapsed * track.speed);
-  const project = (x: number, y: number) =>
-    portrait ? { x: -y * minor, y: x * major } : { x: x * major, y: y * minor };
-  const offset = project(orbit.x, orbit.y);
-  const end = { x: source.x + offset.x, y: source.y + offset.y };
-  const velocity = project(orbit.vx * track.speed, orbit.vy * track.speed);
-  const desired =
-    track.elapsed < CAPTURE_SECONDS
-      ? captureOrbit(track.start, end, velocity, track.elapsed)
-      : end;
-  const captured = Math.min(1, track.elapsed / CAPTURE_SECONDS);
-  return {
-    ...desired,
-    scale: 1 + orbit.depth * 0.08 * captured,
-    zIndex: orbit.depth >= 0 || captured < 1 ? "2" : "0",
-  };
+export function orbitSpeed(index: number) {
+  const radius = (3.25 + index * 0.9) * SHADOW_RADII;
+  return Math.sqrt(0.5 / radius ** 3) * 3.8;
 }
 
 /** Moves the existing anchors, including their hit boxes. No text copies or extra links. */
 export function createElementOrbits() {
+  const conjunction =
+    Math.acos(ECCENTRICITY) - ECCENTRICITY * Math.sqrt(1 - ECCENTRICITY ** 2);
+  const phases = innerWidth < 600 ? [-conjunction, conjunction] : [-2.35, -0.5];
   const targets = Array.from(
     document.querySelectorAll<HTMLAnchorElement>(".contacts a")
   );
@@ -99,14 +69,13 @@ export function createElementOrbits() {
     };
     element.dataset.gravityOrbit = "";
     return {
-      elapsed: 0,
       element,
       index,
+      initialized: false,
       original,
-      phase: innerWidth < 600 ? index * 0.55 : Math.PI / 2 + index * 1.2,
+      phase: phases[index] ?? -2.35,
       scale: 1,
-      speed: TAU / (26 + index * 9),
-      start: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+      speed: orbitSpeed(index),
       x: box.left + box.width / 2,
       y: box.top + box.height / 2,
     };
@@ -128,6 +97,7 @@ export function createElementOrbits() {
         element.style.transform = original.transform;
         element.style.zIndex = original.zIndex;
         delete element.dataset.gravityOrbit;
+        delete element.dataset.gravityDepth;
       }
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", move);
@@ -153,25 +123,27 @@ export function createElementOrbits() {
         const { element } = body;
         const focused = element.contains(document.activeElement);
         const nearby =
-          Math.abs(pointer.x - body.x) < layout.width / 2 + 42 &&
-          Math.abs(pointer.y - body.y) < layout.height / 2 + 42;
-        if (!(nearby || focused)) {
-          body.elapsed += seconds;
-          const desired = orbitPose(body, source, layout.width);
-          // Ease viewport changes and a dragged gravity source without teleporting the links.
-          const ease = 1 - Math.exp(-seconds * 9);
-          body.x += (desired.x - body.x) * ease;
-          body.y += (desired.y - body.y) * ease;
+          Math.abs(pointer.x - body.x) < layout.width / 2 + 24 &&
+          Math.abs(pointer.y - body.y) < layout.height / 2 + 20;
+        if (!((nearby || focused) && body.initialized)) {
+          body.phase += seconds * body.speed;
+          const desired = projectOrbit(body.phase, source.radius, body.index);
+          // Only camera/source motion is smoothed. Never clip a free orbit against viewport edges.
+          const ease = body.initialized ? 1 - Math.exp(-seconds * 6) : 1;
+          body.x += (source.x + desired.x - body.x) * ease;
+          body.y += (source.y + desired.y - body.y) * ease;
           body.scale = desired.scale;
-          element.style.zIndex = desired.zIndex;
+          element.style.zIndex = desired.back > 0 ? "0" : "2";
+          element.dataset.gravityDepth = String(desired.back);
+          body.initialized = true;
         }
-        if (focused || nearby) {
+        if (focused) {
           element.style.zIndex = "3";
+          const edgeX = (layout.width * body.scale) / 2 + 24;
+          const edgeY = (layout.height * body.scale) / 2 + 24;
+          body.x = Math.max(edgeX, Math.min(innerWidth - edgeX, body.x));
+          body.y = Math.max(edgeY, Math.min(innerHeight - edgeY, body.y));
         }
-        const edgeX = (layout.width * body.scale) / 2 + 24;
-        const edgeY = (layout.height * body.scale) / 2 + 24;
-        body.x = Math.max(edgeX, Math.min(innerWidth - edgeX, body.x));
-        body.y = Math.max(edgeY, Math.min(innerHeight - edgeY, body.y));
         element.style.transform = `translate(${body.x - layout.x}px, ${body.y - layout.y}px) scale(${body.scale})`;
         return new DOMRect(
           body.x - layout.width / 2,

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { captureOrbit, orbitalState } from "./gravity-orbits";
+import { orbitalState, orbitSpeed, projectOrbit } from "./gravity-orbits";
 
 test("bound orbits conserve area rate and accelerate at periapsis", () => {
   const eccentricity = 0.22;
@@ -25,13 +25,23 @@ test("an orbit closes continuously instead of fading or resetting position", () 
   expect(orbitalState(0)).toEqual(orbitalState(Math.PI * 2 * 20));
 });
 
-test("capture starts at the original element and joins with the orbit's velocity", () => {
-  const start = { x: 400, y: 900 };
-  const end = { x: 600, y: 550 };
-  const velocity = { x: -40, y: 12 };
-  expect(captureOrbit(start, end, velocity, 0)).toEqual(start);
-  expect(captureOrbit(start, end, velocity, 7)).toEqual(end);
-  const before = captureOrbit(start, end, velocity, 7 - 0.000_01);
-  expect((end.x - before.x) / 0.000_01).toBeCloseTo(velocity.x, 2);
-  expect((end.y - before.y) / 0.000_01).toBeCloseTo(velocity.y, 2);
+test("the far-side image is lifted over the shadow while the near side stays in the disk plane", () => {
+  const eccentric = Math.acos(0.12);
+  const phase = eccentric - 0.12 * Math.sin(eccentric);
+  const back = projectOrbit(phase, 100, 0);
+  const front = projectOrbit(-phase, 100, 0);
+  expect(back.y).toBeLessThan(-100);
+  expect(front.y).toBeGreaterThan(0);
+  expect(front.y).toBeLessThan(50);
+  expect(front.scale).toBeGreaterThan(1);
+  expect(back.scale).toBeLessThan(1);
+  expect(orbitSpeed(0) / orbitSpeed(1)).toBeCloseTo((4.15 / 3.25) ** 1.5, 8);
+});
+
+test("projection remains continuous through both disk crossings and the orbital seam", () => {
+  for (let phase = -Math.PI; phase < Math.PI; phase += 0.01) {
+    const a = projectOrbit(phase, 124, 0);
+    const b = projectOrbit(phase + 0.0001, 124, 0);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeLessThan(0.5);
+  }
 });

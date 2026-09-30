@@ -91,11 +91,10 @@ export function createGravityLens(
       in: "field",
       result: "centered",
     });
-    for (const channel of ["feFuncR", "feFuncG"] as const) {
-      neutral.append(
-        svgElement(channel, { intercept: -0.5 / 255, slope: 1, type: "linear" })
-      );
-    }
+    const channels = (["feFuncR", "feFuncG"] as const).map((channel) =>
+      svgElement(channel, { intercept: -0.5 / 255, slope: 1, type: "linear" })
+    );
+    neutral.append(...channels);
     const bend = svgElement("feDisplacementMap", {
       in: "SourceGraphic",
       in2: "centered",
@@ -108,21 +107,24 @@ export function createGravityLens(
     const original = element.style.filter;
     const computed = getComputedStyle(element).filter;
     const applied = `${computed === "none" ? "" : `${computed} `}url("#${id}")`;
-    return { applied, element, image, original };
+    return { applied, bend, channels, element, image, original };
   });
   document.body.append(definitions);
   let ready = false;
   let pending = false;
   let disposed = false;
+  let source: GravitySource | null = null;
   // Decode first so swapping an feImage never briefly blanks its SourceGraphic while the new PNG loads.
   const decoded = new Image();
-  decoded.onload = () => {
-    pending = false;
-    if (disposed) {
+  const align = () => {
+    if (!ready || disposed) {
       return;
     }
     const boxes = filters.map(({ element }) => element.getBoundingClientRect());
-    for (const [index, { element, image, applied }] of filters.entries()) {
+    for (const [
+      index,
+      { element, image, bend, channels },
+    ] of filters.entries()) {
       const box = boxes[index];
       if (!box) {
         continue;
@@ -133,12 +135,42 @@ export function createGravityLens(
       image.setAttribute("y", String(-box.top / scaleY));
       image.setAttribute("width", String(width / scaleX));
       image.setAttribute("height", String(height / scaleY));
+      if (element.hasAttribute("data-gravity-orbit") && source) {
+        // Orbital centroids are already projected through the lens. Bend their letters
+        // relative to that centroid instead of displacing the entire link a second time.
+        const center = lensingField(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+          source
+        );
+        channels[0]?.setAttribute(
+          "intercept",
+          String(-0.5 / 255 - center.x / (2 * displacement))
+        );
+        channels[1]?.setAttribute(
+          "intercept",
+          String(-0.5 / 255 - center.y / (2 * displacement))
+        );
+        bend.setAttribute(
+          "scale",
+          String(displacement * 2 * Number(element.dataset.gravityDepth ?? 0))
+        );
+      }
+    }
+  };
+  decoded.onload = () => {
+    pending = false;
+    if (disposed) {
+      return;
+    }
+    for (const { element, image, applied } of filters) {
       image.setAttribute("href", decoded.src);
       if (!ready) {
         element.style.filter = applied;
       }
     }
     ready = true;
+    align();
   };
   decoded.onerror = () => {
     pending = false;
@@ -153,12 +185,20 @@ export function createGravityLens(
       }
       definitions.remove();
     },
-    update(texture: string) {
+    update(nextSource: GravitySource, texture?: string) {
+      source = nextSource;
+      align();
+      if (!texture) {
+        return true;
+      }
       if (pending || disposed) {
-        return;
+        return false;
       }
       pending = true;
       decoded.src = texture;
+      return true;
     },
   };
 }
+
+import { type GravitySource, lensingField } from "./gravity-infall";

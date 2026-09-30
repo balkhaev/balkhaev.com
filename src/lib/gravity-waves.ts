@@ -1,4 +1,4 @@
-import { type GravitySource, infallField } from "./gravity-infall";
+import { type GravitySource, lensingField } from "./gravity-infall";
 import { createGravityLens } from "./gravity-lens";
 import { createElementOrbits } from "./gravity-orbits";
 
@@ -13,7 +13,17 @@ const WAVE_SPEED = 460;
 const WAVE_WIDTH = 56;
 const WAVE_LIFETIME_MS = 2800;
 const MAX_WAVES = 8;
-const MAX_DISPLACEMENT = 48;
+const MAX_DISPLACEMENT = 160;
+
+function sourceShift(source: GravitySource, previous: GravitySource | null) {
+  return previous
+    ? Math.hypot(
+        source.x - previous.x,
+        source.y - previous.y,
+        source.radius - previous.radius
+      )
+    : Number.POSITIVE_INFINITY;
+}
 
 /** A screen-space vector field: neighbouring pixels are bent by different amounts at a wavefront. */
 function drawDisplacement(
@@ -23,22 +33,8 @@ function drawDisplacement(
   now: number,
   stepX: number,
   stepY: number,
-  source: GravitySource,
-  time: number,
-  anchors: DOMRect[]
+  source: GravitySource
 ) {
-  const tides = anchors.map((anchor) => {
-    const x = anchor.left + anchor.width / 2;
-    const y = anchor.top + anchor.height / 2;
-    const angle = Math.atan2(y - source.y, x - source.x);
-    return {
-      span: anchor.width / 2 + 60,
-      ux: Math.cos(angle),
-      uy: Math.sin(angle),
-      x,
-      y,
-    };
-  });
   const fronts = waves.map((wave) => {
     const age = (now - wave.birth) / 1000;
     // Smoothly reach zero before retirement, including a wave still inside a very large viewport.
@@ -54,23 +50,9 @@ function drawDisplacement(
     const y = (row + 0.5) * stepY;
     for (let column = 0; column < pixels.width; column += 1) {
       const x = (column + 0.5) * stepX;
-      const field = infallField(x, y, source, time);
+      const field = lensingField(x, y, source);
       let dx = field.x / MAX_DISPLACEMENT;
       let dy = field.y / MAX_DISPLACEMENT;
-      // Local tidal gradients visibly bend the letters and their surrounding stars together.
-      for (const anchor of tides) {
-        const vx = x - anchor.x;
-        const vy = y - anchor.y;
-        const { span, ux, uy } = anchor;
-        if (Math.abs(vx) > span * 1.5 || Math.abs(vy) > 80) {
-          continue;
-        }
-        const along = vx * ux + vy * uy;
-        const envelope = Math.exp(-((vx / span) ** 2 + (vy / 45) ** 2));
-        const tide = Math.sin(along / 28 + time * 1.8) * envelope * 6;
-        dx += (ux * tide) / MAX_DISPLACEMENT;
-        dy += (uy * tide) / MAX_DISPLACEMENT;
-      }
       for (const wave of fronts) {
         const vx = x - wave.x;
         const vy = y - wave.y;
@@ -81,8 +63,8 @@ function drawDisplacement(
         }
         const deflection =
           Math.sin(phase * Math.PI) * Math.exp(-phase * phase) * wave.amplitude;
-        dx += (vx / distance) * deflection * (20 / MAX_DISPLACEMENT);
-        dy += (vy / distance) * deflection * (20 / MAX_DISPLACEMENT);
+        dx += (vx / distance) * deflection * (7 / MAX_DISPLACEMENT);
+        dy += (vy / distance) * deflection * (7 / MAX_DISPLACEMENT);
       }
       pixels.data[index] = 128 + Math.max(-1, Math.min(1, dx)) * 127;
       pixels.data[index + 1] = 128 + Math.max(-1, Math.min(1, dy)) * 127;
@@ -94,7 +76,7 @@ function drawDisplacement(
   context.putImageData(pixels, 0, 0);
 }
 
-/** Continuous infall and transient drag waves share one field, so filters never overwrite each other. */
+/** The lens stays fixed until its mass moves; only an explicit drag produces a short ripple. */
 export function createGravityWaves(
   reducedMotion: MediaQueryList,
   scene: HTMLElement,
@@ -111,7 +93,9 @@ export function createGravityWaves(
   let lastOrbit = 0;
   let width = 0;
   let height = 0;
-  let time = 0;
+  let previousSource: GravitySource | null = null;
+  let hadWaves = false;
+  let dirty = true;
   let detail = "";
   const canvas = scene.querySelector("canvas");
 
@@ -131,15 +115,16 @@ export function createGravityWaves(
       orbits = null;
     }
     pixels = null;
+    previousSource = null;
     detail = "";
   };
   const fit = (next: string) => {
     width = innerWidth;
     height = innerHeight;
     const edges: Record<string, number> = {
-      balanced: 200,
-      high: 240,
-      low: 144,
+      balanced: 320,
+      high: 400,
+      low: 200,
     };
     const ratio = (edges[next] ?? 200) / Math.max(width, height);
     map.width = Math.max(1, Math.round(width * ratio));
@@ -147,7 +132,33 @@ export function createGravityWaves(
     pixels = context?.createImageData(map.width, map.height) ?? null;
     lens?.dispose();
     lens = createGravityLens(width, height, MAX_DISPLACEMENT);
+    previousSource = null;
     detail = next;
+  };
+  const renderLens = (now: number, source: GravitySource) => {
+    if (!(pixels && context)) {
+      return;
+    }
+    waves = waves.filter((wave) => now - wave.birth < WAVE_LIFETIME_MS);
+    const moved = sourceShift(source, previousSource) > 0.15;
+    if (moved || waves.length > 0 || hadWaves || dirty) {
+      drawDisplacement(
+        context,
+        pixels,
+        waves,
+        now,
+        width / map.width,
+        height / map.height,
+        source
+      );
+      dirty = !lens?.update(source, map.toDataURL());
+      if (!dirty) {
+        previousSource = source;
+      }
+    } else {
+      lens?.update(source);
+    }
+    hadWaves = waves.length > 0;
   };
   const tick = (now: number) => {
     if (reducedMotion.matches || document.hidden) {
@@ -166,34 +177,17 @@ export function createGravityWaves(
       x: box.left + box.width / 2,
       y: box.top + box.height / 2,
     };
-    const anchors = orbits?.update(source, orbitSeconds) ?? [];
+    orbits?.update(source, orbitSeconds);
     const next = canvas?.dataset.holeQuality ?? "balanced";
     const interval = next === "high" ? 1000 / 30 : 1000 / 20;
     if (now - last < interval - 1 || !context) {
       return;
     }
-    const elapsed = last ? Math.min(0.1, (now - last) / 1000) : 0;
-    time += elapsed;
     last = now;
     if (next !== detail) {
       fit(next);
     }
-    if (!pixels) {
-      return;
-    }
-    waves = waves.filter((wave) => now - wave.birth < WAVE_LIFETIME_MS);
-    drawDisplacement(
-      context,
-      pixels,
-      waves,
-      now,
-      width / map.width,
-      height / map.height,
-      source,
-      time,
-      anchors
-    );
-    lens?.update(map.toDataURL());
+    renderLens(now, source);
   };
   const wake = () => {
     if (frame || reducedMotion.matches || document.hidden || !context) {

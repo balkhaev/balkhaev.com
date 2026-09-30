@@ -114,6 +114,10 @@ main {
   transition: color 0.2s ease;
 }
 .contacts a[data-gravity-orbit] {
+  color: #d8d1c4;
+  text-shadow:
+    0 1px 5px #000,
+    0 0 2px #000;
   will-change: transform;
 }
 .contacts a:hover {
