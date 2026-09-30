@@ -37,9 +37,27 @@ main {
 .orbit {
   position: absolute;
   top: 44svh;
+  z-index: 1;
   width: 100%;
   height: clamp(300px, 62svh, 660px);
   transform: translateY(-50%);
+}
+.infall-images {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.infall-copy {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  color: #d9b690;
+  white-space: pre;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
 }
 .scene {
   position: absolute;

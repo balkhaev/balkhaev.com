@@ -18,7 +18,7 @@ function measureTargets() {
   for (const element of document.querySelectorAll<HTMLElement>(TARGETS)) {
     if (
       element.closest(
-        "[data-gravity-source], [data-nextjs-dialog], [role=dialog]"
+        "[data-gravity-source], [data-gravity-infall], [data-nextjs-dialog], [role=dialog]"
       ) ||
       element.parentElement?.closest(TARGETS)
     ) {
@@ -64,6 +64,10 @@ export function createGravityLens(
       box: starSurface.getBoundingClientRect(),
       element: starSurface,
     });
+  }
+  const infall = document.querySelector<HTMLElement>("[data-gravity-infall]");
+  if (infall) {
+    targets.push({ box: infall.getBoundingClientRect(), element: infall });
   }
   const filters = targets.map(({ element, box }, index) => {
     const id = `${prefix}-${index}`;
@@ -112,21 +116,49 @@ export function createGravityLens(
   });
   document.body.append(definitions);
   let ready = false;
+  let pending = false;
+  let disposed = false;
+  // Decode first so swapping an feImage never briefly blanks its SourceGraphic while the new PNG loads.
+  const decoded = new Image();
+  decoded.onload = () => {
+    pending = false;
+    if (disposed) {
+      return;
+    }
+    const boxes = filters.map(({ element }) => element.getBoundingClientRect());
+    for (const [index, { element, image, applied }] of filters.entries()) {
+      const box = boxes[index];
+      if (!box) {
+        continue;
+      }
+      image.setAttribute("x", String(-box.left));
+      image.setAttribute("y", String(-box.top));
+      image.setAttribute("href", decoded.src);
+      if (!ready) {
+        element.style.filter = applied;
+      }
+    }
+    ready = true;
+  };
+  decoded.onerror = () => {
+    pending = false;
+  };
   return {
     dispose() {
+      disposed = true;
+      decoded.onload = null;
+      decoded.onerror = null;
       for (const { element, original } of filters) {
         element.style.filter = original;
       }
       definitions.remove();
     },
     update(texture: string) {
-      for (const { element, image, applied } of filters) {
-        image.setAttribute("href", texture);
-        if (!ready) {
-          element.style.filter = applied;
-        }
+      if (pending || disposed) {
+        return;
       }
-      ready = true;
+      pending = true;
+      decoded.src = texture;
     },
   };
 }

@@ -20,7 +20,7 @@ export function createHoleDrag(
   size: number
 ) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const waves = createGravityWaves(reducedMotion);
+  const waves = createGravityWaves(reducedMotion, scene, size);
   const attraction = createGravityPull(scene, handle, reducedMotion);
   let offsetX = 0;
   let offsetY = 0;

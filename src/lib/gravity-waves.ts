@@ -1,3 +1,8 @@
+import {
+  createInfallImages,
+  type GravitySource,
+  infallField,
+} from "./gravity-infall";
 import { createGravityLens } from "./gravity-lens";
 
 interface Wave {
@@ -10,10 +15,8 @@ interface Wave {
 const WAVE_SPEED = 460;
 const WAVE_WIDTH = 56;
 const WAVE_LIFETIME_MS = 2800;
-const MAX_WAVES = 16;
-const FRAME_MS = 1000 / 30;
-const MAP_LONG_EDGE = 280;
-const MAX_DISPLACEMENT = 20;
+const MAX_WAVES = 8;
+const MAX_DISPLACEMENT = 48;
 
 /** A screen-space vector field: neighbouring pixels are bent by different amounts at a wavefront. */
 function drawDisplacement(
@@ -22,8 +25,23 @@ function drawDisplacement(
   waves: Wave[],
   now: number,
   stepX: number,
-  stepY: number
+  stepY: number,
+  source: GravitySource,
+  time: number,
+  anchors: DOMRect[]
 ) {
+  const tides = anchors.map((anchor) => {
+    const x = anchor.left + anchor.width / 2;
+    const y = anchor.top + anchor.height / 2;
+    const angle = Math.atan2(y - source.y, x - source.x);
+    return {
+      span: anchor.width / 2 + 60,
+      ux: Math.cos(angle),
+      uy: Math.sin(angle),
+      x,
+      y,
+    };
+  });
   const fronts = waves.map((wave) => {
     const age = (now - wave.birth) / 1000;
     // Smoothly reach zero before retirement, including a wave still inside a very large viewport.
@@ -39,8 +57,23 @@ function drawDisplacement(
     const y = (row + 0.5) * stepY;
     for (let column = 0; column < pixels.width; column += 1) {
       const x = (column + 0.5) * stepX;
-      let dx = 0;
-      let dy = 0;
+      const field = infallField(x, y, source, time);
+      let dx = field.x / MAX_DISPLACEMENT;
+      let dy = field.y / MAX_DISPLACEMENT;
+      // Local tidal gradients visibly bend the letters and their surrounding stars together.
+      for (const anchor of tides) {
+        const vx = x - anchor.x;
+        const vy = y - anchor.y;
+        const { span, ux, uy } = anchor;
+        if (Math.abs(vx) > span * 1.5 || Math.abs(vy) > 80) {
+          continue;
+        }
+        const along = vx * ux + vy * uy;
+        const envelope = Math.exp(-((vx / span) ** 2 + (vy / 45) ** 2));
+        const tide = Math.sin(along / 28 + time * 1.8) * envelope * 6;
+        dx += (ux * tide) / MAX_DISPLACEMENT;
+        dy += (uy * tide) / MAX_DISPLACEMENT;
+      }
       for (const wave of fronts) {
         const vx = x - wave.x;
         const vy = y - wave.y;
@@ -51,8 +84,8 @@ function drawDisplacement(
         }
         const deflection =
           Math.sin(phase * Math.PI) * Math.exp(-phase * phase) * wave.amplitude;
-        dx += (vx / distance) * deflection;
-        dy += (vy / distance) * deflection;
+        dx += (vx / distance) * deflection * (20 / MAX_DISPLACEMENT);
+        dy += (vy / distance) * deflection * (20 / MAX_DISPLACEMENT);
       }
       pixels.data[index] = 128 + Math.max(-1, Math.min(1, dx)) * 127;
       pixels.data[index + 1] = 128 + Math.max(-1, Math.min(1, dy)) * 127;
@@ -64,93 +97,134 @@ function drawDisplacement(
   context.putImageData(pixels, 0, 0);
 }
 
-/** One shared texture refracts the actual rendered stars, text, borders and controls. */
-export function createGravityWaves(reducedMotion: MediaQueryList) {
+/** Continuous infall and transient drag waves share one field, so filters never overwrite each other. */
+export function createGravityWaves(
+  reducedMotion: MediaQueryList,
+  scene: HTMLElement,
+  size: number
+) {
   const map = document.createElement("canvas");
   const context = map.getContext("2d");
   let pixels: ImageData | null = null;
   let lens: ReturnType<typeof createGravityLens> | null = null;
+  let images: ReturnType<typeof createInfallImages> | null = null;
   let waves: Wave[] = [];
   let frame = 0;
   let last = 0;
   let width = 0;
   let height = 0;
+  let time = 0;
+  let detail = "";
+  const canvas = scene.querySelector("canvas");
 
   const clear = () => {
+    waves = [];
+  };
+  const stop = () => {
     cancelAnimationFrame(frame);
     frame = 0;
     last = 0;
-    waves = [];
+    clear();
     lens?.dispose();
     lens = null;
+    images?.dispose();
+    images = null;
     pixels = null;
+    detail = "";
+  };
+  const fit = (next: string) => {
+    width = innerWidth;
+    height = innerHeight;
+    const edges: Record<string, number> = {
+      balanced: 200,
+      high: 240,
+      low: 144,
+    };
+    const ratio = (edges[next] ?? 200) / Math.max(width, height);
+    map.width = Math.max(1, Math.round(width * ratio));
+    map.height = Math.max(1, Math.round(height * ratio));
+    pixels = context?.createImageData(map.width, map.height) ?? null;
+    lens?.dispose();
+    lens = createGravityLens(width, height, MAX_DISPLACEMENT);
+    detail = next;
   };
   const tick = (now: number) => {
-    waves = waves.filter((wave) => now - wave.birth < WAVE_LIFETIME_MS);
-    if (waves.length === 0 || reducedMotion.matches || document.hidden) {
-      clear();
+    if (reducedMotion.matches || document.hidden) {
+      stop();
       return;
     }
     frame = requestAnimationFrame(tick);
-    if (now - last < FRAME_MS - 1 || !(context && pixels)) {
+    const next = canvas?.dataset.holeQuality ?? "balanced";
+    const interval = next === "high" ? 1000 / 30 : 1000 / 20;
+    if (now - last < interval - 1 || !context) {
       return;
     }
+    const elapsed = last ? Math.min(0.1, (now - last) / 1000) : 0;
+    time += elapsed;
     last = now;
+    if (next !== detail) {
+      fit(next);
+    }
+    if (!pixels) {
+      return;
+    }
+    const box = scene.getBoundingClientRect();
+    const image = canvas?.getBoundingClientRect() ?? box;
+    const source = {
+      radius: Math.min(image.width, image.height) * size,
+      x: box.left + box.width / 2,
+      y: box.top + box.height / 2,
+    };
+    waves = waves.filter((wave) => now - wave.birth < WAVE_LIFETIME_MS);
+    const anchors = images?.update(source, time, next === "low") ?? [];
     drawDisplacement(
       context,
       pixels,
       waves,
       now,
       width / map.width,
-      height / map.height
+      height / map.height,
+      source,
+      time,
+      anchors
     );
     lens?.update(map.toDataURL());
   };
-  const visibility = () => {
-    if (document.hidden) {
-      clear();
+  const wake = () => {
+    if (frame || reducedMotion.matches || document.hidden || !context) {
+      return;
     }
+    images = createInfallImages();
+    frame = requestAnimationFrame(tick);
   };
-  const editing = (event: FocusEvent) => {
-    if (
-      event.target instanceof Element &&
-      event.target.matches("input, textarea, select, [contenteditable=true]")
-    ) {
-      clear();
-    }
+  const reset = () => {
+    stop();
+    wake();
   };
-  window.addEventListener("resize", clear);
-  window.addEventListener("blur", clear);
-  document.addEventListener("scroll", clear, { capture: true, passive: true });
+  const visibility = () => (document.hidden ? stop() : wake());
+  window.addEventListener("resize", reset);
+  window.addEventListener("blur", stop);
+  window.addEventListener("focus", wake);
+  document.addEventListener("scroll", reset, { capture: true, passive: true });
   document.addEventListener("visibilitychange", visibility);
-  document.addEventListener("focusin", editing);
-  reducedMotion.addEventListener("change", clear);
-
+  reducedMotion.addEventListener("change", reset);
+  wake();
   return {
     clear,
     dispose() {
-      clear();
-      window.removeEventListener("resize", clear);
-      window.removeEventListener("blur", clear);
-      document.removeEventListener("scroll", clear, true);
+      stop();
+      window.removeEventListener("resize", reset);
+      window.removeEventListener("blur", stop);
+      window.removeEventListener("focus", wake);
+      document.removeEventListener("scroll", reset, true);
       document.removeEventListener("visibilitychange", visibility);
-      document.removeEventListener("focusin", editing);
-      reducedMotion.removeEventListener("change", clear);
+      reducedMotion.removeEventListener("change", reset);
     },
     emit(x: number, y: number, strength: number) {
       if (reducedMotion.matches || document.hidden || !context) {
         return;
       }
-      if (frame === 0) {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        const ratio = MAP_LONG_EDGE / Math.max(width, height);
-        map.width = Math.max(1, Math.round(width * ratio));
-        map.height = Math.max(1, Math.round(height * ratio));
-        pixels = context.createImageData(map.width, map.height);
-        lens = createGravityLens(width, height, MAX_DISPLACEMENT);
-        frame = requestAnimationFrame(tick);
-      }
+      wake();
       waves.push({ birth: performance.now(), strength, x, y });
       if (waves.length > MAX_WAVES) {
         waves.shift();

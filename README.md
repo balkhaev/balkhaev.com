@@ -15,6 +15,8 @@ Open `http://localhost:4175`. Rebuild with `bun run build` after edits. `bun run
 
 Animation pauses in a hidden tab and respects reduced motion. The contact links and a static fallback remain available without WebGL.
 
+The continuous gravity field bends the actual text and star pixels. Decorative light images of the contacts stretch and spiral toward the horizon in a seamless loop; the original anchors stay interactive. Infall and drag waves share one displacement map, decoded before display to prevent blank frames. Map resolution and image count follow the black hole's detail level.
+
 ## Production
 
 Coolify serves an Nginx image on `https://balkhaev.com`. DNS points to `49.13.216.63`. The Docker image listens on port 8080; TLS is handled by Coolify.
