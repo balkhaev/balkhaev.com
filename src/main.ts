@@ -5,28 +5,21 @@ import {
 } from "./lib/black-hole-gl";
 import { createHoleQuality, HOLE_QUALITY } from "./lib/black-hole-quality";
 import { createFlight } from "./lib/flight";
-import {
-  CLOCK_RATE,
-  contactPosition,
-  OBSERVER_RADIUS,
-} from "./lib/scene-geometry";
+import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
-const links = Array.from(
-  document.querySelectorAll<HTMLAnchorElement>(".contacts a")
-);
 const hint = document.querySelector<HTMLElement>("#hint");
 
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
   const view: HoleView = {
     distance: OBSERVER_RADIUS,
-    fov: 56,
+    fov: 64,
     pitch: 0,
     roll: 0,
     spin: -1,
-    stars: 0.9,
+    stars: 0.25,
     x: 0.5,
     y: 0.5,
     yaw: 0,
@@ -39,48 +32,27 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let frame = 0;
   let last = 0;
   let time = 0;
-  let selected = -1;
-  let tracking = -1;
-  let pointer: { x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
   let gesture: {
     x: number;
     y: number;
     distance: number;
     dragged: boolean;
-    contact: number;
   } | null = null;
 
   const frameView = () => {
     view.distance = flight.radius;
     view.x = 0.5;
     view.y = 0.5;
-    if (tracking >= 0) {
-      const point = contactPosition(tracking, time);
-      const tilt = (84 * Math.PI) / 180;
-      const dy = point.y - view.distance * Math.cos(tilt);
-      const dz = point.z + view.distance * Math.sin(tilt);
-      view.yaw =
-        (Math.atan2(-point.x, -dy * Math.cos(tilt) + dz * Math.sin(tilt)) *
-          180) /
-        Math.PI;
-      view.pitch =
-        (Math.asin(
-          (dy * Math.sin(tilt) + dz * Math.cos(tilt)) /
-            Math.hypot(point.x, dy, dz)
-        ) *
-          180) /
-        Math.PI;
-    }
     surface.dataset.observerRadius = view.distance.toFixed(4);
     surface.dataset.horizon = String(flight.crossed);
     if (flightStatus) {
       let label = "";
       if (flight.active) {
-        label = `Свободное падение · ${view.distance.toFixed(2)} rₛ`;
+        label = "Погружение";
       }
       if (flight.crossed) {
-        label = "За горизонтом · оглянитесь";
+        label = "За горизонтом событий";
       }
       if (flight.ended) {
         label = "Конец траектории";
@@ -100,11 +72,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       return;
     }
     frameView();
-    if (pointer && !gesture && tracking < 0) {
-      selected = renderer.hit(pointer.x, pointer.y, time);
-    }
-    input.dataset.overContact = String(selected >= 0);
-    renderer.draw({ accretion: 1, selected, time });
+    renderer.draw({ accretion: 1, time });
     document.documentElement.classList.add("rendered");
   };
 
@@ -166,17 +134,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     time = 0;
     view.pitch = 0;
     view.yaw = 0;
-    tracking = -1;
-    selected = -1;
+    hint?.classList.remove("dismissed");
     draw();
   };
   restart?.addEventListener("click", reset);
   const travel = (amount: number) => {
-    tracking = -1;
     time += flight.travel(amount, still.matches);
   };
-  const contactAt = (event: PointerEvent) =>
-    renderer?.hit(event.clientX, event.clientY, time) ?? -1;
 
   input.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) {
@@ -184,13 +148,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     dismissHint();
     input.focus({ preventScroll: true });
-    tracking = -1;
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
     input.setPointerCapture(event.pointerId);
     const points = [...touches.values()];
     const [a, b] = points;
     gesture = {
-      contact: contactAt(event),
       distance: a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0,
       dragged: points.length > 1,
       x: event.clientX,
@@ -199,9 +161,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     input.dataset.dragging = "true";
   });
   input.addEventListener("pointermove", (event) => {
-    pointer = { x: event.clientX, y: event.clientY };
     if (gesture && touches.has(event.pointerId)) {
-      touches.set(event.pointerId, pointer);
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       const points = [...touches.values()];
       const [a, b] = points;
       if (a && b) {
@@ -228,26 +189,14 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
   });
   const release = (event: PointerEvent) => {
-    const click =
-      event.type === "pointerup" &&
-      gesture &&
-      !gesture.dragged &&
-      gesture.contact >= 0 &&
-      gesture.contact === contactAt(event);
-    const index = gesture?.contact ?? -1;
     touches.delete(event.pointerId);
     if (input.hasPointerCapture(event.pointerId)) {
       input.releasePointerCapture(event.pointerId);
     }
     const [remaining] = [...touches.values()];
-    gesture = remaining
-      ? { ...remaining, contact: -1, distance: 0, dragged: true }
-      : null;
+    gesture = remaining ? { ...remaining, distance: 0, dragged: true } : null;
     if (!gesture) {
       delete input.dataset.dragging;
-    }
-    if (click) {
-      links[index]?.click();
     }
   };
   input.addEventListener("pointerup", release);
@@ -255,12 +204,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   input.addEventListener("lostpointercapture", (event) => {
     if (touches.has(event.pointerId)) {
       release(event);
-    }
-  });
-  input.addEventListener("pointerleave", () => {
-    pointer = null;
-    if (tracking < 0) {
-      selected = -1;
     }
   });
   input.addEventListener(
@@ -281,8 +224,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   );
   input.addEventListener("keydown", (event) => {
     if (event.key === "Home" || event.key === "Escape") {
+      event.preventDefault();
       reset();
-    } else if (event.key === "ArrowLeft") {
+      return;
+    }
+    if (event.key === "ArrowLeft") {
       view.yaw -= 5;
     } else if (event.key === "ArrowRight") {
       view.yaw += 5;
@@ -301,26 +247,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     dismissHint();
     draw();
   });
-  for (const [index, link] of links.entries()) {
-    link.addEventListener("focus", () => {
-      selected = index;
-      tracking = index;
-      pointer = null;
-      dismissHint();
-      draw();
-    });
-    link.addEventListener("blur", () => {
-      tracking = -1;
-      selected = -1;
-      draw();
-    });
-    link.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        input.focus();
-        reset();
-      }
-    });
-  }
   const resize = new ResizeObserver(fit);
   resize.observe(surface);
   still.addEventListener("change", resume);
@@ -346,9 +272,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     gesture = null;
     touches.clear();
     delete input.dataset.dragging;
-    pointer = null;
   });
-  window.setTimeout(dismissHint, 10_000);
   mount();
 }
 

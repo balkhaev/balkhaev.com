@@ -8,14 +8,9 @@ import {
   HOLE_QUALITY,
   type HoleQuality,
 } from "./black-hole-quality";
-import { contactAtlas } from "./contact-atlas";
 import { infallTable } from "./infall-geodesics";
 import {
-  CONTACT_NORMAL,
-  CONTACT_UP,
-  CONTACTS,
   cameraOf,
-  contactHit,
   focalLength,
   OBSERVER_RADIUS,
   type SceneView,
@@ -32,7 +27,7 @@ import { STELLAR_SHADER } from "./stellar-shader";
  *
  * Passive circular tracers supply disk opacity. A zero-torque Schwarzschild thin-disk profile sets temperature.
  * Each intersection uses ingoing PG emission time and photon energy in the observer's falling frame.
- * Planck radiance at gT includes the frequency shift and beaming together. Disk and contact-plane crossings
+ * Planck radiance at gT includes the frequency shift and beaming together. Disk and stellar intersections
  * are composited in ray order; the same escaping rays sample the distant star field.
  */
 
@@ -53,7 +48,6 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
-  selected?: number;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
   time: number;
 }
@@ -62,7 +56,6 @@ export interface HoleRenderer {
   dispose: () => void;
   draw: (frame: HoleFrame) => void;
   gpuTime: () => number | null;
-  hit: (x: number, y: number, time: number) => number;
   quality: (level: HoleQuality) => void;
   /**
    * Sizes the drawing to the canvas's CSS box times the device's pixel ratio, within the pixel budget times `detail`
@@ -94,8 +87,6 @@ uniform sampler2D uTable;
 uniform sampler2D uEnds;
 uniform sampler2D uParticles;
 uniform sampler2D uTimes;
-uniform sampler2D uContacts;
-uniform int uSelected;
 uniform int uImages;
 uniform vec2 uCenter;
 uniform float uFocal;
@@ -120,9 +111,7 @@ const float FLUX_PEAK = 0.00011458947;
 // Planck's law at the three primaries for 6500 K: the white the colours are balanced to.
 const vec3 WHITE = vec3(0.32205, 0.36152, 0.39627);
 // The hottest gas, kelvin, before any shift.
-const float T_PEAK = 5400.0;
-const vec3 CONTACT_UP = vec3(${CONTACT_UP.join(", ")});
-const vec3 CONTACT_NORMAL = vec3(${CONTACT_NORMAL.join(", ")});
+const float T_PEAK = 3200.0;
 
 
 float rowOf(float angle) {
@@ -146,34 +135,6 @@ float travelTime(float row, float phi) { return tableValue(uTimes, row, phi); }
 
 vec3 blackbody(float t);
 ${STELLAR_SHADER}
-
-vec4 beacon(vec3 hit, float time, vec3 photonCovector, float energy, float facing) {
-  const vec4 bodies[2] = vec4[2](
-    vec4(${CONTACTS[0].radius.toFixed(4)}, ${CONTACTS[0].phase.toFixed(4)}, ${CONTACTS[0].width.toFixed(4)}, ${CONTACTS[0].height.toFixed(4)}),
-    vec4(${CONTACTS[1].radius.toFixed(4)}, ${CONTACTS[1].phase.toFixed(4)}, ${CONTACTS[1].width.toFixed(4)}, ${CONTACTS[1].height.toFixed(4)})
-  );
-  for (int index = 0; index < 2; index++) {
-    vec4 body = bodies[index];
-    float omega = sqrt(0.5 / (body.x * body.x * body.x));
-    float angle = body.y + omega * time;
-    vec2 center = body.x * vec2(cos(angle), sin(angle));
-    vec2 uv = (vec2(hit.x, dot(hit, CONTACT_UP)) - center) / body.zw;
-    if (abs(uv.x) > 0.5 || abs(uv.y) > 0.5) continue;
-    uv = vec2(0.5 - uv.x * facing, 0.5 - uv.y);
-    vec4 ink = texture(uContacts, vec2(uv.x, (float(index) + uv.y) * 0.5));
-    vec3 velocity = body.x * omega * (vec3(-sin(angle), 0.0, 0.0) + CONTACT_UP * cos(angle));
-    float lapse = 1.0 - 1.0 / length(hit);
-    float radialVelocity = dot(velocity, normalize(hit));
-    float properRate = sqrt(max(0.0, lapse - dot(velocity, velocity) - 2.0 * sqrt(1.0 - lapse) * radialVelocity));
-    float g = properRate / (max(0.00001, energy - dot(photonCovector, velocity)));
-    // I_nu / nu^3 is invariant: a Planck emitter is observed as B_nu(g T).
-    vec3 colour = blackbody(6500.0 * g) * 0.65;
-    float underline = uSelected == index ? (1.0 - smoothstep(0.008, 0.017, abs(uv.y - 0.84))) * step(0.07, uv.x) * step(uv.x, 0.93) : 0.0;
-    float alpha = max(ink.a, underline * 0.7);
-    return vec4(colour, alpha);
-  }
-  return vec4(0.0);
-}
 
 /** Where the ray ends: the angle it escapes at, or minus the angle it falls in at. */
 float endOf(float row) {
@@ -231,12 +192,13 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	// Advected density filaments: each annulus keeps its own Keplerian angular rate.
 	float phase = psi + omega * uSpin * (uTime - delay + EPOCH);
 	vec2 flow = vec2(cos(phase), sin(phase)) * 9.0;
-	float clouds = densityNoise(flow + vec2(r * 8.0, 0.0));
-	float fine = densityNoise(flow * 3.0 + vec2(r * 29.0, r * 7.0));
-	float bands = sin(r * 23.0 + 3.0 * clouds) * (1.0 - smoothstep(0.3, 1.5, fwidth(r * 23.0)));
+	float clouds = densityNoise(flow * 0.55 + vec2(r * 3.7, 0.0));
+	float wisps = densityNoise(flow * 1.4 + vec2(r * 16.0 + clouds * 2.0, r * 2.0));
+	float fine = densityNoise(flow * 3.0 + vec2(r * 43.0, r * 6.0));
+	float structure = smoothstep(0.15, 0.85, 0.5 * clouds + 0.35 * wisps + 0.15 * fine);
 	float t = T_PEAK * pow(flux, 0.25) * g;
 	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
-	float alpha = edge * (0.38 + 0.16 * n + 0.05 * bands + 0.29 * clouds + 0.12 * fine);
+	float alpha = edge * (0.16 + 0.16 * n + 0.68 * structure);
 	return vec4(blackbody(t) * uAccretion, alpha);
 }
 
@@ -251,7 +213,7 @@ vec3 stars(vec3 dir, vec3 dx, vec3 dy) {
 	const float CELLS = 150.0;
 	vec3 id = floor(dir * CELLS);
 	vec3 draw = random3(id, 0u);
-	if (draw.x > 0.008) {
+	if (draw.x > 0.005) {
 		return vec3(0.0);
 	}
 	vec3 star = normalize((id + 0.3 + 0.4 * random3(id, 7u)) / CELLS);
@@ -292,19 +254,15 @@ void main() {
 	{
 		vec3 normal = cross(e1, e2);
 		float diskPhi = mod(atan(e2.y, e1.y) + 0.5 * PI, PI);
-		float beaconPhi = mod(atan(dot(e2, CONTACT_NORMAL), dot(e1, CONTACT_NORMAL)) + 0.5 * PI, PI);
 		float starImageA = starIntersection(row, angular, phiEnd, e1, e2, 0.0);
 		float starImageB = starIntersection(row, angular, phiEnd, e1, e2, TAU);
 		float starPhi = min(starImageA, starImageB);
 		float starSecond = max(starImageA, starImageB);
 		int diskCount = 0;
-		int beaconCount = 0;
-		for (int k = 0; k < 8; k++) {
-			bool surface = beaconPhi < diskPhi;
-			float phi = min(beaconPhi, diskPhi);
+		for (int k = 0; k < 5; k++) {
+			float phi = diskPhi;
 			bool stellar = starPhi < phi;
 			if (stellar) { phi = starPhi; starPhi = starSecond; starSecond = 1e5; }
-			else if (surface) { beaconCount++; beaconPhi = beaconCount >= uImages ? 1e5 : beaconPhi + PI; }
 			else { diskCount++; diskPhi = diskCount >= uImages ? 1e5 : diskPhi + PI; }
 			if (phi >= phiEnd || through < 0.01) {
 				break;
@@ -317,13 +275,13 @@ void main() {
 			vec3 hit = r * (cos(phi) * e1 + sin(phi) * e2);
 			float delay = travelTime(row, phi);
 			vec4 emission;
-			if (surface || stellar) {
+			if (stellar) {
 				vec3 radial = normalize(hit);
 				vec3 tangent = -sin(phi) * e1 + cos(phi) * e2;
 				float slope = (inverseRadius(row, phi + 0.002) - inverseRadius(row, max(0.0, phi - 0.002))) / 0.004;
 				float radialCovector = (angular * slope + sqrt(u) * energy) / (1.0 - u);
         vec3 photonCovector = radialCovector * radial - angular * u * tangent;
-				emission = stellar ? photosphere(hit, uTime - delay + EPOCH, photonCovector, energy) : beacon(hit, uTime - delay + EPOCH, photonCovector, energy, sign(dot(tangent, CONTACT_NORMAL)));
+				emission = photosphere(hit, uTime - delay + EPOCH, photonCovector, energy);
 			} else {
 				if (r < DISK_IN || r > DISK_OUT) continue;
 				emission = disk(r, atan(hit.z, hit.x), -angular * normal.y, energy, delay);
@@ -389,8 +347,12 @@ vec3 encode(vec3 linear) {
 void main() {
 	vec4 scene = texture(uScene, vUv);
 	vec3 glow = texture(uGlow0, vUv).rgb * 0.18 + texture(uGlow1, vUv).rgb * 0.2 + texture(uGlow2, vUv).rgb * 0.22 + texture(uGlow3, vUv).rgb * 0.22 + texture(uGlow4, vUv).rgb * 0.18;
-	vec3 light = mix(scene.rgb, glow, 0.24) * uExposure;
-	vec3 colour = encode(aces(light));
+	vec3 light = mix(scene.rgb, glow, 0.16) * uExposure;
+	// Luminance tone mapping preserves the thermal colour in bright filaments.
+	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
+	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
+	mapped /= max(1.0, max(mapped.r, max(mapped.g, mapped.b)));
+	vec3 colour = encode(mapped);
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);
 	float alpha = max(scene.a, max(colour.r, max(colour.g, colour.b)));
@@ -502,10 +464,8 @@ export function createHoleRenderer(
       "uEnds",
       "uParticles",
       "uTimes",
-      "uContacts",
       "uOrbit",
       "uOrbitClock",
-      "uSelected",
       "uImages",
       "uCenter",
       "uFocal",
@@ -543,25 +503,6 @@ export function createHoleRenderer(
   const timesTexture = dataTexture(gl, table.phiCount, table.rows, table.times);
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
-  const contactsTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, contactsTexture);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    contactAtlas()
-  );
-  gl.generateMipmap(gl.TEXTURE_2D);
-  gl.texParameteri(
-    gl.TEXTURE_2D,
-    gl.TEXTURE_MIN_FILTER,
-    gl.LINEAR_MIPMAP_LINEAR
-  );
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const particles = createDiskParticles(gl, particleProgram.program);
   const gpu = createGpuClock(gl);
   let quality: HoleQuality = "balanced";
@@ -637,7 +578,6 @@ export function createHoleRenderer(
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
       gl.deleteTexture(orbitTexture);
-      gl.deleteTexture(contactsTexture);
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
@@ -646,7 +586,7 @@ export function createHoleRenderer(
       }
     },
 
-    draw({ accretion, time, selected = -1 }) {
+    draw({ accretion, time }) {
       if (!sceneTarget) {
         return;
       }
@@ -662,14 +602,10 @@ export function createHoleRenderer(
       texture(2, particles.texture);
       texture(4, timesTexture);
       texture(6, orbitTexture);
-      if (contactsTexture) {
-        texture(5, contactsTexture);
-      }
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
       gl.uniform1i(at("uTimes"), 4);
-      gl.uniform1i(at("uContacts"), 5);
       gl.uniform1i(at("uOrbit"), 6);
       gl.uniform4f(
         at("uOrbitClock"),
@@ -678,7 +614,6 @@ export function createHoleRenderer(
         orbit.offset,
         orbit.orientation
       );
-      gl.uniform1i(at("uSelected"), selected);
       gl.uniform1i(at("uImages"), HOLE_QUALITY[quality].images);
       gl.uniform2f(at("uCenter"), view.x * width, (1 - view.y) * height);
       gl.uniform1f(at("uFocal"), focal);
@@ -730,24 +665,11 @@ export function createHoleRenderer(
       gl.uniform1i(finish("uGlow2"), 3);
       gl.uniform1i(finish("uGlow3"), 4);
       gl.uniform1i(finish("uGlow4"), 5);
-      gl.uniform1f(finish("uExposure"), 1.65);
+      gl.uniform1f(finish("uExposure"), 5.0);
       pass(null);
       gpu.end();
     },
     gpuTime: gpu.read,
-    hit(x, y, time) {
-      const bounds = canvas.getBoundingClientRect();
-      return contactHit(
-        table,
-        view,
-        bounds.width,
-        bounds.height,
-        x - bounds.left,
-        y - bounds.top,
-        time,
-        HOLE_QUALITY[quality].images
-      );
-    },
     quality(next) {
       if (quality !== next) {
         quality = next;

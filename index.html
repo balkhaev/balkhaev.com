@@ -29,22 +29,38 @@
         id="observer"
         type="button"
       ></button>
-      <nav aria-label="Связаться" class="contacts">
-        <a
-          href="https://t.me/balkhaev"
-          rel="noopener noreferrer"
-          target="_blank"
-          >@balkhaev</a
-        >
-        <a href="mailto:m.balkhaev@gmail.com">m.balkhaev@gmail.com</a>
-      </nav>
-      <p aria-hidden="true" id="hint">
-        Тяните — обзор · Скролл вниз — погружение
-      </p>
-      <div class="flight-info">
-        <span id="flight-status"></span>
-        <button hidden id="restart" type="button">Начать заново ↗</button>
-      </div>
+      <header class="masthead">
+        <h1>balkhaev<span aria-hidden="true">.</span></h1>
+        <nav aria-label="Связаться" class="contacts">
+          <a
+            href="https://t.me/balkhaev"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Telegram <span aria-hidden="true">↗</span>
+          </a>
+          <a href="mailto:m.balkhaev@gmail.com">
+            Почта <span aria-hidden="true">↗</span>
+          </a>
+        </nav>
+      </header>
+      <footer class="flight-info">
+        <p aria-hidden="true" id="hint">
+          <span class="scroll-mark"></span>
+          <span
+            ><span class="hint-desktop"
+              >Мышь — осмотреться<span class="hint-divider">/</span>Скролл —
+              погрузиться</span
+            ><span class="hint-touch"
+              >Потяните для обзора · Разведите пальцы для полёта</span
+            ></span
+          >
+        </p>
+        <span aria-live="polite" id="flight-status"></span>
+        <button hidden id="restart" type="button">
+          К началу <span aria-hidden="true">↺</span>
+        </button>
+      </footer>
     </main>
     <script src="/app.js" type="module"></script>
   </body>

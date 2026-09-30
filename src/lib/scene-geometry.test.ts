@@ -1,17 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { infallTable } from "./infall-geodesics";
 import {
-  CONTACTS,
   cameraOf,
-  contactHit,
-  contactPosition,
   focalLength,
   OBSERVER_RADIUS,
-  orbitRate,
   type SceneView,
 } from "./scene-geometry";
 
-const table = infallTable(OBSERVER_RADIUS);
 const view: SceneView = {
   distance: OBSERVER_RADIUS,
   fov: 56,
@@ -48,37 +42,5 @@ describe("first-person scene", () => {
     expect(focalLength(near, 1280, 720)).toBe(focalLength(view, 1280, 720));
     expect(Math.hypot(...cameraOf(near).eye)).toBeCloseTo(0.6, 12);
     expect(Math.hypot(...cameraOf(view).eye)).toBeCloseTo(12.5, 12);
-  });
-  test("contact surfaces and their orbits remain outside the disk", () => {
-    for (const [index, body] of CONTACTS.entries()) {
-      expect(
-        body.radius - Math.hypot(body.width, body.height) / 2
-      ).toBeGreaterThan(11);
-      const period = (2 * Math.PI) / orbitRate(body.radius);
-      for (const fraction of [0, 0.25, 0.5, 1]) {
-        const point = contactPosition(index, period * fraction);
-        expect(Math.hypot(point.x, point.y, point.z)).toBeCloseTo(
-          body.radius,
-          10
-        );
-      }
-    }
-    const [a, b] = CONTACTS;
-    expect(b.radius - a.radius).toBeGreaterThan(
-      (Math.hypot(a.width, a.height) + Math.hypot(b.width, b.height)) / 2
-    );
-  });
-  test("both initial contact images can be picked with curved rays; the shadow is empty", () => {
-    const found = new Set<number>();
-    for (let y = 0; y < 720; y += 6) {
-      for (let x = 0; x < 1280; x += 6) {
-        const hit = contactHit(table, view, 1280, 720, x, y, 0);
-        if (hit >= 0) {
-          found.add(hit);
-        }
-      }
-    }
-    expect([...found].sort()).toEqual([0, 1]);
-    expect(contactHit(table, view, 1280, 720, 640, 360, 0)).toBe(-1);
   });
 });
