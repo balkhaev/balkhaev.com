@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="#000000" name="theme-color">
+    <meta
+      content="Balkhaev. Чёрная дыра, немного гравитации и связь."
+      name="description"
+    >
+    <meta content="Balkhaev" property="og:title">
+    <meta
+      content="Чёрная дыра, немного гравитации и связь."
+      property="og:description"
+    >
+    <meta content="https://balkhaev.com/" property="og:url">
+    <meta content="website" property="og:type">
+    <link href="https://balkhaev.com/" rel="canonical">
+    <link href="/icon.svg" rel="icon" type="image/svg+xml">
+    <link href="/style.css" rel="stylesheet">
+    <title>Balkhaev</title>
+  </head>
+  <body>
+    <div aria-hidden="true" class="sky" data-gravity-sky>
+      <svg
+        aria-hidden="true"
+        focusable="false"
+        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 1440 1000"
+      >
+        <g id="montage-stars"></g>
+      </svg>
+    </div>
+    <main aria-label="Balkhaev">
+      <div class="orbit">
+        <div class="scene" data-gravity-source>
+          <div aria-hidden="true" class="fallback"></div>
+          <canvas aria-hidden="true" id="hole"></canvas>
+          <button
+            aria-label="Переместить чёрную дыру. Тяните диск или используйте стрелки. Home — вернуть на место."
+            id="grab"
+            title="Потяните диск · стрелки — двигать · Home — вернуть"
+            type="button"
+          ></button>
+        </div>
+      </div>
+      <nav aria-label="Связаться" class="contacts">
+        <a
+          href="https://t.me/balkhaev"
+          rel="noopener noreferrer"
+          target="_blank"
+          >@balkhaev<span aria-hidden="true">↗</span></a
+        >
+        <a href="mailto:m.balkhaev@gmail.com"
+          >m.balkhaev@gmail.com<span aria-hidden="true">↗</span></a
+        >
+      </nav>
+    </main>
+    <div aria-hidden="true" class="disk-glow" data-disk-glow></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

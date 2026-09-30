@@ -1,0 +1,9 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <title>Balkhaev</title>
+  <rect fill="#000" height="64" rx="16" width="64" />
+  <path
+    d="M13 34a19 19 0 0 1 38 0h-7a12 12 0 0 0-24 0Zm7 0a12 12 0 0 0 24 0h7a19 19 0 0 1-38 0Z"
+    fill="#e4cd9f"
+  />
+  <ellipse cx="32" cy="34" fill="#fff1d6" rx="29" ry="3" />
+</svg>
