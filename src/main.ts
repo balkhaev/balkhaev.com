@@ -4,12 +4,10 @@ import {
   type HoleView,
 } from "./lib/black-hole-gl";
 import { createHoleQuality, HOLE_QUALITY } from "./lib/black-hole-quality";
+import { createFlight } from "./lib/flight";
 import {
   CLOCK_RATE,
-  cameraOf,
   contactPosition,
-  fittedSize,
-  focalLength,
   OBSERVER_RADIUS,
 } from "./lib/scene-geometry";
 
@@ -23,22 +21,24 @@ const hint = document.querySelector<HTMLElement>("#hint");
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
   const view: HoleView = {
-    azimuth: 0,
-    inclination: 76,
-    roll: -8,
-    size: 0.06,
+    distance: OBSERVER_RADIUS,
+    fov: 56,
+    pitch: 0,
+    roll: 0,
     spin: -1,
     stars: 0.9,
     x: 0.5,
     y: 0.5,
+    yaw: 0,
   };
   const quality = createHoleQuality();
+  const flight = createFlight();
+  const flightStatus = document.querySelector<HTMLElement>("#flight-status");
+  const restart = document.querySelector<HTMLButtonElement>("#restart");
   let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
   let time = 0;
-  let framingTime = 0;
-  let zoom = 1;
   let selected = -1;
   let tracking = -1;
   let pointer: { x: number; y: number } | null = null;
@@ -52,34 +52,45 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   } | null = null;
 
   const frameView = () => {
-    const { width, height } = surface.getBoundingClientRect();
-    view.size = fittedSize(view, width, height, framingTime) * zoom;
+    view.distance = flight.radius;
     view.x = 0.5;
     view.y = 0.5;
     if (tracking >= 0) {
       const point = contactPosition(tracking, time);
-      const { basis, eye } = cameraOf(view);
-      const distance =
-        OBSERVER_RADIUS -
-        (point.x * eye[0] + point.y * eye[1] + point.z * eye[2]) /
-          OBSERVER_RADIUS;
-      const focal = focalLength(view, width, height);
-      view.x =
-        0.5 -
-        (focal *
-          (point.x * (basis[0] ?? 0) +
-            point.y * (basis[1] ?? 0) +
-            point.z * (basis[2] ?? 0))) /
-          distance /
-          width;
-      view.y =
-        0.5 +
-        (focal *
-          (point.x * (basis[3] ?? 0) +
-            point.y * (basis[4] ?? 0) +
-            point.z * (basis[5] ?? 0))) /
-          distance /
-          height;
+      const tilt = (84 * Math.PI) / 180;
+      const dy = point.y - view.distance * Math.cos(tilt);
+      const dz = point.z + view.distance * Math.sin(tilt);
+      view.yaw =
+        (Math.atan2(-point.x, -dy * Math.cos(tilt) + dz * Math.sin(tilt)) *
+          180) /
+        Math.PI;
+      view.pitch =
+        (Math.asin(
+          (dy * Math.sin(tilt) + dz * Math.cos(tilt)) /
+            Math.hypot(point.x, dy, dz)
+        ) *
+          180) /
+        Math.PI;
+    }
+    surface.dataset.observerRadius = view.distance.toFixed(4);
+    surface.dataset.horizon = String(flight.crossed);
+    if (flightStatus) {
+      let label = "";
+      if (flight.active) {
+        label = `Свободное падение · ${view.distance.toFixed(2)} rₛ`;
+      }
+      if (flight.crossed) {
+        label = "За горизонтом · оглянитесь";
+      }
+      if (flight.ended) {
+        label = "Конец траектории";
+      }
+      if (flightStatus.textContent !== label) {
+        flightStatus.textContent = label;
+      }
+    }
+    if (restart) {
+      restart.hidden = !flight.active;
     }
     renderer?.view(view);
   };
@@ -115,7 +126,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     const seconds = last ? (now - last) / 1000 : 0;
     last = now;
-    time += seconds * CLOCK_RATE;
+    time += flight.active ? flight.advance(seconds) : seconds * CLOCK_RATE;
     if (quality.sample(seconds, renderer?.gpuTime() ?? null)) {
       renderer?.quality(quality.level);
       fit();
@@ -151,13 +162,18 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     hint?.classList.add("dismissed");
   };
   const reset = () => {
-    framingTime = time;
-    view.inclination = 76;
-    view.azimuth = 0;
-    zoom = 1;
+    flight.reset();
+    time = 0;
+    view.pitch = 0;
+    view.yaw = 0;
     tracking = -1;
     selected = -1;
     draw();
+  };
+  restart?.addEventListener("click", reset);
+  const travel = (amount: number) => {
+    tracking = -1;
+    time += flight.travel(amount, still.matches);
   };
   const contactAt = (event: PointerEvent) =>
     renderer?.hit(event.clientX, event.clientY, time) ?? -1;
@@ -191,10 +207,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       if (a && b) {
         const distance = Math.hypot(a.x - b.x, a.y - b.y);
         if (gesture.distance > 0) {
-          zoom = Math.max(
-            0.55,
-            Math.min(2, (zoom * distance) / gesture.distance)
-          );
+          travel(Math.log(distance / gesture.distance));
         }
         gesture.distance = distance;
         gesture.dragged = true;
@@ -203,14 +216,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
           dy = event.clientY - gesture.y;
         if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
           gesture.dragged = true;
-          view.azimuth = Math.max(
-            -65,
-            Math.min(65, (view.azimuth ?? 0) - dx * 0.16)
-          );
-          view.inclination = Math.max(
-            28,
-            Math.min(152, view.inclination + dy * 0.16)
-          );
+          view.yaw -= dx * 0.19;
+          view.pitch = Math.max(-89, Math.min(89, view.pitch + dy * 0.19));
           gesture.x = event.clientX;
           gesture.y = event.clientY;
         }
@@ -261,10 +268,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     (event) => {
       event.preventDefault();
       dismissHint();
-      zoom = Math.max(
-        0.55,
-        Math.min(2, zoom * Math.exp(-event.deltaY * 0.001))
-      );
+      let unit = 1;
+      if (event.deltaMode === 1) {
+        unit = 16;
+      } else if (event.deltaMode === 2) {
+        unit = surface.clientHeight;
+      }
+      travel(event.deltaY * unit * 0.0025);
       draw();
     },
     { passive: false }
@@ -273,17 +283,17 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     if (event.key === "Home" || event.key === "Escape") {
       reset();
     } else if (event.key === "ArrowLeft") {
-      view.azimuth = Math.max(-65, (view.azimuth ?? 0) - 4);
+      view.yaw -= 5;
     } else if (event.key === "ArrowRight") {
-      view.azimuth = Math.min(65, (view.azimuth ?? 0) + 4);
+      view.yaw += 5;
     } else if (event.key === "ArrowUp") {
-      view.inclination = Math.max(28, view.inclination - 4);
+      view.pitch = Math.min(89, view.pitch + 5);
     } else if (event.key === "ArrowDown") {
-      view.inclination = Math.min(152, view.inclination + 4);
+      view.pitch = Math.max(-89, view.pitch - 5);
     } else if (event.key === "+" || event.key === "=") {
-      zoom = Math.min(2, zoom * 1.1);
+      travel(0.3);
     } else if (event.key === "-") {
-      zoom = Math.max(0.55, zoom / 1.1);
+      travel(-0.3);
     } else {
       return;
     }

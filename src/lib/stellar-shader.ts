@@ -29,9 +29,8 @@ vec3 rayPoint(float row, float phi, vec3 e1, vec3 e2) {
 }
 
 vec3 relativeTangent(float row, float phi, float b, vec3 e1, vec3 e2, vec4 state) {
-  float u = inverseRadius(row, phi);
   vec3 derivative = (rayPoint(row, phi + 0.001, e1, e2) - rayPoint(row, max(0.0, phi - 0.001), e1, e2)) / 0.002;
-  float dt = 1.0 / max(b * u * u * (1.0 - u), 0.00001);
+  float dt = (travelTime(row, phi + 0.001) - travelTime(row, max(0.0, phi - 0.001))) / 0.002;
   return derivative + starVelocity(state) * dt;
 }
 
@@ -43,7 +42,7 @@ float starIntersection(float row, float b, float end, vec3 e1, vec3 e2, float wi
     vec3 center = starCenter(state);
     phi = mod(atan(dot(center, e2), dot(center, e1)) + TAU, TAU) + winding;
     if (phi >= end || phi < 0.001) return 1e5;
-    state = orbitState(uTime - travelTime(row, phi) + D);
+    state = orbitState(uTime - travelTime(row, phi) + EPOCH);
   }
   vec3 delta = rayPoint(row, phi, e1, e2) - starCenter(state);
   vec3 tangent = relativeTangent(row, phi, b, e1, e2, state);
@@ -55,27 +54,27 @@ float starIntersection(float row, float b, float end, vec3 e1, vec3 e2, float wi
   // Refine the front photosphere intersection on the curved, retarded ray.
   for (int j = 0; j < 4; j++) {
     if (phi <= 0.0 || phi >= end) return 1e5;
-    state = orbitState(uTime - travelTime(row, phi) + D);
+    state = orbitState(uTime - travelTime(row, phi) + EPOCH);
     delta = rayPoint(row, phi, e1, e2) - starCenter(state);
     tangent = relativeTangent(row, phi, b, e1, e2, state);
     float derivative = 2.0 * dot(delta, tangent);
     if (abs(derivative) < 1e-6) return 1e5;
     phi -= clamp((dot(delta, delta) - STAR_RADIUS * STAR_RADIUS) / derivative, -0.04, 0.04);
   }
-  state = orbitState(uTime - travelTime(row, phi) + D);
+  state = orbitState(uTime - travelTime(row, phi) + EPOCH);
   delta = rayPoint(row, phi, e1, e2) - starCenter(state);
   if (phi <= 0.0 || phi >= end || abs(length(delta) - STAR_RADIUS) > 0.015) return 1e5;
   return phi;
 }
 
-vec4 photosphere(vec3 hit, float time, vec3 photonCovector) {
+vec4 photosphere(vec3 hit, float time, vec3 photonCovector, float energy) {
   vec4 state = orbitState(time);
   vec3 velocity = starVelocity(state);
   vec3 radial = normalize(hit);
   float lapse = 1.0 - 1.0 / length(hit);
   float vr = dot(velocity, radial);
-  float properRate = sqrt(max(0.0, lapse - dot(velocity, velocity) - (1.0 / lapse - 1.0) * vr * vr));
-  float g = properRate / (sqrt(1.0 - 1.0 / D) * (1.0 - dot(photonCovector, velocity)));
+  float properRate = sqrt(max(0.0, lapse - dot(velocity, velocity) - 2.0 * sqrt(1.0 - lapse) * vr));
+  float g = properRate / max(0.00001, energy - dot(photonCovector, velocity));
   vec3 outward = normalize(hit - starCenter(state));
   vec3 photon = photonCovector - radial * dot(photonCovector, radial) * (1.0 - sqrt(lapse));
   float limb = clamp(dot(outward, normalize(photon)), 0.0, 1.0);

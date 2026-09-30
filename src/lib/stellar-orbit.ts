@@ -1,10 +1,10 @@
 /** Bound Schwarzschild geodesic in Darwin's relativistic anomaly, in r_s = c = 1.
  * The photosphere is a compact test star; its centre follows the exact timelike orbit.
- * Tabulation is uniform in coordinate time so the GPU can sample retarded emission. */
+ * Tabulation uses horizon-regular ingoing PG time so the GPU can sample retarded emission. */
 export const STAR_RADIUS = 0.34;
 export const STAR_PERIAPSIS = 12;
 export const STAR_APOAPSIS = 32;
-// Odd count samples both turning points exactly and fits WebGL 2's 2048-texel minimum.
+// Includes both periapsis endpoints and fits WebGL 2's 2048-texel minimum.
 export const STAR_SAMPLES = 2047;
 const TAU = 2 * Math.PI;
 const ECCENTRICITY =
@@ -16,16 +16,19 @@ function anomalyState(chi: number) {
   const cosine = Math.cos(chi);
   const shape = 1 + ECCENTRICITY * cosine;
   const root = Math.sqrt(P - 6 - 2 * ECCENTRICITY * cosine);
-  const dt =
+  const schwarzschildTime =
     (0.5 * P ** 2 * Math.sqrt((P - 2) ** 2 - 4 * ECCENTRICITY ** 2)) /
     ((P - 2 - 2 * ECCENTRICITY * cosine) * shape ** 2 * root);
   const dphi = Math.sqrt(P) / root;
+  const radius = (0.5 * P) / shape;
+  const dr = (0.5 * P * ECCENTRICITY * Math.sin(chi)) / shape ** 2;
+  const dt = schwarzschildTime + dr / (Math.sqrt(radius) * (1 - 1 / radius));
   return {
     angular: dphi / dt,
     dphi,
     dt,
-    radial: (0.5 * P * ECCENTRICITY * Math.sin(chi)) / (shape ** 2 * dt),
-    radius: (0.5 * P) / shape,
+    radial: dr / dt,
+    radius,
   };
 }
 

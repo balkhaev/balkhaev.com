@@ -1,6 +1,7 @@
-import { CRITICAL_B, type GeodesicTable } from "./geodesics";
+import { START_RADIUS } from "./flight";
+import { angleRow, type InfallTable, infallSample } from "./infall-geodesics";
 
-export const OBSERVER_RADIUS = 60;
+export const OBSERVER_RADIUS = START_RADIUS;
 export const CLOCK_RATE = 3.8;
 export const CONTACT_TILT = (70 * Math.PI) / 180;
 export const CONTACT_UP = [
@@ -29,12 +30,13 @@ export const CONTACTS = [
 ] as const;
 
 export interface SceneView {
-  azimuth?: number;
-  inclination: number;
+  distance: number;
+  fov: number;
+  pitch: number;
   roll: number;
-  size: number;
   x: number;
   y: number;
+  yaw: number;
 }
 
 export const orbitRate = (radius: number) => Math.sqrt(0.5 / radius ** 3);
@@ -52,23 +54,31 @@ export function contactPosition(index: number, time: number) {
   };
 }
 
-/** Stationary Schwarzschild observer. Changing the viewpoint selects another observer;
- * camera navigation is not interpreted as a physical spacecraft trajectory. */
+/** A first-person rain observer just above the disk plane; looking never moves the eye. */
 export function cameraOf(view: SceneView) {
-  const tilt = (view.inclination * Math.PI) / 180;
-  const yaw = ((view.azimuth ?? 0) * Math.PI) / 180;
+  const tilt = (84 * Math.PI) / 180;
+  const yaw = (view.yaw * Math.PI) / 180;
+  const pitch = (view.pitch * Math.PI) / 180;
   const eye: [number, number, number] = [
-    OBSERVER_RADIUS * Math.sin(tilt) * Math.sin(yaw),
-    OBSERVER_RADIUS * Math.cos(tilt),
-    -OBSERVER_RADIUS * Math.sin(tilt) * Math.cos(yaw),
+    0,
+    view.distance * Math.cos(tilt),
+    -view.distance * Math.sin(tilt),
   ];
-  const forward = eye.map((value) => -value / OBSERVER_RADIUS);
-  const right0 = [-Math.cos(yaw), 0, -Math.sin(yaw)];
-  const up0 = [
-    -Math.cos(tilt) * Math.sin(yaw),
-    Math.sin(tilt),
-    Math.cos(tilt) * Math.cos(yaw),
-  ];
+  const inward = [0, -Math.cos(tilt), Math.sin(tilt)];
+  const horizonUp = [0, Math.sin(tilt), Math.cos(tilt)];
+  const side = [-1, 0, 0];
+  const right0 = side.map(
+    (v, i) => v * Math.cos(yaw) - (inward[i] ?? 0) * Math.sin(yaw)
+  );
+  const heading = inward.map(
+    (v, i) => v * Math.cos(yaw) + (side[i] ?? 0) * Math.sin(yaw)
+  );
+  const forward = heading.map(
+    (v, i) => v * Math.cos(pitch) + (horizonUp[i] ?? 0) * Math.sin(pitch)
+  );
+  const up0 = horizonUp.map(
+    (v, i) => v * Math.cos(pitch) - (heading[i] ?? 0) * Math.sin(pitch)
+  );
   const roll = (view.roll * Math.PI) / 180;
   const right = right0.map(
     (value, i) => value * Math.cos(roll) + (up0[i] ?? 0) * Math.sin(roll)
@@ -80,91 +90,11 @@ export function cameraOf(view: SceneView) {
 }
 
 export function focalLength(view: SceneView, width: number, height: number) {
-  const sine =
-    (CRITICAL_B * Math.sqrt(1 - 1 / OBSERVER_RADIUS)) / OBSERVER_RADIUS;
-  return (view.size * Math.min(width, height)) / Math.tan(Math.asin(sine));
-}
-
-/** Change the observer's optics, never the bodies, to keep the primary scene framed. */
-export function fittedSize(
-  view: SceneView,
-  width: number,
-  height: number,
-  time: number
-) {
-  const { basis, eye } = cameraOf(view);
-  let extentX = 0.2;
-  let extentY = 0.12;
-  for (const [index, body] of CONTACTS.entries()) {
-    for (const delay of [-16, 0, 16]) {
-      const point = contactPosition(index, time + delay);
-      for (const sx of [-1, 1]) {
-        for (const sy of [-1, 1]) {
-          const x = point.x + (sx * body.width) / 2;
-          const y = point.y + (sy * body.height * CONTACT_UP[1]) / 2;
-          const z = point.z + (sy * body.height * CONTACT_UP[2]) / 2;
-          const depth =
-            OBSERVER_RADIUS -
-            (x * eye[0] + y * eye[1] + z * eye[2]) / OBSERVER_RADIUS;
-          extentX = Math.max(
-            extentX,
-            Math.abs(
-              (x * (basis[0] ?? 0) +
-                y * (basis[1] ?? 0) +
-                z * (basis[2] ?? 0)) /
-                depth
-            ) * 1.06
-          );
-          extentY = Math.max(
-            extentY,
-            Math.abs(
-              (x * (basis[3] ?? 0) +
-                y * (basis[4] ?? 0) +
-                z * (basis[5] ?? 0)) /
-                depth
-            ) * 1.06
-          );
-        }
-      }
-    }
-  }
-  const size =
-    (Math.min(width / 22, height / 25) * CRITICAL_B) / Math.min(width, height);
-  const focal = focalLength({ ...view, size }, width, height);
-  return (
-    size *
-    Math.min(
-      1,
-      (width / 2 - 18) / (focal * extentX),
-      (height * 0.45 - 28) / (focal * extentY)
-    )
-  );
-}
-
-export function tableSample(
-  table: GeodesicTable,
-  data: Float32Array,
-  row: number,
-  phi: number
-) {
-  const column = (phi / table.phiMax) * (table.phiCount - 1);
-  const x = Math.floor(column),
-    y = Math.floor(row);
-  const cell = (dx: number, dy: number) =>
-    data[
-      Math.max(0, Math.min(table.rows - 1, y + dy)) * table.phiCount +
-        Math.max(0, Math.min(table.phiCount - 1, x + dx))
-    ] ?? 0;
-  const f = column - x,
-    g = row - y;
-  return (
-    (cell(0, 0) * (1 - f) + cell(1, 0) * f) * (1 - g) +
-    (cell(0, 1) * (1 - f) + cell(1, 1) * f) * g
-  );
+  return (Math.min(width, height) * 0.5) / Math.tan((view.fov * Math.PI) / 360);
 }
 
 export function sceneRay(
-  table: GeodesicTable,
+  table: InfallTable,
   view: SceneView,
   width: number,
   height: number,
@@ -180,35 +110,26 @@ export function sceneRay(
   );
   const norm = Math.hypot(...raw);
   const dir = raw.map((v) => v / norm);
-  const e1 = eye.map((v) => v / OBSERVER_RADIUS);
+  const e1 = eye.map((v) => v / view.distance);
   const dot = dir.reduce((sum, v, i) => sum + v * (e1[i] ?? 0), 0);
   const across = dir.map((v, i) => v - dot * (e1[i] ?? 0));
   const sine = Math.hypot(...across);
   if (sine < 1e-8) {
     return null;
   }
-  const b = (OBSERVER_RADIUS * sine) / Math.sqrt(1 - 1 / OBSERVER_RADIUS);
-  if (b > table.bMax) {
-    return null;
-  }
-  const row =
-    b < CRITICAL_B
-      ? table.below * (1 - Math.sqrt(1 - b / CRITICAL_B))
-      : table.below +
-        ((b - CRITICAL_B) / (table.bMax - CRITICAL_B)) ** (1 / 3) *
-          (table.rows - 1 - table.below);
+  const row = angleRow(Math.acos(Math.max(-1, Math.min(1, -dot))), table);
   const low = Math.floor(row),
     f = row - low;
   const a = table.ends[low] ?? 0,
     c = table.ends[Math.min(low + 1, table.rows - 1)] ?? 0;
   const nearest = f < 0.5 ? a : c;
   const end = Math.sign(a) === Math.sign(c) ? a + (c - a) * f : nearest;
-  return { b, e1, e2: across.map((v) => v / sine), end, row };
+  return { e1, e2: across.map((v) => v / sine), end, row };
 }
 
 /** Picking uses the same curved ray, retarded emission time and surface bounds as GLSL. */
 export function contactHit(
-  table: GeodesicTable,
+  table: InfallTable,
   view: SceneView,
   width: number,
   height: number,
@@ -233,7 +154,7 @@ export function contactHit(
     if (phi >= Math.abs(ray.end)) {
       break;
     }
-    const inverse = tableSample(table, table.u, ray.row, phi);
+    const inverse = infallSample(table, table.u, ray.row, phi);
     if (inverse <= 0 || inverse >= 1) {
       continue;
     }
@@ -247,7 +168,7 @@ export function contactHit(
           ((ray.e2[1] ?? 0) * CONTACT_UP[1] +
             (ray.e2[2] ?? 0) * CONTACT_UP[2])) /
       inverse;
-    const delay = tableSample(table, table.times, ray.row, phi);
+    const delay = infallSample(table, table.times, ray.row, phi);
     for (const [index, body] of CONTACTS.entries()) {
       const center = contactPosition(index, time - delay + OBSERVER_RADIUS);
       if (

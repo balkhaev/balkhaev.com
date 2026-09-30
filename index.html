@@ -25,7 +25,7 @@
       <div aria-hidden="true" class="fallback"></div>
       <canvas aria-hidden="true" id="hole"></canvas>
       <button
-        aria-label="Осмотреть сцену. Потяните или используйте стрелки для смены ракурса. Колесо, жест двумя пальцами или плюс и минус — масштаб. Home — общий план. Tab — контакты."
+        aria-label="Осмотреть сцену от первого лица. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — полёт к чёрной дыре. Home — начать заново. Tab — контакты."
         id="observer"
         type="button"
       ></button>
@@ -38,7 +38,13 @@
         >
         <a href="mailto:m.balkhaev@gmail.com">m.balkhaev@gmail.com</a>
       </nav>
-      <p aria-hidden="true" id="hint">Потяните, чтобы осмотреться</p>
+      <p aria-hidden="true" id="hint">
+        Тяните — обзор · Скролл вниз — погружение
+      </p>
+      <div class="flight-info">
+        <span id="flight-status"></span>
+        <button hidden id="restart" type="button">Начать заново ↗</button>
+      </div>
     </main>
     <script src="/app.js" type="module"></script>
   </body>

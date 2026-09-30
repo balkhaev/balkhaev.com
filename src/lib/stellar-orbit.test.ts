@@ -18,9 +18,14 @@ test("eccentric geodesic conserves independent Schwarzschild energy and angular 
     const state = stellarState(orbit, (k * orbit.period) / 1000 - orbit.offset);
     const lapse = 1 - 1 / state.radius;
     const properRate = Math.sqrt(
-      lapse - state.radial ** 2 / lapse - (state.radius * state.angular) ** 2
+      lapse -
+        (2 * state.radial) / Math.sqrt(state.radius) -
+        state.radial ** 2 -
+        (state.radius * state.angular) ** 2
     );
-    energies.push(lapse / properRate);
+    energies.push(
+      (lapse - state.radial / Math.sqrt(state.radius)) / properRate
+    );
     momenta.push((state.radius ** 2 * state.angular) / properRate);
     minimum = Math.min(minimum, state.radius);
     maximum = Math.max(maximum, state.radius);
@@ -28,7 +33,8 @@ test("eccentric geodesic conserves independent Schwarzschild energy and angular 
   expect(Math.max(...energies) - Math.min(...energies)).toBeLessThan(0.000_002);
   expect(Math.max(...momenta) - Math.min(...momenta)).toBeLessThan(0.000_05);
   expect(minimum).toBeCloseTo(STAR_PERIAPSIS, 5);
-  expect(maximum).toBeCloseTo(STAR_APOAPSIS, 5);
+  // In PG time apoapsis is no longer at half-period; the sampled peak is within 5e-5 r_s.
+  expect(maximum).toBeCloseTo(STAR_APOAPSIS, 4);
   expect(minimum - STAR_RADIUS).toBeGreaterThan(11);
 });
 
