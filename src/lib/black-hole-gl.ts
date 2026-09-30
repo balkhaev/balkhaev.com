@@ -4,6 +4,7 @@ import {
   createDiskParticles,
   PARTICLE_FRAGMENT,
   PARTICLE_VERTEX,
+  WAKE_FRAGMENT,
 } from "./black-hole-particles";
 import {
   createGpuClock,
@@ -192,12 +193,13 @@ vec4 disk(float r, float psi, float lambda) {
 	float flux = pow(x, -3.0) * max(0.0, 1.0 - sqrt(1.0 / x)) / FLUX_PEAK;
 	float omega = sqrt(0.5 / (r * r * r));
 	float g = sqrt(max(0.0, 1.0 - 1.5 / r)) / (1.0 - omega * lambda * uSpin);
-	vec2 matter = textureLod(uParticles, vec2(psi / TAU + 0.5, (r - DISK_IN) / (DISK_OUT - DISK_IN)), 0.0).rg;
+	vec3 matter = textureLod(uParticles, vec2(psi / TAU + 0.5, (r - DISK_IN) / (DISK_OUT - DISK_IN)), 0.0).rgb;
 	float n = 1.0 - exp(-matter.r * 3.0);
 	float t = (T_PEAK + matter.g * 1500.0) * pow(flux, 0.25) * g;
-	float bright = flux * pow(g, BEAMING) * (1.0 + 0.45 * n) * 1.3 * (1.0 + matter.g * 1.5);
+	float remaining = 1.0 - matter.b * 0.96;
+	float bright = flux * pow(g, BEAMING) * (1.0 + 0.45 * n) * 1.3 * (1.0 + matter.g * 1.5) * remaining;
 	float edge = smoothstep(DISK_IN, DISK_IN + 0.9, r) * (1.0 - smoothstep(DISK_OUT * 0.4, DISK_OUT, r));
-	float alpha = edge * (0.72 + 0.28 * n);
+	float alpha = edge * (0.72 + 0.28 * n) * remaining;
 	return vec4(blackbody(t) * bright * uAccretion, alpha);
 }
 
@@ -282,7 +284,7 @@ void main() {
 	float gas = smoothstep(0.015, 0.35, max(light.r, max(light.g, light.b)));
 	float friction = 0.4 + uMotion * 4.0;
 	light *= 1.0 + contactWarmth * friction;
-	light += vec3(1.0, 0.72, 0.38) * gas * contactCore * friction * 2.0;
+	light += vec3(1.0, 0.72, 0.38) * gas * contactCore * friction * 0.25;
 	if (end > 0.0 && uStars > 0.0) {
 		light += through * stars(away, skyX, skyY) * uStars;
 	}
@@ -469,6 +471,7 @@ export function createHoleRenderer(
   let blur: Program;
   let compose: Program;
   let particleProgram: Program;
+  let wakeProgram: Program;
   try {
     scene = compile(gl, SCENE, [
       "uTable",
@@ -498,6 +501,7 @@ export function createHoleRenderer(
       "uExposure",
     ]);
     particleProgram = compile(gl, PARTICLE_FRAGMENT, [], PARTICLE_VERTEX);
+    wakeProgram = compile(gl, WAKE_FRAGMENT, []);
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.error(error);
@@ -508,7 +512,11 @@ export function createHoleRenderer(
   const table = tableOnce();
   const tableTexture = dataTexture(gl, table.phiCount, table.rows, table.u);
   const endsTexture = dataTexture(gl, table.rows, 1, table.ends);
-  const particles = createDiskParticles(gl, particleProgram.program);
+  const particles = createDiskParticles(
+    gl,
+    particleProgram.program,
+    wakeProgram.program
+  );
   const gpu = createGpuClock(gl);
   let quality: HoleQuality = "balanced";
   const vao = gl.createVertexArray();
@@ -585,7 +593,14 @@ export function createHoleRenderer(
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
-      for (const each of [scene, downsample, blur, compose, particleProgram]) {
+      for (const each of [
+        scene,
+        downsample,
+        blur,
+        compose,
+        particleProgram,
+        wakeProgram,
+      ]) {
         gl.deleteProgram(each.program);
       }
     },
