@@ -11,6 +11,39 @@ const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
 const hint = document.querySelector<HTMLElement>("#hint");
 
+function flightLabel(flight: ReturnType<typeof createFlight>) {
+  if (!flight.active) {
+    return "";
+  }
+  if (flight.playback === "rewinding") {
+    return "Перемотка назад";
+  }
+  if (flight.playback === "paused") {
+    return flight.journey.phase > 0
+      ? `Пауза · ${flight.journey.stage.toLowerCase()}`
+      : "Начало полёта";
+  }
+  return flight.journey.stage;
+}
+
+function flightInstruction(flight: ReturnType<typeof createFlight>) {
+  if (flight.playback === "ended") {
+    return "Потяните — обзор · Скролл вверх — перемотка";
+  }
+  if (flight.playback === "paused" || flight.playback === "rewinding") {
+    return "Скролл вниз — продолжить падение";
+  }
+  return flight.crossed
+    ? "Потяните, чтобы увидеть внешнее небо сбоку и сзади"
+    : "";
+}
+
+function updateText(element: HTMLElement | null, value: string) {
+  if (element && element.textContent !== value) {
+    element.textContent = value;
+  }
+}
+
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
   const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
@@ -40,6 +73,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     hint?.classList.add("dismissed");
   }
   const flightStatus = document.querySelector<HTMLElement>("#flight-status");
+  const flightNote = document.querySelector<HTMLElement>("#flight-note");
   let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
@@ -66,12 +100,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.horizon = String(flight.crossed);
     surface.dataset.journeyStage = flight.active ? journey.stage : "Обзор";
     surface.dataset.journeyPhase = journey.phase.toFixed(3);
-    if (flightStatus) {
-      const label = flight.active ? journey.stage : "";
-      if (flightStatus.textContent !== label) {
-        flightStatus.textContent = label;
-      }
-    }
+    surface.dataset.playback = flight.playback;
+    updateText(flightStatus, flightLabel(flight));
+    updateText(flightNote, flightInstruction(flight));
     renderer?.view(view);
   };
 

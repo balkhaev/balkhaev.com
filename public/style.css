@@ -178,11 +178,19 @@ h1 span {
   content: "";
   background: #c0b5a5;
 }
-#flight-status {
+.flight-state {
   flex: 1;
   align-self: center;
 }
 #flight-status:empty {
+  display: none;
+}
+#flight-note {
+  margin: 5px 0 0;
+  font-size: 11px;
+  color: #817d78;
+}
+#flight-note:empty {
   display: none;
 }
 .fallback {

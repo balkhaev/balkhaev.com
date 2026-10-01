@@ -12,15 +12,25 @@ export const flightRadius = (properTime: number) =>
     Math.max(0, START_RADIUS ** 1.5 - 1.5 * properTime) ** (2 / 3)
   );
 
-/** The model ends at a finite interior radius; there is no escape or automatic reset. */
+/** The trajectory ends at a finite interior radius. Navigation scrubs its display time in either direction. */
 export function journeyAt(progress: number) {
   const phase = Math.max(0, Math.min(END_PROGRESS, progress));
   const radius = START_RADIUS * Math.exp(-phase);
+  const finished = phase >= END_PROGRESS - 1e-7;
+  let stage = "Погружение";
+  if (finished) {
+    stage = "Последний кадр";
+  } else if (radius < 0.25) {
+    stage = "Небо сжимается";
+  } else if (phase >= HORIZON_PROGRESS) {
+    stage = "За горизонтом событий";
+  }
   return {
     clock: (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5),
+    finished,
     phase,
     radius,
-    stage: phase >= HORIZON_PROGRESS ? "За горизонтом событий" : "Погружение",
+    stage,
   };
 }
 
@@ -28,15 +38,18 @@ export function createFlight() {
   let progress = 0;
   let target = 0;
   let active = false;
-  let committed = false;
+  let playing = false;
   const properTime = () => journeyAt(progress).clock;
   return {
     get active() {
       return active;
     },
     advance(seconds: number, reducedMotion = false) {
+      if (!(Number.isFinite(seconds) && seconds > 0)) {
+        return 0;
+      }
       const journey = journeyAt(progress);
-      if (active && !reducedMotion) {
+      if (playing && !reducedMotion) {
         const pace =
           journey.phase < HORIZON_PROGRESS
             ? Math.min(0.55, 3.8 / journey.radius ** 1.5)
@@ -45,17 +58,15 @@ export function createFlight() {
       }
       const previous = properTime();
       let step = (target - progress) * (1 - Math.exp(-seconds * 7));
-      if (step > 0 && !reducedMotion) {
-        step = Math.min(
-          step,
-          seconds * (journey.phase < HORIZON_PROGRESS ? 1 : 0.45)
-        );
+      if (!reducedMotion) {
+        const forwardRate = journey.phase < HORIZON_PROGRESS ? 1 : 0.45;
+        const limit = seconds * (step < 0 ? 1.2 : forwardRate);
+        step = Math.sign(step) * Math.min(Math.abs(step), limit);
       }
       progress += step;
       if (Math.abs(target - progress) < 1e-7) {
         progress = target;
       }
-      committed ||= progress >= HORIZON_PROGRESS;
       return properTime() - previous;
     },
     get crossed() {
@@ -64,22 +75,34 @@ export function createFlight() {
     get journey() {
       return journeyAt(progress);
     },
+    get playback() {
+      if (!active) {
+        return "idle";
+      }
+      if (target < progress - 1e-7) {
+        return "rewinding";
+      }
+      if (journeyAt(progress).finished) {
+        return "ended";
+      }
+      return playing ? "playing" : "paused";
+    },
     get radius() {
       return journeyAt(progress).radius;
     },
     travel(amount: number, immediate = false) {
-      if (committed && amount < 0) {
+      if (!Number.isFinite(amount) || amount === 0) {
         return 0;
       }
       active = true;
-      target = Math.min(
-        END_PROGRESS,
-        Math.max(committed ? progress : 0, target + amount)
-      );
+      // A direction change cancels the old queued motion and anchors the gesture to the visible frame.
+      const anchor =
+        amount < 0 ? Math.min(progress, target) : Math.max(progress, target);
+      playing = amount > 0 && !immediate;
+      target = Math.min(END_PROGRESS, Math.max(0, anchor + amount));
       const previous = properTime();
       if (immediate) {
         progress = target;
-        committed ||= progress >= HORIZON_PROGRESS;
       }
       return properTime() - previous;
     },
