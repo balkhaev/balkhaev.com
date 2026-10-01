@@ -106,7 +106,7 @@ const float DISK_OUT = ${DISK_OUT.toFixed(1)};
 // Peak of the zero-torque Schwarzschild thin-disk flux, at r = 4.7755 r_s.
 const float FLUX_PEAK = 0.00011458947;
 // The hottest gas, kelvin, before any shift.
-const float T_PEAK = 3200.0;
+const float T_PEAK = 2800.0;
 
 
 float rowOf(float angle) {
@@ -202,6 +202,9 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float wisps = filteredDensity(flow * 2.5 + vec2(r * 24.0 + clouds * 3.0, r * 2.0));
 	float fine = filteredDensity(flow * 14.0 + vec2(r * 70.0, r * 15.0));
 	float structure = smoothstep(0.18, 0.82, 0.35 * clouds + 0.45 * wisps + 0.2 * fine);
+	float strandPhase = r * 47.0 + clouds * 9.0 + sin(phase * 4.0) * 1.4;
+	float strand = pow(0.5 + 0.5 * sin(strandPhase), 14.0);
+	strand = mix(strand, 0.15, smoothstep(0.8, 2.0, fwidth(strandPhase)));
 	// Small thermal eddies co-rotate with the disk; compression heats the wake's edges.
 	float ember = smoothstep(0.64, 0.9, fine) * smoothstep(0.48, 0.8, wisps);
 	float breathing = 0.5 + 0.5 * sin((uTime - delay) * 0.24 + clouds * TAU);
@@ -209,10 +212,10 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float eddyAngle = atan(sin(phase + 2.35), cos(phase + 2.35));
 	float eddy = exp(-pow((r - 4.9) / 0.38, 2.0) - pow(eddyAngle / 0.12, 2.0));
 	float flare = pow(0.5 + 0.5 * sin((uTime - delay + EPOCH) * 0.075), 4.0);
-	float t = T_PEAK * pow(flux, 0.25) * (1.0 + 0.12 * ember * breathing + 0.24 * eddy * flare + 0.22 * wake.y) * g;
+	float t = T_PEAK * pow(flux, 0.25) * (1.0 + 0.09 * ember * breathing + 0.18 * eddy * flare + 0.22 * wake.y) * g;
 	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
-	float alpha = edge * clamp(0.12 + 0.12 * n + 0.76 * structure + 0.72 * wake.x, 0.015, 1.0);
-	return vec4(blackbody(t) * uAccretion, alpha);
+	float alpha = edge * clamp(0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand + 0.72 * wake.x, 0.015, 1.0);
+	return vec4(blackbody(t) * uAccretion * (0.85 + 0.4 * strand), alpha);
 }
 
 /**
@@ -518,6 +521,7 @@ export function createHoleRenderer(
       "uDistance",
       "uTime",
       "uPassage",
+      "uDrummer",
       "uAccretion",
       "uSpin",
       "uStars",
@@ -557,6 +561,49 @@ export function createHoleRenderer(
   );
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
+  const drummerTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, drummerTexture);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    new Uint8Array(4)
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const drummer = new Image();
+  let disposed = false;
+  drummer.addEventListener("load", () => {
+    if (disposed || gl.isContextLost()) {
+      return;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, drummerTexture);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      drummer
+    );
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.LINEAR_MIPMAP_LINEAR
+    );
+    canvas.dataset.drummerLoaded = "true";
+    canvas.dispatchEvent(new Event("sceneassetload"));
+  });
+  drummer.src = "/drummer-atlas.png";
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
   let previousTime = 0;
@@ -629,12 +676,14 @@ export function createHoleRenderer(
 
   return {
     dispose() {
+      disposed = true;
       free([...(sceneTarget ? [sceneTarget] : []), ...glow.flat()]);
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
       gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
+      gl.deleteTexture(drummerTexture);
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
@@ -672,12 +721,16 @@ export function createHoleRenderer(
       texture(2, particles.texture);
       texture(3, spectrumTexture);
       texture(4, timesTexture);
+      if (drummerTexture) {
+        texture(5, drummerTexture);
+      }
       texture(6, orbitTexture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
       gl.uniform1i(at("uSpectrum"), 3);
       gl.uniform1i(at("uTimes"), 4);
+      gl.uniform1i(at("uDrummer"), 5);
       gl.uniform1i(at("uOrbit"), 6);
       gl.uniform4f(
         at("uOrbitClock"),

@@ -5,12 +5,12 @@
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="#000000" name="theme-color">
     <meta
-      content="Balkhaev. Путешествие сквозь чёрную и белую дыру."
+      content="Balkhaev. Чёрная дыра, ритм бубна и новый виток."
       name="description"
     >
     <meta content="Balkhaev" property="og:title">
     <meta
-      content="Путешествие сквозь чёрную и белую дыру."
+      content="Чёрная дыра, ритм бубна и новый виток."
       property="og:description"
     >
     <meta content="https://balkhaev.com/" property="og:url">
@@ -18,6 +18,7 @@
     <link href="https://balkhaev.com/" rel="canonical">
     <link href="/icon.svg" rel="icon" type="image/svg+xml">
     <link href="/style.css" rel="stylesheet">
+    <link as="image" href="/drummer-atlas.png" rel="preload">
     <title>Balkhaev</title>
   </head>
   <body>
@@ -25,7 +26,7 @@
       <div aria-hidden="true" class="fallback"></div>
       <canvas aria-hidden="true" id="hole"></canvas>
       <button
-        aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — продолжить полёт сквозь чёрную и белую дыру. Tab — контакты."
+        aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — погрузиться в чёрную дыру. Внутри бурятский музыкант играет на бубне и выпускает вас наружу в новый виток полёта. Tab — контакты."
         id="observer"
         type="button"
       ></button>
@@ -60,6 +61,22 @@
           >
         </p>
         <span aria-live="polite" id="flight-status"></span>
+        <button
+          aria-label="Включить звук бубна"
+          aria-pressed="false"
+          id="sound"
+          type="button"
+        >
+          <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+            <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+            <path
+              class="sound-waves"
+              d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+            />
+            <path class="sound-off" d="m16 9 5 6m0-6-5 6" />
+          </svg>
+          <span>Звук</span>
+        </button>
       </footer>
     </main>
     <script src="/app.js" type="module"></script>

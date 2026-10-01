@@ -4,7 +4,8 @@ import {
   type HoleView,
 } from "./lib/black-hole-gl";
 import { createHoleQuality } from "./lib/black-hole-quality";
-import { createFlight } from "./lib/flight";
+import { createDrumAudio } from "./lib/drum-audio";
+import { BEAT_PERIOD, createFlight, EJECTION_START } from "./lib/flight";
 import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
@@ -35,6 +36,17 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const quality = createHoleQuality();
   const flight = createFlight();
+  const audio = createDrumAudio();
+  const sound = document.querySelector<HTMLButtonElement>("#sound");
+  sound?.addEventListener("click", async () => {
+    const enabled = await audio.toggle();
+    sound.setAttribute("aria-pressed", String(enabled));
+    sound.setAttribute(
+      "aria-label",
+      enabled ? "Выключить звук бубна" : "Включить звук бубна"
+    );
+  });
+  let lastBeat = -1;
   if (previewStill && previewProgress > 0) {
     flight.travel(previewProgress, true);
     hint?.classList.add("dismissed");
@@ -64,7 +76,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.observerRadius = view.distance.toFixed(4);
     surface.dataset.horizon = String(flight.crossed);
     surface.dataset.journeyStage = flight.active ? journey.stage : "Обзор";
-    surface.dataset.exitDistance = journey.passage[2]?.toFixed(3) ?? "3";
+    surface.dataset.journeyCycle = String(journey.cycle);
+    surface.dataset.journeyPhase = journey.phase.toFixed(3);
+    surface.dataset.beatClock = journey.beatClock.toFixed(3);
     if (flightStatus) {
       const label = flight.active ? journey.stage : "";
       if (flightStatus.textContent !== label) {
@@ -81,6 +95,23 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     const passage = frameView();
     renderer.draw({ accretion: 1, passage, time });
+    const { journey } = flight;
+    const beat = Math.floor(
+      (journey.beatClock - (passage[1] ?? 0) + 3.5) / BEAT_PERIOD
+    );
+    const beatId = journey.cycle * 100 + beat;
+    if (beatId !== lastBeat) {
+      if (
+        flight.active &&
+        !previewStill &&
+        !still.matches &&
+        (passage[0] ?? 0) > 0.99 &&
+        beat >= 1
+      ) {
+        audio.pulse(journey.phase >= EJECTION_START ? 1.3 : 1);
+      }
+      lastBeat = beatId;
+    }
     document.documentElement.classList.add("rendered");
   };
 
@@ -287,11 +318,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     document.documentElement.classList.remove("rendered");
   });
   surface.addEventListener("webglcontextrestored", mount);
+  surface.addEventListener("sceneassetload", draw);
   window.addEventListener("pagehide", (event) => {
     stop();
     if (!event.persisted) {
       resize.disconnect();
       renderer?.dispose();
+      audio.dispose();
       renderer = null;
     }
   });

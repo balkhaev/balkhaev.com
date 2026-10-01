@@ -2,45 +2,70 @@ export const START_RADIUS = 12.5;
 export const END_RADIUS = 0.2;
 export const HORIZON_TIME = (2 / 3) * (START_RADIUS ** 1.5 - 1);
 export const END_TIME = (2 / 3) * (START_RADIUS ** 1.5 - END_RADIUS ** 1.5);
-export const WHITE_EXIT = 5.85;
-export const OPEN_SPACE = 8.5;
-export const EXIT_VELOCITY = 0.45;
+export const CHAMBER_START = 2.72;
+export const DRUM_START = 3.65;
+export const BEAT_PERIOD = 10;
+// The eighth contact is seen after its light has travelled from the drum to the observer.
+export const EJECTION_START = DRUM_START + (8 * BEAT_PERIOD - 3.5 + 5.4) / 30;
+export const LOOP_LENGTH = 9.2;
 const CORE_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
+const AUTHORED_CLOCK_RATE = 30;
 
 const smoothRange = (a: number, b: number, value: number) => {
   const t = Math.max(0, Math.min(1, (value - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
-/** Classical infall ends before the singularity; the following passage is a visual interpretation. */
+const rainClock = (radius: number) =>
+  (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5);
+const classicalClock = rainClock(START_RADIUS * Math.exp(-CHAMBER_START));
+export const LOOP_CLOCK =
+  classicalClock + (LOOP_LENGTH - CHAMBER_START) * AUTHORED_CLOCK_RATE;
+
+/** The optical infall is classical. The drummer and looping escape are authored fiction. */
 export function journeyAt(progress: number) {
-  const radius = START_RADIUS * Math.exp(-Math.min(CORE_PROGRESS, progress));
+  const cycle = Math.floor(Math.max(0, progress) / LOOP_LENGTH);
+  const phase = Math.max(0, progress) - cycle * LOOP_LENGTH;
+  const fallingRadius =
+    START_RADIUS * Math.exp(-Math.min(CORE_PROGRESS, phase));
+  const departure = smoothRange(EJECTION_START, 8.4, phase);
+  const returnBlend = smoothRange(7.8, 8.95, phase);
+  const radius =
+    phase < EJECTION_START
+      ? fallingRadius
+      : END_RADIUS +
+        (START_RADIUS - END_RADIUS) * smoothRange(6.65, 8.95, phase);
+  const beatClock = Math.max(0, phase - DRUM_START) * AUTHORED_CLOCK_RATE;
   const passage = new Float32Array([
-    smoothRange(2.7, 3.7, progress),
-    Math.max(0, Math.min(1, (progress - 2.65) / 3.2)),
-    3 + Math.max(0, progress - WHITE_EXIT) * 10,
-    smoothRange(5.6, 6.5, progress),
+    smoothRange(CHAMBER_START, 3.55, phase) * (1 - returnBlend),
+    18 - 12.6 * smoothRange(CHAMBER_START, 4.3, phase) + 32 * departure,
+    beatClock,
+    departure,
   ]);
   let stage = "Погружение";
-  if (radius < 1) {
+  if (phase >= Math.log(START_RADIUS)) {
     stage = "За горизонтом событий";
   }
-  if (progress >= 3.7) {
-    stage = "Переход";
+  if (phase >= DRUM_START) {
+    stage = "В ритме бубна";
   }
-  if (progress >= WHITE_EXIT) {
-    stage = "Белая дыра";
+  if (phase >= EJECTION_START) {
+    stage = "Выход наружу";
   }
-  if (progress >= OPEN_SPACE) {
-    stage = "По ту сторону";
+  if (phase >= 8.4) {
+    stage = "Новый виток";
   }
   return {
-    cameraYaw: 180 * smoothRange(6.4, 8.2, progress),
+    beatClock,
+    cameraYaw: 0,
     clock:
-      (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5) +
-      Math.max(0, Math.min(progress, WHITE_EXIT) - CORE_PROGRESS) * 35 +
-      (Math.max(0, progress - WHITE_EXIT) * 10) / EXIT_VELOCITY,
+      cycle * LOOP_CLOCK +
+      (phase <= CHAMBER_START
+        ? rainClock(fallingRadius)
+        : classicalClock + (phase - CHAMBER_START) * AUTHORED_CLOCK_RATE),
+    cycle,
     passage,
+    phase,
     radius,
     stage,
   };
@@ -57,7 +82,7 @@ export function createFlight() {
   let progress = 0;
   let target = 0;
   let active = false;
-  let crossed = false;
+  let committed = false;
   const horizon = Math.log(START_RADIUS);
   const properTime = () => journeyAt(progress).clock;
   return {
@@ -65,27 +90,27 @@ export function createFlight() {
       return active;
     },
     advance(seconds: number, reducedMotion = false) {
+      const journey = journeyAt(progress);
       if (active && !reducedMotion) {
-        const pace = crossed ? 0.08 : 0.025;
+        const pace =
+          journey.phase < horizon
+            ? Math.min(0.55, 3.8 / journey.radius ** 1.5)
+            : 0.2;
         target += seconds * pace;
       }
       const previous = properTime();
       let step = (target - progress) * (1 - Math.exp(-seconds * 7));
       if (step > 0 && !reducedMotion) {
-        step = crossed
-          ? Math.min(step, seconds * 0.5)
-          : Math.min(
-              step,
-              seconds * 1.2,
-              Math.max(0.05, horizon - progress + 0.05)
-            );
+        // Queued wheel gestures change the pace, but cannot skip the drummer.
+        step = Math.min(step, seconds * (journey.phase < horizon ? 1 : 0.38));
       }
       progress += step;
-      crossed ||= progress >= horizon;
+      committed ||= progress >= horizon;
       return properTime() - previous;
     },
     get crossed() {
-      return crossed;
+      const { phase } = journeyAt(progress);
+      return phase >= horizon && phase < 8.4;
     },
     get journey() {
       return journeyAt(progress);
@@ -94,15 +119,15 @@ export function createFlight() {
       return journeyAt(progress).radius;
     },
     travel(amount: number, immediate = false) {
-      if (crossed && amount < 0) {
+      if (committed && amount < 0) {
         return 0;
       }
       active = true;
-      target = Math.max(crossed ? horizon + 0.0001 : 0, target + amount);
+      target = Math.max(committed ? progress : 0, target + amount);
       const previous = properTime();
       if (immediate) {
         progress = target;
-        crossed ||= progress >= horizon;
+        committed ||= progress >= horizon;
       }
       return properTime() - previous;
     },
