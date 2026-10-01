@@ -118,8 +118,7 @@ h1 span {
   color: #e1bc8e;
   transform: translate(2px, -2px);
 }
-.contacts a:focus-visible,
-#restart:focus-visible {
+.contacts a:focus-visible {
   outline: 1px solid #d6b68b;
   outline-offset: 7px;
   border-radius: 2px;
@@ -184,32 +183,6 @@ h1 span {
 }
 #flight-status:empty {
   display: none;
-}
-#restart {
-  display: inline-flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 8px 0 8px 12px;
-  margin-left: auto;
-  font: inherit;
-  color: #d7cec0;
-  pointer-events: auto;
-  cursor: pointer;
-  background: none;
-  border: 0;
-  transition: color 0.2s;
-}
-#restart[hidden] {
-  display: none;
-}
-#restart:hover {
-  color: #fff8ed;
-}
-#restart span {
-  font-size: 18px;
-  color: #b59977;
 }
 .fallback {
   position: absolute;

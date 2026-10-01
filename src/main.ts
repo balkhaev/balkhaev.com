@@ -13,6 +13,15 @@ const hint = document.querySelector<HTMLElement>("#hint");
 
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
+  const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
+    ? new URLSearchParams(location.search).get("preview-stage")
+    : null;
+  const previewProgress = Number(localPreview);
+  const previewStill =
+    localPreview !== null &&
+    Number.isFinite(previewProgress) &&
+    previewProgress >= 0 &&
+    previewProgress <= 20;
   const view: HoleView = {
     distance: OBSERVER_RADIUS,
     fov: 64,
@@ -26,12 +35,16 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const quality = createHoleQuality();
   const flight = createFlight();
+  if (previewStill && previewProgress > 0) {
+    flight.travel(previewProgress, true);
+    hint?.classList.add("dismissed");
+  }
   const flightStatus = document.querySelector<HTMLElement>("#flight-status");
-  const restart = document.querySelector<HTMLButtonElement>("#restart");
   let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
-  let time = 0;
+  let time = previewStill ? flight.journey.clock : 0;
+  let lookYaw = 0;
   let pointer: { x: number; y: number; at: number } | null = null;
   let lastImpulse = 0;
   const touches = new Map<number, { x: number; y: number }>();
@@ -43,38 +56,31 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   } | null = null;
 
   const frameView = () => {
-    view.distance = flight.radius;
+    const { journey } = flight;
+    view.distance = journey.radius;
+    view.yaw = lookYaw + (still.matches ? 0 : journey.cameraYaw);
     view.x = 0.5;
     view.y = 0.5;
     surface.dataset.observerRadius = view.distance.toFixed(4);
     surface.dataset.horizon = String(flight.crossed);
+    surface.dataset.journeyStage = flight.active ? journey.stage : "Обзор";
+    surface.dataset.exitDistance = journey.passage[2]?.toFixed(3) ?? "3";
     if (flightStatus) {
-      let label = "";
-      if (flight.active) {
-        label = "Погружение";
-      }
-      if (flight.crossed) {
-        label = "За горизонтом событий";
-      }
-      if (flight.ended) {
-        label = "Конец траектории";
-      }
+      const label = flight.active ? journey.stage : "";
       if (flightStatus.textContent !== label) {
         flightStatus.textContent = label;
       }
     }
-    if (restart) {
-      restart.hidden = !flight.active;
-    }
     renderer?.view(view);
+    return journey.passage;
   };
 
   const draw = () => {
     if (!renderer) {
       return;
     }
-    frameView();
-    renderer.draw({ accretion: 1, time });
+    const passage = frameView();
+    renderer.draw({ accretion: 1, passage, time });
     document.documentElement.classList.add("rendered");
   };
 
@@ -110,7 +116,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       return;
     }
     draw();
-    if (!still.matches) {
+    if (!(still.matches || previewStill)) {
       frame = requestAnimationFrame(tick);
     }
   };
@@ -126,21 +132,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const dismissHint = () => {
     hint?.classList.add("dismissed");
   };
-  const reset = () => {
-    flight.reset();
-    time = 0;
-    view.pitch = 0;
-    view.yaw = 0;
-    renderer?.clearWake();
-    pointer = null;
-    lastImpulse = 0;
-    delete surface.dataset.diskImpulses;
-    hint?.classList.remove("dismissed");
-    draw();
-  };
-  restart?.addEventListener("click", reset);
   const travel = (amount: number) => {
-    time += flight.travel(amount, still.matches);
+    time += flight.travel(amount, still.matches || previewStill);
   };
 
   const disturb = (event: PointerEvent, tap = false) => {
@@ -165,7 +158,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       )
     ) {
       lastImpulse = now;
-      if (still.matches) {
+      if (still.matches || previewStill) {
         draw();
       }
     }
@@ -213,7 +206,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
           dy = event.clientY - gesture.y;
         if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
           gesture.dragged = true;
-          view.yaw -= dx * 0.15;
+          lookYaw -= dx * 0.15;
           view.pitch = Math.max(-89, Math.min(89, view.pitch + dy * 0.15));
           gesture.x = event.clientX;
           gesture.y = event.clientY;
@@ -263,15 +256,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   );
   input.addEventListener("keydown", (event) => {
     delete input.dataset.pointerFocused;
-    if (event.key === "Home" || event.key === "Escape") {
-      event.preventDefault();
-      reset();
-      return;
-    }
     if (event.key === "ArrowLeft") {
-      view.yaw -= 4;
+      lookYaw -= 4;
     } else if (event.key === "ArrowRight") {
-      view.yaw += 4;
+      lookYaw += 4;
     } else if (event.key === "ArrowUp") {
       view.pitch = Math.min(89, view.pitch + 4);
     } else if (event.key === "ArrowDown") {

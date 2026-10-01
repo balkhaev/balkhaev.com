@@ -11,6 +11,7 @@ import {
 } from "./black-hole-quality";
 import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
 import { infallTable } from "./infall-geodesics";
+import { PASSAGE_SHADER } from "./passage-shader";
 import {
   cameraOf,
   focalLength,
@@ -48,12 +49,13 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
+  /** Visual passage beyond the classical infall model. */
+  passage: Float32Array;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
   time: number;
 }
 
 export interface HoleRenderer {
-  clearWake: () => void;
   dispose: () => void;
   /** Screen position in normalized CSS coordinates; energy is bounded locally. */
   disturb: (x: number, y: number, time: number, strength: number) => boolean;
@@ -262,9 +264,15 @@ vec3 stars(vec3 dir, vec3 dx, vec3 dy, float cameraArea, float shift) {
 	return shiftedSpectrum(temperature, shift) * brightness * gain * exp(-dot(spot, spot) / 0.45);
 }
 
+${PASSAGE_SHADER}
+
 void main() {
 	vec2 offset = (gl_FragCoord.xy - uCenter) / uFocal;
 	vec3 dir = normalize(uCamera * vec3(offset, 1.0));
+	if (uPassage.x >= 1.0) {
+		outColor = vec4(passageLight(dir), 1.0);
+		return;
+	}
 	vec3 e1 = uEye / uDistance;
 	float cosA = dot(dir, e1);
 	vec3 across = dir - cosA * e1;
@@ -327,7 +335,8 @@ void main() {
 		light += through * sky * uStars;
 	}
 	float opacity = end < 0.0 ? 1.0 : 1.0 - through;
-	outColor = vec4(light, opacity);
+	if (uPassage.x > 0.0) light = mix(light, passageLight(dir), uPassage.x);
+	outColor = vec4(light, mix(opacity, 1.0, uPassage.x));
 }`;
 
 const DOWNSAMPLE = `#version 300 es
@@ -508,6 +517,7 @@ export function createHoleRenderer(
       "uGrid",
       "uDistance",
       "uTime",
+      "uPassage",
       "uAccretion",
       "uSpin",
       "uStars",
@@ -618,7 +628,6 @@ export function createHoleRenderer(
   };
 
   return {
-    clearWake: wake.clear,
     dispose() {
       free([...(sceneTarget ? [sceneTarget] : []), ...glow.flat()]);
       gl.deleteTexture(tableTexture);
@@ -643,7 +652,7 @@ export function createHoleRenderer(
       return true;
     },
 
-    draw({ accretion, time }) {
+    draw({ accretion, passage, time }) {
       if (!sceneTarget) {
         return;
       }
@@ -691,6 +700,7 @@ export function createHoleRenderer(
       );
       gl.uniform1f(at("uDistance"), table.distance);
       gl.uniform1f(at("uTime"), time);
+      gl.uniform4fv(at("uPassage"), passage);
       gl.uniform1f(at("uAccretion"), accretion);
       gl.uniform1f(at("uSpin"), view.spin);
       gl.uniform1f(at("uStars"), view.stars);

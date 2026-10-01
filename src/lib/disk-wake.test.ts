@@ -34,7 +34,7 @@ describe("disk interaction", () => {
     expect(turned?.radius).toBeCloseTo(a.radius, 6);
   });
 
-  test("retains bounded history, emission timestamps and energy, and clears on restart", () => {
+  test("retains bounded history, emission timestamps and energy, and clears explicitly", () => {
     const wake = createDiskWake();
     const hit = { angle: -0.5, delay: 10, radius: 6 };
     for (let i = 0; i < 80; i += 1) {
