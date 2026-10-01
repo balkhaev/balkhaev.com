@@ -241,13 +241,13 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	// A finite emitting inner boundary feeds the plunge, instead of a black gap at the ISCO.
 	float feed = 1.0 - smoothstep(3.0, 3.8, r);
 	vec4 injection = inflowMaterial(phase, uTime - delay + EPOCH);
-	float innerTemperature = 2050.0 * (0.86 + 0.17 * injection.x + 0.13 * injection.z + injection.w * 0.08);
+	float innerTemperature = 2050.0 * (0.6 + 0.55 * injection.x + 0.1 * injection.z + injection.w * 0.2);
 	float temperature = mix(T_PEAK * pow(flux, 0.25), innerTemperature, feed);
 	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.45 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
 	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
 	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
 	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
-	alpha = mix(alpha, 1.0 - exp(-(0.015 + 1.4 * pow(injection.y, 3.0) + 1.8 * injection.w) * 0.9), feed);
+	alpha = mix(alpha, 1.0 - exp(-(0.015 + 0.1 * injection.x + 0.45 * injection.y * injection.y + 2.2 * injection.w) * 0.9), feed);
 	vec3 radiance = blackbody(t) * (0.85 + 0.4 * strand + tracer * wake.y * 0.35);
 	radiance += blackbody(T_PEAK * pow(flux, 0.25) * 1.52 * g) * splashes * 0.18;
 	return vec4(radiance * uAccretion, alpha);

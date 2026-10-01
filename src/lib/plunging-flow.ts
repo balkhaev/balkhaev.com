@@ -127,11 +127,15 @@ vec4 plungeState(float r) {
 
 vec4 inflowMaterial(float phase, float birthTime) {
   vec2 material = vec2(cos(phase), sin(phase));
-  float clouds = filteredDensity(material * 2.3 + vec2(birthTime * 0.018, 7.0));
-  float filaments = filteredDensity(material * 13.0 + vec2(birthTime * 0.12, clouds * 2.0));
-  float fine = filteredDensity(material * 49.0 + vec2(birthTime * 0.45, 0.0));
+  float clouds = filteredDensity(material * 3.4 + vec2(birthTime * 0.028, 7.0));
+  float filaments = filteredDensity(material * 47.0 + vec2(birthTime * 0.7, clouds * 2.0));
+  float fine = filteredDensity(material * 180.0 + vec2(birthTime * 3.4, 0.0));
   // Irregular injection patches shear naturally into streams, with no evenly spaced spiral arms.
-  float stream = pow(smoothstep(0.3, 0.65, clouds) * smoothstep(0.4, 0.75, filaments), 2.0);
+  vec2 gradient = vec2(dFdx(filaments), dFdy(filaments));
+  float variance = dot(gradient, gradient) / 12.0;
+  float width = 0.0016 + 2.0 * variance;
+  float stream = sqrt(0.0016 / width) * exp(-pow(filaments - 0.55, 2.0) / width);
+  stream *= 0.2 + 0.8 * clouds * clouds;
   return vec4(clouds, filaments, fine, stream);
 }
 
@@ -159,11 +163,11 @@ vec4 plungingDisk(float r, float psi, float lambda, float angular, float energy,
   vec4 structure = inflowMaterial(phase, birthTime);
   // Constant stationary mass flux: r Sigma |U^r| is conserved.
   float column = 3.0 * ${PLUNGE_KICK.toFixed(3)} / (r * speed);
-  float density = (0.015 + 1.4 * pow(structure.y, 3.0) + 1.8 * structure.w) * column;
+  float density = (0.015 + 0.1 * structure.x + 0.45 * structure.y * structure.y + 2.2 * structure.w) * column;
   float alpha = 1.0 - exp(-density * 0.9);
   // Prescribed thermal emission with a restrained compression contribution; no luminous horizon.
   float temperature = 2050.0 * pow(max(column, 0.0001), 0.12) * pow(3.0 / r, 0.08);
-  temperature *= 0.86 + 0.17 * structure.x + 0.13 * structure.z + structure.w * 0.08;
+  temperature *= 0.6 + 0.55 * structure.x + 0.1 * structure.z + structure.w * 0.2;
   return vec4(blackbody(temperature * shift) * uAccretion, alpha);
 }
 `;
