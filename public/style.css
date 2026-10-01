@@ -185,46 +185,6 @@ h1 span {
 #flight-status:empty {
   display: none;
 }
-#sound {
-  display: none;
-  gap: 8px;
-  align-items: center;
-  min-height: 44px;
-  padding: 8px 0 8px 12px;
-  margin-left: auto;
-  font: inherit;
-  color: #a39b90;
-  pointer-events: auto;
-  cursor: pointer;
-  background: none;
-  border: 0;
-}
-.rendered #sound {
-  display: inline-flex;
-}
-#sound:hover,
-#sound[aria-pressed="true"] {
-  color: #e4c59c;
-}
-#sound:focus-visible {
-  outline: 1px solid #d6b68b;
-  outline-offset: 5px;
-}
-#sound svg {
-  width: 17px;
-  height: 17px;
-  stroke: currentColor;
-  stroke-width: 1.3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-#sound .sound-waves,
-#sound[aria-pressed="true"] .sound-off {
-  display: none;
-}
-#sound[aria-pressed="true"] .sound-waves {
-  display: block;
-}
 .fallback {
   position: absolute;
   top: 49%;

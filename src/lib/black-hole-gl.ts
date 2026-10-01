@@ -10,9 +10,7 @@ import {
   type HoleQuality,
 } from "./black-hole-quality";
 import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
-import { drummerPose, observedScore } from "./drum-score";
 import { infallTable } from "./infall-geodesics";
-import { PASSAGE_SHADER } from "./passage-shader";
 import {
   cameraOf,
   focalLength,
@@ -50,10 +48,6 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
-  exitVelocity: number;
-  /** Visual passage beyond the classical infall model. */
-  passage: Float32Array;
-  passageCamera: Float32Array;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
   time: number;
 }
@@ -270,15 +264,9 @@ vec3 stars(vec3 dir, vec3 dx, vec3 dy, float cameraArea, float shift) {
 	return shiftedSpectrum(temperature, shift) * brightness * gain * exp(-dot(spot, spot) / 0.45);
 }
 
-${PASSAGE_SHADER}
-
 void main() {
 	vec2 offset = (gl_FragCoord.xy - uCenter) / uFocal;
 	vec3 dir = normalize(uCamera * vec3(offset, 1.0));
-	if (uPassage.x >= 1.0) {
-		outColor = vec4(passageLight(dir), 1.0);
-		return;
-	}
 	vec3 e1 = uEye / uDistance;
 	float cosA = dot(dir, e1);
 	vec3 across = dir - cosA * e1;
@@ -341,8 +329,7 @@ void main() {
 		light += through * sky * uStars;
 	}
 	float opacity = end < 0.0 ? 1.0 : 1.0 - through;
-	if (uPassage.x > 0.0) light = mix(light, passageLight(dir), uPassage.x);
-	outColor = vec4(light, mix(opacity, 1.0, uPassage.x));
+	outColor = vec4(light, opacity);
 }`;
 
 const DOWNSAMPLE = `#version 300 es
@@ -523,12 +510,6 @@ export function createHoleRenderer(
       "uGrid",
       "uDistance",
       "uTime",
-      "uPassage",
-      "uDrummer",
-      "uPassageCamera",
-      "uBones[0]",
-      "uBody",
-      "uExitVelocity",
       "uAccretion",
       "uSpin",
       "uStars",
@@ -568,49 +549,6 @@ export function createHoleRenderer(
   );
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
-  const drummerTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, drummerTexture);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    1,
-    1,
-    0,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    new Uint8Array(4)
-  );
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const drummer = new Image();
-  let disposed = false;
-  drummer.addEventListener("load", () => {
-    if (disposed || gl.isContextLost()) {
-      return;
-    }
-    gl.bindTexture(gl.TEXTURE_2D, drummerTexture);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      drummer
-    );
-    gl.generateMipmap(gl.TEXTURE_2D);
-    gl.texParameteri(
-      gl.TEXTURE_2D,
-      gl.TEXTURE_MIN_FILTER,
-      gl.LINEAR_MIPMAP_LINEAR
-    );
-    canvas.dataset.drummerLoaded = "true";
-    canvas.dispatchEvent(new Event("sceneassetload"));
-  });
-  drummer.src = "/drummer-rig.png";
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
   let previousTime = 0;
@@ -683,14 +621,12 @@ export function createHoleRenderer(
 
   return {
     dispose() {
-      disposed = true;
       free([...(sceneTarget ? [sceneTarget] : []), ...glow.flat()]);
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
       gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
-      gl.deleteTexture(drummerTexture);
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
@@ -708,7 +644,7 @@ export function createHoleRenderer(
       return true;
     },
 
-    draw({ accretion, passage, passageCamera, exitVelocity, time }) {
+    draw({ accretion, time }) {
       if (!sceneTarget) {
         return;
       }
@@ -728,17 +664,13 @@ export function createHoleRenderer(
       texture(2, particles.texture);
       texture(3, spectrumTexture);
       texture(4, timesTexture);
-      if (drummerTexture) {
-        texture(5, drummerTexture);
-      }
-      texture(6, orbitTexture);
+      texture(5, orbitTexture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
       gl.uniform1i(at("uSpectrum"), 3);
       gl.uniform1i(at("uTimes"), 4);
-      gl.uniform1i(at("uDrummer"), 5);
-      gl.uniform1i(at("uOrbit"), 6);
+      gl.uniform1i(at("uOrbit"), 5);
       gl.uniform4f(
         at("uOrbitClock"),
         orbit.period,
@@ -760,12 +692,6 @@ export function createHoleRenderer(
       );
       gl.uniform1f(at("uDistance"), table.distance);
       gl.uniform1f(at("uTime"), time);
-      gl.uniform4fv(at("uPassage"), passage);
-      gl.uniform4fv(at("uPassageCamera"), passageCamera);
-      const pose = drummerPose(observedScore(passage[2] ?? 0, passageCamera));
-      gl.uniform3fv(at("uBones[0]"), pose.bones);
-      gl.uniform4fv(at("uBody"), pose.body);
-      gl.uniform1f(at("uExitVelocity"), exitVelocity);
       gl.uniform1f(at("uAccretion"), accretion);
       gl.uniform1f(at("uSpin"), view.spin);
       gl.uniform1f(at("uStars"), view.stars);

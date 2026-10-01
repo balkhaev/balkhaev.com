@@ -4,8 +4,6 @@ import {
   type HoleView,
 } from "./lib/black-hole-gl";
 import { createHoleQuality } from "./lib/black-hole-quality";
-import { createDrumAudio } from "./lib/drum-audio";
-import { observedScore, scoreAt } from "./lib/drum-score";
 import { createFlight } from "./lib/flight";
 import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
 
@@ -37,17 +35,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const quality = createHoleQuality();
   const flight = createFlight();
-  const audio = createDrumAudio();
-  const sound = document.querySelector<HTMLButtonElement>("#sound");
-  sound?.addEventListener("click", async () => {
-    const enabled = await audio.toggle();
-    sound.setAttribute("aria-pressed", String(enabled));
-    sound.setAttribute(
-      "aria-label",
-      enabled ? "Выключить звук бубна" : "Включить звук бубна"
-    );
-  });
-  let lastBeat = -1;
   if (previewStill && previewProgress > 0) {
     flight.travel(previewProgress, true);
     hint?.classList.add("dismissed");
@@ -71,19 +58,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const frameView = () => {
     const { journey } = flight;
     view.distance = journey.radius;
-    view.yaw = lookYaw + (still.matches ? 0 : journey.cameraYaw);
+    view.yaw = lookYaw;
     view.x = 0.5;
     view.y = 0.5;
     surface.dataset.observerRadius = view.distance.toFixed(4);
     surface.dataset.horizon = String(flight.crossed);
     surface.dataset.journeyStage = flight.active ? journey.stage : "Обзор";
-    surface.dataset.journeyCycle = String(journey.cycle);
     surface.dataset.journeyPhase = journey.phase.toFixed(3);
-    surface.dataset.beatClock = journey.beatClock.toFixed(3);
-    surface.dataset.observedScore = observedScore(
-      journey.beatClock,
-      journey.camera
-    ).toFixed(3);
     if (flightStatus) {
       const label = flight.active ? journey.stage : "";
       if (flightStatus.textContent !== label) {
@@ -91,39 +72,14 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       }
     }
     renderer?.view(view);
-    return journey;
   };
 
   const draw = () => {
     if (!renderer) {
       return;
     }
-    const journey = frameView();
-    const { passage } = journey;
-    renderer.draw({
-      accretion: 1,
-      exitVelocity: journey.exitVelocity,
-      passage,
-      passageCamera: journey.camera,
-      time,
-    });
-    const { index: beat } = scoreAt(
-      observedScore(journey.beatClock, journey.camera)
-    );
-    const beatId = journey.cycle * 4 + beat;
-    if (beatId !== lastBeat) {
-      if (
-        flight.active &&
-        !previewStill &&
-        !still.matches &&
-        (passage[0] ?? 0) > 0.99 &&
-        (passage[3] ?? 0) < 0.1 &&
-        beat >= 0
-      ) {
-        audio.pulse(beat === 3 ? 1.5 : 0.7 + beat * 0.15);
-      }
-      lastBeat = beatId;
-    }
+    frameView();
+    renderer.draw({ accretion: 1, time });
     document.documentElement.classList.add("rendered");
   };
 
@@ -330,13 +286,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     document.documentElement.classList.remove("rendered");
   });
   surface.addEventListener("webglcontextrestored", mount);
-  surface.addEventListener("sceneassetload", draw);
   window.addEventListener("pagehide", (event) => {
     stop();
     if (!event.persisted) {
       resize.disconnect();
       renderer?.dispose();
-      audio.dispose();
       renderer = null;
     }
   });
