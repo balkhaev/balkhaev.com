@@ -32,6 +32,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let frame = 0;
   let last = 0;
   let time = 0;
+  let pointer: { x: number; y: number; at: number } | null = null;
+  let lastImpulse = 0;
   const touches = new Map<number, { x: number; y: number }>();
   let gesture: {
     x: number;
@@ -129,6 +131,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     time = 0;
     view.pitch = 0;
     view.yaw = 0;
+    renderer?.clearWake();
+    pointer = null;
+    lastImpulse = 0;
+    delete surface.dataset.diskImpulses;
     hint?.classList.remove("dismissed");
     draw();
   };
@@ -137,11 +143,41 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     time += flight.travel(amount, still.matches);
   };
 
+  const disturb = (event: PointerEvent, tap = false) => {
+    const now = event.timeStamp;
+    const box = surface.getBoundingClientRect();
+    const x = (event.clientX - box.left) / box.width;
+    const y = (event.clientY - box.top) / box.height;
+    const speed = pointer
+      ? Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) /
+        Math.max(16, now - pointer.at)
+      : 0.3;
+    pointer = { at: now, x: event.clientX, y: event.clientY };
+    if (!tap && (now - lastImpulse < 65 || speed < 0.035)) {
+      return;
+    }
+    if (
+      renderer?.disturb(
+        x,
+        y,
+        time,
+        tap ? 1.25 : 0.65 + Math.min(0.85, speed * 0.6)
+      )
+    ) {
+      lastImpulse = now;
+      if (still.matches) {
+        draw();
+      }
+    }
+  };
+
   input.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) {
       return;
     }
     dismissHint();
+    input.dataset.pointerFocused = "true";
+    disturb(event, true);
     input.focus({ preventScroll: true });
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
     input.setPointerCapture(event.pointerId);
@@ -154,6 +190,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       y: event.clientY,
     };
     input.dataset.dragging = "true";
+  });
+  input.addEventListener("pointermove", (event) => {
+    if (!gesture && event.pointerType === "mouse") {
+      disturb(event);
+    }
   });
   input.addEventListener("pointermove", (event) => {
     if (gesture && touches.has(event.pointerId)) {
@@ -182,6 +223,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     if (still.matches || gesture) {
       draw();
     }
+  });
+  input.addEventListener("pointerleave", () => {
+    pointer = null;
   });
   const release = (event: PointerEvent) => {
     touches.delete(event.pointerId);
@@ -218,6 +262,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     { passive: false }
   );
   input.addEventListener("keydown", (event) => {
+    delete input.dataset.pointerFocused;
     if (event.key === "Home" || event.key === "Escape") {
       event.preventDefault();
       reset();
@@ -266,6 +311,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   window.addEventListener("blur", () => {
     gesture = null;
     touches.clear();
+    pointer = null;
     delete input.dataset.dragging;
   });
   mount();

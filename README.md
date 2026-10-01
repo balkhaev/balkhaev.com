@@ -2,7 +2,7 @@
 
 A black hole and two ways to get in touch. Static HTML, CSS and TypeScript; no backend or runtime framework.
 
-The renderer originated in the owner's Montage site at commit `184f50fc547d`. The page renders disk and stars in one Schwarzschild scene, framed by a quiet wordmark and two native contact links. Typography stays sharp and accessible above the canvas, independent of gravitational lensing. There are no screen-space gravity filters, cursor forces or drag waves.
+The renderer originated in the owner's Montage site at commit `184f50fc547d`. The page renders disk and stars in one Schwarzschild scene, framed by a quiet wordmark and two native contact links. Typography stays sharp and accessible above the canvas, independent of gravitational lensing. Disk interactions are sampled in the scene's material coordinates through the same curved rays as the image.
 
 ## Scene and interaction
 
@@ -11,6 +11,8 @@ The initial observer is 12.5 horizon radii from the centre, six degrees above th
 The first scroll starts a radial free-fall sequence. Scroll controls progress along that worldline; a slow forward playback continues between gestures, with display speed reduced near the centre to allow time to look around. World time advances by the observer's proper-time increment, so accelerated playback advances the emitters consistently. Reversing scroll after horizon crossing cannot move the observer outward. Restart selects the initial scene; it is not a physical escape from the black hole. The visual model stops at r = 0.2 r_s, before the singularity. Reduced motion disables autonomous movement, while explicit flight and look controls still work. The idle opening samples successive rain observers at the same location until a flight begins.
 
 ## Relativistic rendering
+
+Moving the mouse over the disk deposits bounded local pressure packets; tapping creates a stronger packet. Dragging continues to control the camera. Each contact uses the first visible disk intersection and its emission timestamp. Compression heats the bow edge while a depleted groove remains behind it. Packets co-rotate at each annulus's Keplerian rate, shear into spirals, propagate with a prescribed group speed below 0.26 c in material coordinates and damp away. The same emission field is visible in primary and delayed secondary images, rather than copied onto the screen. The 16-contact history is cleared on restart or reversing world time. This is an interactive prescribed-emission approximation, not a GRMHD fluid simulation; the cursor acts as an external authoring input, not an in-world object moving between contacts. Fine thermal eddies and a periodically heated coherent vortex evolve with the disk, and the nearby star has prescribed photospheric granulation sampled at retarded emission time.
 
 The renderer uses ingoing Painleve–Gullstrand coordinates, regular across the future event horizon, with metric ds² = -dT² + (dr + sqrt(1/r) dT)² + r² dΩ² in r_s = c = 1 units. The observer follows dr/dτ = -1/sqrt(r), dT/dτ = 1. Past-directed photons start in that observer's local orthonormal frame. Their conserved energy and angular momentum initialize u'' = -u + 3u²/2, with a rationalized PG travel-time equation that remains finite at the horizon for light arriving from outside.
 

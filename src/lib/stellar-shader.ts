@@ -78,6 +78,15 @@ vec4 photosphere(vec3 hit, float time, vec3 photonCovector, float energy) {
   vec3 outward = normalize(hit - starCenter(state));
   vec3 photon = photonCovector - radial * dot(photonCovector, radial) * (1.0 - sqrt(lapse));
   float limb = clamp(dot(outward, normalize(photon)), 0.0, 1.0);
-  return vec4(blackbody(11800.0 * g) * (0.42 + 0.58 * limb), 1.0);
+  // Prescribed photospheric granules, sampled on the retarded world-space surface.
+  vec3 local = vec3(outward.x * cos(state.y) + outward.z * sin(state.y), outward.y,
+    -outward.x * sin(state.y) + outward.z * cos(state.y));
+  vec3 weights = abs(local);
+  weights /= max(dot(weights, vec3(1.0)), 0.0001);
+  float granules = dot(weights, vec3(
+    filteredDensity(local.yz * 31.0 + time * 0.014),
+    filteredDensity(local.xz * 31.0 + time * 0.014),
+    filteredDensity(local.xy * 31.0 + time * 0.014)));
+  return vec4(blackbody(11800.0 * (0.94 + 0.12 * granules) * g) * (0.42 + 0.58 * limb), 1.0);
 }
 `;

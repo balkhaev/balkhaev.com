@@ -29,7 +29,7 @@ void main() {
   outColor = vec4(spot, 0.0, 0.0, 1.0);
 }`;
 
-/** Passive circular tracers in the prescribed disk; no cursor forces or heat sources. */
+/** Passive circular tracers; cursor pressure packets modulate the rendered disk layer separately. */
 export function createDiskParticles(
   gl: WebGL2RenderingContext,
   program: WebGLProgram

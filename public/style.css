@@ -40,6 +40,7 @@ main {
 #observer {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: none;
   width: 100%;
   height: 100%;
@@ -58,13 +59,14 @@ main {
 #observer:focus {
   outline: none;
 }
-#observer:focus-visible {
+#observer:focus-visible:not([data-pointer-focused]) {
   outline: 1px solid #ab947566;
   outline-offset: -8px;
 }
 .masthead {
   position: absolute;
   inset: 0 0 auto;
+  z-index: 2;
   display: flex;
   gap: 24px;
   align-items: center;
@@ -122,6 +124,7 @@ h1 span {
 .flight-info {
   position: absolute;
   inset: auto 0 0;
+  z-index: 2;
   display: flex;
   gap: 20px;
   align-items: flex-end;
