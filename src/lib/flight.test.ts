@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
+import { DRUM_STRIKES, observedScore } from "./drum-score";
 import {
-  BEAT_PERIOD,
   CHAMBER_START,
   createFlight,
   DRUM_START,
@@ -10,6 +10,7 @@ import {
   journeyAt,
   LOOP_CLOCK,
   LOOP_LENGTH,
+  PORTAL_EXIT,
   START_RADIUS,
 } from "./flight";
 
@@ -60,14 +61,14 @@ test("large scroll gestures reveal every stage before crossing the cycle seam", 
     if (stages.at(-1) !== stage) {
       stages.push(stage);
     }
-    if (stage === "В ритме бубна") {
+    if (stage === "Внутри") {
       chamberFrames += 1;
     }
   }
   expect(stages.slice(0, 6)).toEqual([
     "Погружение",
     "За горизонтом событий",
-    "В ритме бубна",
+    "Внутри",
     "Выход наружу",
     "Новый виток",
     "Погружение",
@@ -82,9 +83,12 @@ test("visible geometry and the world clock are continuous at all phase boundarie
       CHAMBER_START,
       3.55,
       DRUM_START,
-      4.3,
+      4.15,
+      4.7,
       EJECTION_START,
-      6.65,
+      EJECTION_START + 0.22,
+      EJECTION_START + 0.35,
+      PORTAL_EXIT,
       7.8,
       8.4,
       8.95,
@@ -110,6 +114,11 @@ test("visible geometry and the world clock are continuous at all phase boundarie
             Math.abs((b.passage[i] ?? 0) - (a.passage[i] ?? 0))
           ).toBeLessThan(0.0001);
         }
+        for (let i = 0; i < 4; i += 1) {
+          expect(
+            Math.abs((b.camera[i] ?? 0) - (a.camera[i] ?? 0))
+          ).toBeLessThan(0.0001);
+        }
       }
     }
   }
@@ -117,8 +126,10 @@ test("visible geometry and the world clock are continuous at all phase boundarie
 
 test("ejection begins exactly on a drum contact after several visible beats", () => {
   const journey = journeyAt(EJECTION_START);
-  expect((journey.beatClock - 5.4 + 3.5) % BEAT_PERIOD).toBeCloseTo(0, 10);
-  expect(journey.beatClock / BEAT_PERIOD).toBeGreaterThan(7);
+  expect(observedScore(journey.beatClock, journey.camera)).toBeCloseTo(
+    DRUM_STRIKES[3],
+    6
+  );
   expect(journeyAt(DRUM_START).beatClock).toBe(0);
 });
 
@@ -144,12 +155,21 @@ test("each cycle preserves classical infall optics and never rewinds emission ti
 });
 
 test("the authored outgoing camera remains slower than light", () => {
-  for (let phase = EJECTION_START + 0.02; phase < 8.4; phase += 0.02) {
+  for (let phase = 3.6; phase < 8.9; phase += 0.02) {
     const a = journeyAt(phase - 0.01);
     const b = journeyAt(phase + 0.01);
     const speed =
       ((b.passage[1] ?? 0) - (a.passage[1] ?? 0)) / (b.clock - a.clock);
-    expect(speed).toBeGreaterThanOrEqual(0);
+    const cameraSpeed =
+      Math.hypot(
+        ...Array.from(
+          b.camera.slice(0, 3),
+          (value, i) => value - (a.camera[i] ?? 0)
+        )
+      ) /
+      (b.clock - a.clock);
+    expect(cameraSpeed).toBeLessThan(1);
     expect(speed).toBeLessThan(1);
+    expect(journeyAt(phase).exitVelocity).toBeCloseTo(speed, 4);
   }
 });

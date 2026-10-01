@@ -1,11 +1,27 @@
 # Drummer asset
 
 Generated with the built-in imagegen tool on 2026-10-01.
-Saved project asset: `public/drummer-atlas.png` (1254 × 1254 RGBA PNG, four equally sized frames).
+Current project asset: `public/drummer-rig.png` (1254 × 1254 RGBA PNG, four equally sized rig-part cells).
+It is an imagegen edit of the original `public/drummer-atlas.png`, which is retained as the source reference.
+The cells contain the body with its holding arm and drum, the upper striking arm, the forearm and gripping hand, and the beater.
+The renderer articulates the striking arm with fixed-length inverse kinematics and composites the textured planes in ray order. The body uses restrained procedural breathing, inclination and recoil. This is a layered character rig, not a full 3D human mesh.
 The transparent sprite is a respectful cinematic interpretation, not an ethnographic reconstruction.
-Cosmic geometry, lighting, pose playback, optical fall and outgoing waves are rendered in code.
+Cosmic geometry, lighting, continuous pose animation, optical fall, elastic membrane and outgoing waves are rendered in code.
 
-## Final generation prompt
+## Final rig edit prompt
+
+```text
+Use case: precise-object-edit.
+Edit target: the referenced four-frame Buryat musician image. Preserve this man's identity, clothing, face, realistic style, drum and lighting. Convert it into a FOUR-PART RIG ATLAS, for continuous skeletal animation, NOT four complete poses.
+Output square 2x2 atlas, truly transparent background, no text, borders or scenery. Each part isolated entirely in its own equal quadrant, with clear transparent margins.
+TOP LEFT: one complete full body of this musician, facing front, weight on his legs, warm attentive face looking toward camera. His left arm (viewer right) holds the round leather frame drum in exactly the same chest position as reference. REMOVE ONLY his right arm (viewer left) below the shoulder: the body torso should have a clean closed indigo shoulder joint with no arm sticking out. No beater on the body. This is a layered puppet base, not an injured person. Body and drum centered, full feet visible.
+TOP RIGHT: isolated matching RIGHT UPPER ARM only, sleeve from shoulder joint to elbow, straight vertically downward, shoulder at top and elbow at bottom, indigo cloth and matching bronze trim, cylindrical round ends with a little overlap for joints, no torso or hand.
+BOTTOM LEFT: isolated matching RIGHT FOREARM with naturally clenched hand gripping an invisible thin shaft, straight vertically downward, elbow/cuff at top, wrist then hand at bottom. Same skin and indigo sleeve, realistic anatomy, rounded overlaps. No beater attached.
+BOTTOM RIGHT: one isolated long wooden drum beater only, straight vertically, padded oval striking head at TOP, thin wooden shaft going DOWN to the grip at bottom. Matches reference.
+Lighting consistent warm light from viewer right, blue rim from left. Crisp detailed photoreal game-character layers. Do not put a complete musician in any quadrant except top left. Four clean separable parts are essential. Transparent alpha in every unused area.
+```
+
+## Original generation prompt
 
 ```text
 Use case: stylized-concept

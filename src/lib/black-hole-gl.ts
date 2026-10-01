@@ -10,6 +10,7 @@ import {
   type HoleQuality,
 } from "./black-hole-quality";
 import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
+import { drummerPose, observedScore } from "./drum-score";
 import { infallTable } from "./infall-geodesics";
 import { PASSAGE_SHADER } from "./passage-shader";
 import {
@@ -49,8 +50,10 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
+  exitVelocity: number;
   /** Visual passage beyond the classical infall model. */
   passage: Float32Array;
+  passageCamera: Float32Array;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
   time: number;
 }
@@ -522,6 +525,10 @@ export function createHoleRenderer(
       "uTime",
       "uPassage",
       "uDrummer",
+      "uPassageCamera",
+      "uBones[0]",
+      "uBody",
+      "uExitVelocity",
       "uAccretion",
       "uSpin",
       "uStars",
@@ -603,7 +610,7 @@ export function createHoleRenderer(
     canvas.dataset.drummerLoaded = "true";
     canvas.dispatchEvent(new Event("sceneassetload"));
   });
-  drummer.src = "/drummer-atlas.png";
+  drummer.src = "/drummer-rig.png";
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
   let previousTime = 0;
@@ -701,7 +708,7 @@ export function createHoleRenderer(
       return true;
     },
 
-    draw({ accretion, passage, time }) {
+    draw({ accretion, passage, passageCamera, exitVelocity, time }) {
       if (!sceneTarget) {
         return;
       }
@@ -754,6 +761,11 @@ export function createHoleRenderer(
       gl.uniform1f(at("uDistance"), table.distance);
       gl.uniform1f(at("uTime"), time);
       gl.uniform4fv(at("uPassage"), passage);
+      gl.uniform4fv(at("uPassageCamera"), passageCamera);
+      const pose = drummerPose(observedScore(passage[2] ?? 0, passageCamera));
+      gl.uniform3fv(at("uBones[0]"), pose.bones);
+      gl.uniform4fv(at("uBody"), pose.body);
+      gl.uniform1f(at("uExitVelocity"), exitVelocity);
       gl.uniform1f(at("uAccretion"), accretion);
       gl.uniform1f(at("uSpin"), view.spin);
       gl.uniform1f(at("uStars"), view.stars);

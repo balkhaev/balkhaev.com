@@ -5,7 +5,8 @@ import {
 } from "./lib/black-hole-gl";
 import { createHoleQuality } from "./lib/black-hole-quality";
 import { createDrumAudio } from "./lib/drum-audio";
-import { BEAT_PERIOD, createFlight, EJECTION_START } from "./lib/flight";
+import { observedScore, scoreAt } from "./lib/drum-score";
+import { createFlight } from "./lib/flight";
 import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
@@ -79,6 +80,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.journeyCycle = String(journey.cycle);
     surface.dataset.journeyPhase = journey.phase.toFixed(3);
     surface.dataset.beatClock = journey.beatClock.toFixed(3);
+    surface.dataset.observedScore = observedScore(
+      journey.beatClock,
+      journey.camera
+    ).toFixed(3);
     if (flightStatus) {
       const label = flight.active ? journey.stage : "";
       if (flightStatus.textContent !== label) {
@@ -86,29 +91,36 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       }
     }
     renderer?.view(view);
-    return journey.passage;
+    return journey;
   };
 
   const draw = () => {
     if (!renderer) {
       return;
     }
-    const passage = frameView();
-    renderer.draw({ accretion: 1, passage, time });
-    const { journey } = flight;
-    const beat = Math.floor(
-      (journey.beatClock - (passage[1] ?? 0) + 3.5) / BEAT_PERIOD
+    const journey = frameView();
+    const { passage } = journey;
+    renderer.draw({
+      accretion: 1,
+      exitVelocity: journey.exitVelocity,
+      passage,
+      passageCamera: journey.camera,
+      time,
+    });
+    const { index: beat } = scoreAt(
+      observedScore(journey.beatClock, journey.camera)
     );
-    const beatId = journey.cycle * 100 + beat;
+    const beatId = journey.cycle * 4 + beat;
     if (beatId !== lastBeat) {
       if (
         flight.active &&
         !previewStill &&
         !still.matches &&
         (passage[0] ?? 0) > 0.99 &&
-        beat >= 1
+        (passage[3] ?? 0) < 0.1 &&
+        beat >= 0
       ) {
-        audio.pulse(journey.phase >= EJECTION_START ? 1.3 : 1);
+        audio.pulse(beat === 3 ? 1.5 : 0.7 + beat * 0.15);
       }
       lastBeat = beatId;
     }

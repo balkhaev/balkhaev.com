@@ -6,6 +6,7 @@ const files = new Map([
   ["/style.css", "style.css"],
   ["/icon.svg", "icon.svg"],
   ["/drummer-atlas.png", "drummer-atlas.png"],
+  ["/drummer-rig.png", "drummer-rig.png"],
   ["/robots.txt", "robots.txt"],
   ["/sitemap.xml", "sitemap.xml"],
 ]);
