@@ -11,6 +11,7 @@ export interface InfallTable {
   ends: Float32Array;
   phiCount: number;
   rows: number;
+  /** PG travel-time residual after subtracting the radial incoming-light clock. */
   times: Float32Array;
   u: Float32Array;
 }
@@ -77,6 +78,34 @@ export function pgClock(u: number, slope: number, k: number) {
   return (k * k + inverse ** 3) / Math.max(denominator, 1e-12);
 }
 
+/** Integral of dT/dr for radial incoming light; removes the far-emitter divergence. */
+export function radialClock(radius: number) {
+  const root = Math.sqrt(radius);
+  return radius - 2 * root + 2 * Math.log1p(root);
+}
+
+/** dT/dφ - d(radialClock(1/u))/dφ; rationalize k+s using the null first integral. */
+function residualClock(u: number, slope: number, k: number) {
+  const inverse = Math.max(u, 0.0001);
+  const root = Math.sqrt(inverse);
+  const angular =
+    k > 0 && slope < 0
+      ? (k * (1 - inverse)) / (k - slope)
+      : (k * (k + slope)) / inverse ** 2;
+  return (
+    (angular + inverse + root) /
+    Math.max((k - root * slope) * (1 + root), 1e-12)
+  );
+}
+
+export function columnPhi(column: number, end: number, count: number) {
+  const fraction = column / (count - 1);
+  return (
+    Math.abs(end) *
+    (fraction < 0.5 ? 2 * fraction ** 2 : 1 - 2 * (1 - fraction) ** 2)
+  );
+}
+
 interface State {
   slope: number;
   time: number;
@@ -98,10 +127,10 @@ function advance(state: State, k: number, h: number, clock: boolean) {
   if (clock) {
     state.time +=
       (h / 6) *
-      (pgClock(state.u, a, k) +
-        2 * pgClock(bu, b, k) +
-        2 * pgClock(cu, c, k) +
-        pgClock(du, d, k));
+      (residualClock(state.u, a, k) +
+        2 * residualClock(bu, b, k) +
+        2 * residualClock(cu, c, k) +
+        residualClock(du, d, k));
   }
   state.u += (h / 6) * (a + 2 * b + 2 * c + d);
   state.slope += (h / 6) * (av + 2 * bv + 2 * cv + dv);
@@ -111,7 +140,10 @@ function rayEnd(initial: ReturnType<typeof rainRay>) {
   const state: State = { slope: initial.slope, time: 0, u: initial.u };
   let phi = 0;
   for (let step = 0; step < 1800 && phi < 3.3 * Math.PI; step += 1) {
-    const h = Math.min(0.018, 0.02 / Math.max(Math.abs(state.slope), 0.01));
+    const h = Math.min(
+      0.018,
+      (0.02 * Math.max(1, state.u)) / Math.max(Math.abs(state.slope), 0.01)
+    );
     const before = state.u;
     advance(state, initial.energy / initial.angular, h, false);
     if (state.u <= 0) {
@@ -150,13 +182,24 @@ export function infallTable(
     const end = traced <= 0 ? Math.min(-1e-7, traced) : traced;
     table.ends[row] = end;
     const state: State = { slope: ray.slope, time: 0, u: ray.u };
-    const h = Math.abs(end) / (table.phiCount - 1) / 2;
+    let phi = 0;
     const offset = row * table.phiCount;
     table.u[offset] = state.u;
     table.times[offset] = 0;
     for (let column = 1; column < table.phiCount; column += 1) {
-      advance(state, ray.energy / ray.angular, h, true);
-      advance(state, ray.energy / ray.angular, h, true);
+      // Quadratic spacing resolves both the observer and distant emitters close to escape.
+      const target = columnPhi(column, end, table.phiCount);
+      const maxStep = Math.min(0.018, (target - phi) * 0.5);
+      // Resolve the high curvature at small r without wasting the ray-end iteration budget.
+      while (phi < target) {
+        const h = Math.min(
+          maxStep,
+          target - phi,
+          (0.02 * Math.max(1, state.u)) / Math.max(Math.abs(state.slope), 0.01)
+        );
+        advance(state, ray.energy / ray.angular, h, true);
+        phi += h;
+      }
       table.u[offset + column] = Math.max(0, state.u);
       table.times[offset + column] = Math.min(state.time, 100_000);
     }
@@ -173,10 +216,12 @@ export function infallSample(
   const low = Math.max(0, Math.min(table.rows - 1, Math.floor(row)));
   const sample = (r: number) => {
     const end = Math.abs(table.ends[r] ?? 1);
-    const at = Math.max(
-      0,
-      Math.min(table.phiCount - 1, (phi / end) * (table.phiCount - 1))
-    );
+    const fraction = Math.max(0, Math.min(1, phi / end));
+    const at =
+      (fraction < 0.5
+        ? Math.sqrt(fraction * 0.5)
+        : 1 - Math.sqrt((1 - fraction) * 0.5)) *
+      (table.phiCount - 1);
     const left = Math.floor(at);
     const a = data[r * table.phiCount + left] ?? 0;
     const b =
@@ -186,4 +231,13 @@ export function infallSample(
   const a = sample(low),
     b = sample(Math.min(low + 1, table.rows - 1));
   return a + (b - a) * (row - low);
+}
+
+export function infallDelay(table: InfallTable, row: number, phi: number) {
+  const u = infallSample(table, table.u, row, phi);
+  return (
+    infallSample(table, table.times, row, phi) +
+    radialClock(1 / Math.max(u, 0.0001)) -
+    radialClock(table.distance)
+  );
 }

@@ -10,13 +10,8 @@ import {
   type HoleQuality,
 } from "./black-hole-quality";
 import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
-import { infallTable } from "./infall-geodesics";
-import {
-  cameraOf,
-  focalLength,
-  OBSERVER_RADIUS,
-  type SceneView,
-} from "./scene-geometry";
+import { infallTable, radialClock } from "./infall-geodesics";
+import { cameraOf, OBSERVER_RADIUS, type SceneView } from "./scene-geometry";
 import { createSpectrum, SPECTRUM_SAMPLES, SPECTRUM_SHADER } from "./spectrum";
 import { createStellarOrbit, STAR_SAMPLES } from "./stellar-orbit";
 import { STELLAR_SHADER } from "./stellar-shader";
@@ -89,11 +84,13 @@ uniform sampler2D uParticles;
 uniform sampler2D uTimes;
 uniform int uImages;
 uniform vec2 uCenter;
-uniform float uFocal;
+uniform float uSensor;
+uniform vec3 uLens; // tan(FOV/2), tan(FOV/4), stereographic blend
 uniform mat3 uCamera;
 uniform vec3 uEye;
 uniform vec4 uGrid; // rows, rows below shadow edge, critical local angle, samples per row
 uniform float uDistance;
+uniform float uClockOrigin;
 uniform float uTime;
 uniform float uAccretion;
 uniform float uSpin;
@@ -118,7 +115,8 @@ float rowOf(float angle) {
 }
 float sampleRow(sampler2D data, int row, float phi) {
   float end = max(0.0000001, abs(texelFetch(uEnds, ivec2(row, 0), 0).r));
-  float at = clamp(phi / end * (uGrid.w - 1.0), 0.0, uGrid.w - 1.0);
+  float f = clamp(phi / end, 0.0, 1.0);
+  float at = (f < 0.5 ? sqrt(f * 0.5) : 1.0 - sqrt((1.0 - f) * 0.5)) * (uGrid.w - 1.0);
   int left = int(floor(at));
   float a = texelFetch(data, ivec2(left, row), 0).r;
   float b = texelFetch(data, ivec2(min(left + 1, int(uGrid.w) - 1), row), 0).r;
@@ -129,7 +127,19 @@ float tableValue(sampler2D data, float row, float phi) {
   return mix(sampleRow(data, low, phi), sampleRow(data, min(low + 1, int(uGrid.x) - 1), phi), fract(row));
 }
 float inverseRadius(float row, float phi) { return tableValue(uTable, row, phi); }
-float travelTime(float row, float phi) { return tableValue(uTimes, row, phi); }
+float travelTime(float row, float phi) {
+  float r = 1.0 / max(inverseRadius(row, phi), 0.0001);
+  float root = sqrt(r);
+  return tableValue(uTimes, row, phi) + r - 2.0 * root + 2.0 * log(1.0 + root) - uClockOrigin;
+}
+// The null first integral gives an accurate tangent even for tiny far-emitter angular spans.
+float pathSlope(float row, float phi, float end, float angular, float energy) {
+  float step = min(0.001, max(0.0000001, min(phi, end - phi) * 0.25));
+  float change = inverseRadius(row, phi + step) - inverseRadius(row, max(0.0, phi - step));
+  float u = inverseRadius(row, phi);
+  float k = energy / max(angular, 1e-8);
+  return sign(change) * sqrt(max(0.0, k * k - u * u + u * u * u));
+}
 
 ${SPECTRUM_SHADER}
 float densityNoise(vec2 p);
@@ -279,13 +289,16 @@ vec3 stars(vec3 dir, vec3 dx, vec3 dy, float cameraArea, float shift) {
 }
 
 void main() {
-	vec2 offset = (gl_FragCoord.xy - uCenter) / uFocal;
-	vec3 dir = normalize(uCamera * vec3(offset, 1.0));
+	vec2 offset = (gl_FragCoord.xy - uCenter) * uSensor;
+	float rho = length(offset);
+	float angle = mix(atan(rho * uLens.x), 2.0 * atan(rho * uLens.y), uLens.z);
+	vec3 local = vec3(rho > 1e-8 ? offset * (sin(angle) / rho) : vec2(0.0), cos(angle));
+	vec3 dir = normalize(uCamera * local);
 	vec3 e1 = uEye / uDistance;
 	float cosA = dot(dir, e1);
 	vec3 across = dir - cosA * e1;
 	float sinA = length(across);
-	vec3 e2 = sinA > 1e-7 ? across / sinA : vec3(0.0, 1.0, 0.0);
+	vec3 e2 = sinA > 1e-7 ? across / sinA : normalize(cross(e1, vec3(1.0, 0.0, 0.0)));
 	float angular = uDistance * sinA;
   float energy = 1.0 + cosA / sqrt(uDistance);
   float row = rowOf(acos(clamp(-cosA, -1.0, 1.0)));
@@ -301,8 +314,8 @@ void main() {
 	{
 		vec3 normal = cross(e1, e2);
 		float diskPhi = mod(atan(e2.y, e1.y) + 0.5 * PI, PI);
-		float starImageA = starIntersection(row, angular, phiEnd, e1, e2, 0.0);
-		float starImageB = starIntersection(row, angular, phiEnd, e1, e2, TAU);
+		float starImageA = starIntersection(row, angular, energy, phiEnd, e1, e2, 0.0);
+		float starImageB = starIntersection(row, angular, energy, phiEnd, e1, e2, TAU);
 		float starPhi = min(starImageA, starImageB);
 		float starSecond = max(starImageA, starImageB);
 		int diskCount = 0;
@@ -325,7 +338,7 @@ void main() {
 			if (stellar) {
 				vec3 radial = normalize(hit);
 				vec3 tangent = -sin(phi) * e1 + cos(phi) * e2;
-				float slope = (inverseRadius(row, phi + 0.002) - inverseRadius(row, max(0.0, phi - 0.002))) / 0.004;
+				float slope = pathSlope(row, phi, phiEnd, angular, energy);
 				float radialCovector = (angular * slope + sqrt(u) * energy) / (1.0 - u);
         vec3 photonCovector = radialCovector * radial - angular * u * tangent;
 				emission = photosphere(hit, uTime - delay + EPOCH, photonCovector, energy);
@@ -518,11 +531,13 @@ export function createHoleRenderer(
       "uOrbitClock",
       "uImages",
       "uCenter",
-      "uFocal",
+      "uSensor",
+      "uLens",
       "uCamera",
       "uEye",
       "uGrid",
       "uDistance",
+      "uClockOrigin",
       "uTime",
       "uAccretion",
       "uSpin",
@@ -673,7 +688,6 @@ export function createHoleRenderer(
       }
       previousTime = time;
 
-      const focal = focalLength(view, width, height);
       const { basis, eye } = cameraOf(view);
       particles.draw(time + DISTANCE, view.spin);
       gl.bindVertexArray(vao);
@@ -699,7 +713,14 @@ export function createHoleRenderer(
       );
       gl.uniform1i(at("uImages"), HOLE_QUALITY[quality].images);
       gl.uniform2f(at("uCenter"), view.x * width, (1 - view.y) * height);
-      gl.uniform1f(at("uFocal"), focal);
+      gl.uniform1f(at("uSensor"), 2 / Math.min(width, height));
+      const half = (view.fov * Math.PI) / 360;
+      gl.uniform3f(
+        at("uLens"),
+        Math.tan(half),
+        Math.tan(half * 0.5),
+        view.panorama ?? 0
+      );
       gl.uniformMatrix3fv(at("uCamera"), false, basis);
       gl.uniform3f(at("uEye"), eye[0], eye[1], eye[2]);
       gl.uniform4f(
@@ -710,6 +731,7 @@ export function createHoleRenderer(
         table.phiCount
       );
       gl.uniform1f(at("uDistance"), table.distance);
+      gl.uniform1f(at("uClockOrigin"), radialClock(table.distance));
       gl.uniform1f(at("uTime"), time);
       gl.uniform1f(at("uAccretion"), accretion);
       gl.uniform1f(at("uSpin"), view.spin);

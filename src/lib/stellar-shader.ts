@@ -28,13 +28,18 @@ vec3 rayPoint(float row, float phi, vec3 e1, vec3 e2) {
   return (cos(phi) * e1 + sin(phi) * e2) / max(inverseRadius(row, phi), 0.0001);
 }
 
-vec3 relativeTangent(float row, float phi, float b, vec3 e1, vec3 e2, vec4 state) {
-  vec3 derivative = (rayPoint(row, phi + 0.001, e1, e2) - rayPoint(row, max(0.0, phi - 0.001), e1, e2)) / 0.002;
-  float dt = (travelTime(row, phi + 0.001) - travelTime(row, max(0.0, phi - 0.001))) / 0.002;
+vec3 relativeTangent(float row, float phi, float b, float energy, float end, vec3 e1, vec3 e2, vec4 state) {
+  float u = max(inverseRadius(row, phi), 0.0001);
+  float slope = pathSlope(row, phi, end, b, energy);
+  vec3 radial = cos(phi) * e1 + sin(phi) * e2;
+  vec3 derivative = (-sin(phi) * e1 + cos(phi) * e2) / u - radial * slope / (u * u);
+  float k = energy / max(b, 1e-8);
+  float dt = (k * k + u * u * u) / max(u * u * (k - sqrt(u) * slope), 1e-12);
   return derivative + starVelocity(state) * dt;
 }
 
-float starIntersection(float row, float b, float end, vec3 e1, vec3 e2, float winding) {
+float starIntersection(float row, float b, float energy, float end, vec3 e1, vec3 e2, float winding) {
+  if (energy <= 0.0) return 1e5; // Negative Killing-energy photons cannot originate outside.
   vec4 state = orbitState(uTime);
   float phi = 0.0;
   // Resolve the retarded centre first; this also rejects rays outside the photosphere's cone.
@@ -45,7 +50,7 @@ float starIntersection(float row, float b, float end, vec3 e1, vec3 e2, float wi
     state = orbitState(uTime - travelTime(row, phi) + EPOCH);
   }
   vec3 delta = rayPoint(row, phi, e1, e2) - starCenter(state);
-  vec3 tangent = relativeTangent(row, phi, b, e1, e2, state);
+  vec3 tangent = relativeTangent(row, phi, b, energy, end, e1, e2, state);
   float speed2 = dot(tangent, tangent);
   float along = dot(delta, tangent);
   float discriminant = along * along - speed2 * (dot(delta, delta) - STAR_RADIUS * STAR_RADIUS);
@@ -56,7 +61,7 @@ float starIntersection(float row, float b, float end, vec3 e1, vec3 e2, float wi
     if (phi <= 0.0 || phi >= end) return 1e5;
     state = orbitState(uTime - travelTime(row, phi) + EPOCH);
     delta = rayPoint(row, phi, e1, e2) - starCenter(state);
-    tangent = relativeTangent(row, phi, b, e1, e2, state);
+    tangent = relativeTangent(row, phi, b, energy, end, e1, e2, state);
     float derivative = 2.0 * dot(delta, tangent);
     if (abs(derivative) < 1e-6) return 1e5;
     phi -= clamp((dot(delta, delta) - STAR_RADIUS * STAR_RADIUS) / derivative, -0.04, 0.04);

@@ -1,5 +1,5 @@
 export const START_RADIUS = 12.5;
-export const END_RADIUS = 0.2;
+export const END_RADIUS = 0.02;
 export const HORIZON_PROGRESS = Math.log(START_RADIUS);
 export const END_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
 export const HORIZON_TIME = (2 / 3) * (START_RADIUS ** 1.5 - 1);

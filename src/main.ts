@@ -5,7 +5,7 @@ import {
 } from "./lib/black-hole-gl";
 import { createHoleQuality } from "./lib/black-hole-quality";
 import { createFlight } from "./lib/flight";
-import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
+import { CLOCK_RATE, OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
@@ -58,6 +58,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const frameView = () => {
     const { journey } = flight;
     view.distance = journey.radius;
+    Object.assign(view, opticsAt(journey.radius));
     view.yaw = lookYaw;
     view.x = 0.5;
     view.y = 0.5;

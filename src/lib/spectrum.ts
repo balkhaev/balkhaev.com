@@ -1,6 +1,6 @@
-export const SPECTRUM_SAMPLES = 1024;
+export const SPECTRUM_SAMPLES = 2048;
 export const MIN_TEMPERATURE = 400;
-export const MAX_TEMPERATURE = 200_000;
+export const MAX_TEMPERATURE = 20_000_000;
 const WAVELENGTHS = [0.611, 0.549, 0.464] as const;
 const WHITE = [0.322_05, 0.361_52, 0.396_27] as const;
 

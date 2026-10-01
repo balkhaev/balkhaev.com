@@ -1,5 +1,10 @@
-import { angleRow, type InfallTable, infallSample } from "./infall-geodesics";
-import { cameraOf, focalLength, type SceneView } from "./scene-geometry";
+import {
+  angleRow,
+  type InfallTable,
+  infallDelay,
+  infallSample,
+} from "./infall-geodesics";
+import { cameraOf, cameraRay, type SceneView } from "./scene-geometry";
 
 export const WAKE_COUNT = 24;
 const TAU = Math.PI * 2;
@@ -29,12 +34,7 @@ export function pickDisk(
   y: number
 ): DiskHit | null {
   const { basis, eye } = cameraOf(view);
-  const focal = focalLength(view, width, height);
-  const offset = [
-    ((x - view.x) * width) / focal,
-    ((view.y - y) * height) / focal,
-    1,
-  ];
+  const offset = cameraRay(view, width, height, x, y);
   const direction = [0, 1, 2].map((axis) =>
     offset.reduce(
       (sum, value, column) => sum + value * (basis[column * 3 + axis] ?? 0),
@@ -81,7 +81,7 @@ export function pickDisk(
     );
     return {
       angle: Math.atan2(hit[2] ?? 0, hit[0] ?? 0),
-      delay: infallSample(table, table.times, row, phi),
+      delay: infallDelay(table, row, phi),
       radius,
     };
   }
