@@ -10,6 +10,12 @@ import {
   type HoleQuality,
 } from "./black-hole-quality";
 import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
+import {
+  createPointSky,
+  firstSkyRow,
+  SKY_FRAGMENT,
+  SKY_VERTEX,
+} from "./distant-sky";
 import { infallTable, radialClock } from "./infall-geodesics";
 import { cameraOf, OBSERVER_RADIUS, type SceneView } from "./scene-geometry";
 import { createSpectrum, SPECTRUM_SAMPLES, SPECTRUM_SHADER } from "./spectrum";
@@ -82,6 +88,7 @@ uniform sampler2D uTable;
 uniform sampler2D uEnds;
 uniform sampler2D uParticles;
 uniform sampler2D uTimes;
+uniform sampler2D uPointSky;
 uniform int uImages;
 uniform vec2 uCenter;
 uniform float uSensor;
@@ -161,19 +168,6 @@ float endOf(float row) {
 	return mix(a, b, f);
 }
 
-/** Three random numbers for a cell of the sky: the PCG hash (Jarzynski & Olano), with no pattern between neighbours. */
-vec3 random3(vec3 cell, uint salt) {
-	uvec3 v = uvec3(ivec3(cell) + 65536) * 1664525u + 1013904223u + salt;
-	v.x += v.y * v.z;
-	v.y += v.z * v.x;
-	v.z += v.x * v.y;
-	v ^= v >> 16u;
-	v.x += v.y * v.z;
-	v.y += v.z * v.x;
-	v.z += v.x * v.y;
-	return vec3(v) / 4294967295.0;
-}
-
 float densityHash(ivec2 cell) {
   uint h = uint(cell.x) * 1597334677u ^ uint(cell.y) * 3812015801u;
   h = (h ^ (h >> 16u)) * 2246822519u;
@@ -239,53 +233,35 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	return vec4(radiance * uAccretion, alpha);
 }
 
-/**
- * Faint stars. A star is a point, and lensing only moves it and changes its brightness: the sky this close to the hole
- * is squeezed and stretched round it (the whole frame lies inside the Einstein ring), so a star is found in the sky
- * the pixel sees, put back through the pixel's own map of the sky (dx, dy: how the sky moves per pixel) to a spot a
- * pixel wide on the screen, and made as much brighter as the map magnifies there. Where a pixel holds a great deal of
- * sky, by the photon ring, the stars fade instead of sparkling.
- */
-float galacticBand(vec3 dir) {
-  float latitude = dot(dir, normalize(vec3(0.35, 0.82, 0.45)));
-  return exp(-latitude * latitude / 0.009);
+float filteredGaussian(float position, float widthSquared, float variance) {
+  float width = widthSquared + 2.0 * variance;
+  return sqrt(widthSquared / width) * exp(-position * position / width);
+}
+float skyDensity(vec2 position, vec2 dx, vec2 dy) {
+  float footprint = max(length(dx), length(dy));
+  return mix(densityNoise(position), 0.5, smoothstep(0.45, 1.2, footprint));
 }
 
 // An extended source at infinity makes aberration and multiple lensed images visible.
 // Surface brightness gets a spectral shift, never the point-source magnification factor.
-vec3 distantGalaxy(vec3 dir, float shift) {
-  float latitude = dot(dir, normalize(vec3(0.35, 0.82, 0.45)));
+vec3 distantGalaxy(vec3 dir, vec3 dx, vec3 dy, float shift) {
+  vec3 axis = normalize(vec3(0.35, 0.82, 0.45));
+  float latitude = dot(dir, axis);
+  vec2 gradient = vec2(dot(dx, axis), dot(dy, axis));
+  float variance = dot(gradient, gradient) / 12.0;
   vec2 field = dir.xy + vec2(dir.z * 0.7, -dir.z * 0.9);
-  float clouds = filteredDensity(field * 17.0);
-  float detail = filteredDensity(field * 61.0 + vec2(clouds * 2.0, 0.0));
-  float lane = (latitude + (clouds - 0.5) * 0.045) / 0.018;
-  float dust = 1.0 - 0.82 * exp(-lane * lane);
-  float density = galacticBand(dir) * (0.25 + 0.75 * clouds) * (0.4 + 0.6 * detail) * dust;
+  vec2 fieldX = dx.xy + vec2(dx.z * 0.7, -dx.z * 0.9);
+  vec2 fieldY = dy.xy + vec2(dy.z * 0.7, -dy.z * 0.9);
+  float clouds = skyDensity(field * 17.0, fieldX * 17.0, fieldY * 17.0);
+  float detail = skyDensity(field * 61.0 + vec2(clouds * 2.0, 0.0), fieldX * 61.0, fieldY * 61.0);
+  float lane = (clouds - 0.5) * 0.045;
+  // Integrate the narrow emitting band and its dust lane over the same pixel footprint.
+  float band = filteredGaussian(latitude, 0.009, variance);
+  float absorbed = exp(-lane * lane / (0.009 + 0.000324))
+    * filteredGaussian(latitude + lane * 0.009 / (0.009 + 0.000324), 0.009 * 0.000324 / (0.009 + 0.000324), variance);
+  float density = max(0.0, band - 0.82 * absorbed) * (0.25 + 0.75 * clouds) * (0.4 + 0.6 * detail);
   vec3 spectrum = 0.8 * shiftedSpectrum(4300.0, shift) + 0.2 * shiftedSpectrum(9000.0, shift);
   return spectrum * density * 0.0025;
-}
-
-vec3 stars(vec3 dir, vec3 dx, vec3 dy, float cameraArea, float shift) {
-	const float CELLS = 150.0;
-	vec3 id = floor(dir * CELLS);
-	vec3 draw = random3(id, 0u);
-	float population = galacticBand(normalize(id + vec3(0.5)));
-	if (draw.x > 0.005 + 0.009 * population) {
-		return vec3(0.0);
-	}
-	vec3 star = normalize((id + 0.3 + 0.4 * random3(id, 7u)) / CELLS);
-	vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
-	vec3 t2 = cross(dir, t1);
-	mat2 map = mat2(dot(dx, t1), dot(dx, t2), dot(dy, t1), dot(dy, t2));
-	float area = abs(determinant(map));
-	if (area < 1e-14) {
-		return vec3(0.0);
-	}
-	vec2 spot = inverse(map) * vec2(dot(star - dir, t1), dot(star - dir, t2));
-	float gain = min(12.0, cameraArea / area);
-	float brightness = pow(draw.y, 7.0) * 3.0 + 0.04;
-	float temperature = mix(3200.0, 14000.0, draw.z * draw.z);
-	return shiftedSpectrum(temperature, shift) * brightness * gain * exp(-dot(spot, spot) / 0.45);
 }
 
 void main() {
@@ -307,7 +283,6 @@ void main() {
   vec3 away = cos(phiEnd) * e1 + sin(phiEnd) * e2;
 	vec3 skyX = dFdx(away);
 	vec3 skyY = dFdy(away);
-	float cameraArea = length(cross(dFdx(dir), dFdy(dir)));
 
 	vec3 light = vec3(0.0);
 	float through = 1.0;
@@ -352,9 +327,9 @@ void main() {
 	}
 	if (end > 0.0 && uStars > 0.0) {
 		float shift = 1.0 / max(energy, 0.0001);
-		vec3 sky = stars(away, skyX, skyY, cameraArea, shift) + distantGalaxy(away, shift);
-		light += through * sky * uStars;
+		light += through * distantGalaxy(away, skyX, skyY, shift) * uStars;
 	}
+  light += through * texelFetch(uPointSky, ivec2(gl_FragCoord.xy), 0).rgb;
 	float opacity = end < 0.0 ? 1.0 : 1.0 - through;
 	outColor = vec4(light, opacity);
 }`;
@@ -520,6 +495,7 @@ export function createHoleRenderer(
   let blur: Program;
   let compose: Program;
   let particleProgram: Program;
+  let skyProgram: Program;
   try {
     scene = compile(gl, SCENE, [
       "uTable",
@@ -542,6 +518,7 @@ export function createHoleRenderer(
       "uAccretion",
       "uSpin",
       "uStars",
+      "uPointSky",
       "uWakeCount",
       "uWakes[0]",
       "uWakeDirections[0]",
@@ -559,6 +536,25 @@ export function createHoleRenderer(
       "uExposure",
     ]);
     particleProgram = compile(gl, PARTICLE_FRAGMENT, [], PARTICLE_VERTEX);
+    skyProgram = compile(
+      gl,
+      SKY_FRAGMENT,
+      [
+        "uEnds",
+        "uSpectrum",
+        "uGrid",
+        "uSkyFirst",
+        "uDistance",
+        "uRadial",
+        "uCamera",
+        "uLens",
+        "uViewport",
+        "uCenter",
+        "uSensor",
+        "uStars",
+      ],
+      SKY_VERTEX
+    );
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.error(error);
@@ -579,6 +575,7 @@ export function createHoleRenderer(
   );
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
+  const sky = createPointSky(gl);
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
   let previousTime = 0;
@@ -631,6 +628,7 @@ export function createHoleRenderer(
   let width = 1;
   let height = 1;
   let sceneTarget: Target | null = null;
+  let skyTarget: Target | null = null;
   /** Per level: the downsampled picture and the one it is blurred through. */
   let glow: [Target, Target][] = [];
 
@@ -651,16 +649,28 @@ export function createHoleRenderer(
 
   return {
     dispose() {
-      free([...(sceneTarget ? [sceneTarget] : []), ...glow.flat()]);
+      free([
+        ...(sceneTarget ? [sceneTarget] : []),
+        ...(skyTarget ? [skyTarget] : []),
+        ...glow.flat(),
+      ]);
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
       gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
+      sky.dispose();
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
-      for (const each of [scene, downsample, blur, compose, particleProgram]) {
+      for (const each of [
+        scene,
+        downsample,
+        blur,
+        compose,
+        particleProgram,
+        skyProgram,
+      ]) {
         gl.deleteProgram(each.program);
       }
     },
@@ -679,7 +689,7 @@ export function createHoleRenderer(
     },
 
     draw({ accretion, time }) {
-      if (!sceneTarget) {
+      if (!(sceneTarget && skyTarget)) {
         return;
       }
       gpu.begin();
@@ -690,6 +700,46 @@ export function createHoleRenderer(
 
       const { basis, eye } = cameraOf(view);
       particles.draw(time + DISTANCE, view.spin);
+      const half = (view.fov * Math.PI) / 360;
+      const skyAt = bind(skyProgram);
+      texture(0, endsTexture);
+      texture(1, spectrumTexture);
+      gl.uniform1i(skyAt("uEnds"), 0);
+      gl.uniform1i(skyAt("uSpectrum"), 1);
+      gl.uniform4f(
+        skyAt("uGrid"),
+        table.rows,
+        table.below,
+        table.critical,
+        table.phiCount
+      );
+      gl.uniform1i(skyAt("uSkyFirst"), firstSkyRow(table));
+      gl.uniform1f(skyAt("uDistance"), table.distance);
+      gl.uniform3f(
+        skyAt("uRadial"),
+        eye[0] / table.distance,
+        eye[1] / table.distance,
+        eye[2] / table.distance
+      );
+      gl.uniformMatrix3fv(skyAt("uCamera"), false, basis);
+      gl.uniform3f(
+        skyAt("uLens"),
+        Math.tan(half),
+        Math.tan(half * 0.5),
+        view.panorama ?? 0
+      );
+      gl.uniform2f(skyAt("uViewport"), width, height);
+      gl.uniform2f(skyAt("uCenter"), view.x * width, (1 - view.y) * height);
+      gl.uniform1f(skyAt("uSensor"), 2 / Math.min(width, height));
+      gl.uniform1f(skyAt("uStars"), view.stars);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, skyTarget.framebuffer);
+      gl.viewport(0, 0, width, height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+      sky.draw();
+      gl.disable(gl.BLEND);
       gl.bindVertexArray(vao);
       const at = bind(scene);
       texture(0, tableTexture);
@@ -698,12 +748,14 @@ export function createHoleRenderer(
       texture(3, spectrumTexture);
       texture(4, timesTexture);
       texture(5, orbitTexture);
+      texture(6, skyTarget.texture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
       gl.uniform1i(at("uSpectrum"), 3);
       gl.uniform1i(at("uTimes"), 4);
       gl.uniform1i(at("uOrbit"), 5);
+      gl.uniform1i(at("uPointSky"), 6);
       gl.uniform4f(
         at("uOrbitClock"),
         orbit.period,
@@ -714,7 +766,6 @@ export function createHoleRenderer(
       gl.uniform1i(at("uImages"), HOLE_QUALITY[quality].images);
       gl.uniform2f(at("uCenter"), view.x * width, (1 - view.y) * height);
       gl.uniform1f(at("uSensor"), 2 / Math.min(width, height));
-      const half = (view.fov * Math.PI) / 360;
       gl.uniform3f(
         at("uLens"),
         Math.tan(half),
@@ -799,6 +850,7 @@ export function createHoleRenderer(
         nextWidth === width &&
         nextHeight === height &&
         sceneTarget &&
+        skyTarget &&
         glow.length === HOLE_QUALITY[quality].bloom
       ) {
         return;
@@ -807,8 +859,13 @@ export function createHoleRenderer(
       height = nextHeight;
       canvas.width = width;
       canvas.height = height;
-      free([...(sceneTarget ? [sceneTarget] : []), ...glow.flat()]);
+      free([
+        ...(sceneTarget ? [sceneTarget] : []),
+        ...(skyTarget ? [skyTarget] : []),
+        ...glow.flat(),
+      ]);
       sceneTarget = target(width, height);
+      skyTarget = target(width, height);
       glow = [];
       let levelWidth = width;
       let levelHeight = height;
