@@ -4,28 +4,46 @@ export const HOLE_QUALITY = {
   balanced: {
     atlasHeight: 192,
     atlasWidth: 768,
-    bloom: 4,
-    detail: 0.55,
+    bloom: 3,
     images: 3,
     particles: 12_000,
+    pixels: 4_147_200,
   },
   high: {
     atlasHeight: 256,
     atlasWidth: 1024,
-    bloom: 5,
-    detail: 1,
+    bloom: 4,
     images: 3,
     particles: 28_000,
+    pixels: 8_294_400,
   },
   low: {
     atlasHeight: 128,
     atlasWidth: 512,
-    bloom: 3,
-    detail: 0.25,
+    bloom: 2,
     images: 2,
     particles: 4500,
+    pixels: 2_073_600,
   },
 } as const;
+
+/** Preserve device pixels until the selected GPU budget is actually exceeded. */
+export function drawingSize(
+  width: number,
+  height: number,
+  ratio: number,
+  level: HoleQuality
+) {
+  const pixelRatio = Math.max(1, Math.min(ratio, 3));
+  const scale = Math.min(
+    pixelRatio,
+    Math.sqrt(HOLE_QUALITY[level].pixels / Math.max(width * height, 1))
+  );
+  return {
+    height: Math.max(2, Math.floor(height * scale)),
+    width: Math.max(2, Math.floor(width * scale)),
+  };
+}
 
 const LEVELS: HoleQuality[] = ["low", "balanced", "high"];
 

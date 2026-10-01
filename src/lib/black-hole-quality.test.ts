@@ -1,6 +1,47 @@
 import { expect, test } from "bun:test";
 
-import { createHoleQuality } from "./black-hole-quality";
+import {
+  createHoleQuality,
+  drawingSize,
+  HOLE_QUALITY,
+} from "./black-hole-quality";
+
+test("Full HD stays native even in the lowest quality tier", () => {
+  expect(drawingSize(1920, 1080, 1, "low")).toEqual({
+    height: 1080,
+    width: 1920,
+  });
+  expect(drawingSize(1920, 1080, 1.25, "balanced")).toEqual({
+    height: 1350,
+    width: 2400,
+  });
+  expect(drawingSize(2560, 1440, 1, "balanced")).toEqual({
+    height: 1440,
+    width: 2560,
+  });
+});
+
+test("Retina mobile and 4K retain their device-pixel detail within the budget", () => {
+  expect(drawingSize(390, 844, 2, "low")).toEqual({ height: 1688, width: 780 });
+  expect(drawingSize(390, 844, 3, "balanced")).toEqual({
+    height: 2532,
+    width: 1170,
+  });
+  expect(drawingSize(3840, 2160, 1, "high")).toEqual({
+    height: 2160,
+    width: 3840,
+  });
+});
+
+test("large displays stay inside the GPU budget without changing aspect ratio", () => {
+  for (const level of ["low", "balanced", "high"] as const) {
+    const size = drawingSize(5120, 2880, 2, level);
+    expect(size.width * size.height).toBeLessThanOrEqual(
+      HOLE_QUALITY[level].pixels
+    );
+    expect(size.width / size.height).toBeCloseTo(16 / 9, 2);
+  }
+});
 
 test("sustained slow frames lower detail even without GPU timestamps", () => {
   const quality = createHoleQuality(false);

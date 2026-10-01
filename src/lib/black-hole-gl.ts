@@ -5,6 +5,7 @@ import {
 } from "./black-hole-particles";
 import {
   createGpuClock,
+  drawingSize,
   HOLE_QUALITY,
   type HoleQuality,
 } from "./black-hole-quality";
@@ -37,9 +38,6 @@ const DISTANCE = OBSERVER_RADIUS;
 const DISK_IN = 3;
 const DISK_OUT = 11;
 
-/** At most this many pixels are ray traced; a larger canvas is drawn smaller and stretched (the picture is soft). */
-const MAX_PIXELS = 1_200_000;
-
 export interface HoleView extends SceneView {
   spin: 1 | -1;
   stars: number;
@@ -57,16 +55,8 @@ export interface HoleRenderer {
   draw: (frame: HoleFrame) => void;
   gpuTime: () => number | null;
   quality: (level: HoleQuality) => void;
-  /**
-   * Sizes the drawing to the canvas's CSS box times the device's pixel ratio, within the pixel budget times `detail`
-   * (0–1; a slow device draws fewer pixels).
-   */
-  resize: (
-    width: number,
-    height: number,
-    ratio: number,
-    detail: number
-  ) => void;
+  /** Device-pixel rendering, bounded by the current GPU quality budget. */
+  resize: (width: number, height: number, ratio: number) => void;
   view: (view: HoleView) => void;
 }
 
@@ -170,12 +160,26 @@ vec3 blackbody(float t) {
 	return radiance / WHITE;
 }
 
+float densityHash(ivec2 cell) {
+  uint h = uint(cell.x) * 1597334677u ^ uint(cell.y) * 3812015801u;
+  h = (h ^ (h >> 16u)) * 2246822519u;
+  h = (h ^ (h >> 13u)) * 3266489917u;
+  return float(h ^ (h >> 16u)) / 4294967295.0;
+}
+
 float densityNoise(vec2 p) {
   vec2 cell = floor(p);
   vec2 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
-  vec4 corners = fract(sin(vec4(dot(cell, vec2(127.1, 311.7)), dot(cell + vec2(1.0, 0.0), vec2(127.1, 311.7)), dot(cell + vec2(0.0, 1.0), vec2(127.1, 311.7)), dot(cell + vec2(1.0), vec2(127.1, 311.7)))) * 43758.5453);
+  ivec2 c = ivec2(cell);
+  vec4 corners = vec4(densityHash(c), densityHash(c + ivec2(1, 0)), densityHash(c + ivec2(0, 1)), densityHash(c + ivec2(1)));
   return mix(mix(corners.x, corners.y, f.x), mix(corners.z, corners.w, f.x), f.y);
+}
+
+// Remove only unresolved frequencies; keep resolved filaments sharp as the view changes.
+float filteredDensity(vec2 p) {
+  float footprint = max(length(dFdx(p)), length(dFdy(p)));
+  return mix(densityNoise(p), 0.5, smoothstep(0.45, 1.2, footprint));
 }
 
 /** The disk where a ray crosses it: its light (rgb) and how opaque it is (a). */
@@ -192,13 +196,13 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	// Advected density filaments: each annulus keeps its own Keplerian angular rate.
 	float phase = psi + omega * uSpin * (uTime - delay + EPOCH);
 	vec2 flow = vec2(cos(phase), sin(phase)) * 9.0;
-	float clouds = densityNoise(flow * 0.55 + vec2(r * 3.7, 0.0));
-	float wisps = densityNoise(flow * 1.4 + vec2(r * 16.0 + clouds * 2.0, r * 2.0));
-	float fine = densityNoise(flow * 3.0 + vec2(r * 43.0, r * 6.0));
-	float structure = smoothstep(0.15, 0.85, 0.5 * clouds + 0.35 * wisps + 0.15 * fine);
+	float clouds = filteredDensity(flow * 0.75 + vec2(r * 3.7, 0.0));
+	float wisps = filteredDensity(flow * 2.5 + vec2(r * 24.0 + clouds * 3.0, r * 2.0));
+	float fine = filteredDensity(flow * 14.0 + vec2(r * 70.0, r * 15.0));
+	float structure = smoothstep(0.18, 0.82, 0.35 * clouds + 0.45 * wisps + 0.2 * fine);
 	float t = T_PEAK * pow(flux, 0.25) * g;
 	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
-	float alpha = edge * (0.16 + 0.16 * n + 0.68 * structure);
+	float alpha = edge * (0.12 + 0.12 * n + 0.76 * structure);
 	return vec4(blackbody(t) * uAccretion, alpha);
 }
 
@@ -346,8 +350,8 @@ vec3 encode(vec3 linear) {
 
 void main() {
 	vec4 scene = texture(uScene, vUv);
-	vec3 glow = texture(uGlow0, vUv).rgb * 0.18 + texture(uGlow1, vUv).rgb * 0.2 + texture(uGlow2, vUv).rgb * 0.22 + texture(uGlow3, vUv).rgb * 0.22 + texture(uGlow4, vUv).rgb * 0.18;
-	vec3 light = mix(scene.rgb, glow, 0.16) * uExposure;
+	vec3 glow = texture(uGlow0, vUv).rgb * 0.6 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.1 + texture(uGlow3, vUv).rgb * 0.04 + texture(uGlow4, vUv).rgb * 0.01;
+	vec3 light = mix(scene.rgb, glow, 0.018) * uExposure;
 	// Luminance tone mapping preserves the thermal colour in bright filaments.
 	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
 	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
@@ -679,13 +683,13 @@ export function createHoleRenderer(
       canvas.dataset.holeParticles = String(HOLE_QUALITY[next].particles);
     },
 
-    resize(cssWidth, cssHeight, ratio, detail) {
-      const pixels = cssWidth * cssHeight * ratio * ratio;
-      const scale =
-        ratio *
-        Math.min(1, Math.sqrt((MAX_PIXELS * detail) / Math.max(pixels, 1)));
-      const nextWidth = Math.max(2, Math.round(cssWidth * scale));
-      const nextHeight = Math.max(2, Math.round(cssHeight * scale));
+    resize(cssWidth, cssHeight, ratio) {
+      const { width: nextWidth, height: nextHeight } = drawingSize(
+        cssWidth,
+        cssHeight,
+        ratio,
+        quality
+      );
       if (
         nextWidth === width &&
         nextHeight === height &&

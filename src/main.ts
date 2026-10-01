@@ -3,7 +3,7 @@ import {
   type HoleRenderer,
   type HoleView,
 } from "./lib/black-hole-gl";
-import { createHoleQuality, HOLE_QUALITY } from "./lib/black-hole-quality";
+import { createHoleQuality } from "./lib/black-hole-quality";
 import { createFlight } from "./lib/flight";
 import { CLOCK_RATE, OBSERVER_RADIUS } from "./lib/scene-geometry";
 
@@ -78,12 +78,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
 
   const fit = () => {
     const box = surface.getBoundingClientRect();
-    renderer?.resize(
-      box.width,
-      box.height,
-      Math.min(devicePixelRatio || 1, 2),
-      HOLE_QUALITY[quality.level].detail
-    );
+    renderer?.resize(box.width, box.height, devicePixelRatio || 1);
     draw();
   };
 
