@@ -7,10 +7,12 @@ import {
 import { cameraOf, cameraRay, type SceneView } from "./scene-geometry";
 
 export const WAKE_COUNT = 24;
+export const WAKE_HISTORY = 1024;
 const TAU = Math.PI * 2;
 export const WAVE_SPEED = 0.2;
 export const WAVE_LIFETIME = 42;
 export const SPLASH_COUNT = 3;
+export const WAKE_TEXELS = 2 + SPLASH_COUNT;
 
 export interface WakeContact {
   impact?: boolean;
@@ -93,13 +95,37 @@ export function createDiskWake() {
   const data = new Float32Array(WAKE_COUNT * 4);
   const directions = new Float32Array(WAKE_COUNT * 4);
   const splashes = new Float32Array(WAKE_COUNT * SPLASH_COUNT * 4);
+  const textureData = new Float32Array(WAKE_HISTORY * WAKE_TEXELS * 4);
   let count = 0;
   let cursor = 0;
+  const history: {
+    data: Float32Array;
+    directions: Float32Array;
+    splashes: Float32Array;
+  }[] = [];
+  let lastSeek = Number.NEGATIVE_INFINITY;
+  let revision = 0;
   let previous: {
     hit: DiskHit;
     emissionTime: number;
     observedTime: number;
   } | null = null;
+  const archive = () => {
+    if (history.length > WAKE_HISTORY) {
+      history.shift();
+    }
+    const ordered = [...history].sort(
+      (a, b) => (a.data[2] ?? 0) - (b.data[2] ?? 0)
+    );
+    textureData.fill(0);
+    for (const [i, entry] of ordered.entries()) {
+      const start = i * WAKE_TEXELS * 4;
+      textureData.set(entry.data, start);
+      textureData.set(entry.directions, start + 4);
+      textureData.set(entry.splashes, start + 8);
+    }
+    revision += 1;
+  };
   return {
     clear() {
       count = 0;
@@ -107,6 +133,10 @@ export function createDiskWake() {
       data.fill(0);
       directions.fill(0);
       splashes.fill(0);
+      history.length = 0;
+      textureData.fill(0);
+      revision += 1;
+      lastSeek = Number.NEGATIVE_INFINITY;
       previous = null;
     },
     get count() {
@@ -114,6 +144,9 @@ export function createDiskWake() {
     },
     data,
     directions,
+    get historyCount() {
+      return history.length;
+    },
     push(
       hit: DiskHit,
       emissionTime: number,
@@ -189,20 +222,76 @@ export function createDiskWake() {
         ],
         cursor * 4
       );
+      history.push({
+        data: data.slice(cursor * 4, cursor * 4 + 4),
+        directions: directions.slice(cursor * 4, cursor * 4 + 4),
+        splashes: splashes.slice(
+          cursor * SPLASH_COUNT * 4,
+          (cursor + 1) * SPLASH_COUNT * 4
+        ),
+      });
+      archive();
       cursor = (cursor + 1) % WAKE_COUNT;
       count = Math.min(WAKE_COUNT, count + 1);
       previous = contact.impact ? null : { emissionTime, hit, observedTime };
     },
+    get revision() {
+      return revision;
+    },
+    /** Repack a bounded inspection window without destroying authored events on rewind.
+     * The GPU independently selects contacts from the archive at each image's emission time. */
+    seek(emissionClock: number) {
+      if (!Number.isFinite(emissionClock)) {
+        return;
+      }
+      if (emissionClock < lastSeek) {
+        previous = null;
+      }
+      lastSeek = emissionClock;
+      const retained = history
+        .filter((entry) => {
+          const birth = entry.data[2] ?? 0;
+          return birth <= emissionClock + 0.005 && birth >= emissionClock - 160;
+        })
+        .sort((a, b) => (a.data[2] ?? 0) - (b.data[2] ?? 0))
+        .slice(-WAKE_COUNT);
+      count = retained.length;
+      cursor = count % WAKE_COUNT;
+      data.fill(0);
+      directions.fill(0);
+      splashes.fill(0);
+      for (let i = 0; i < retained.length; i += 1) {
+        const entry = retained[i];
+        if (!entry) {
+          continue;
+        }
+        data.set(entry.data, i * 4);
+        directions.set(entry.directions, i * 4);
+        splashes.set(entry.splashes, i * SPLASH_COUNT * 4);
+      }
+    },
     splashes,
+    textureData,
   };
 }
 
 /** A prescribed, damped pressure packet in disk material coordinates, not a fluid solver. */
 export const DISK_WAKE_SHADER = `
-uniform int uWakeCount;
-uniform vec4 uWakes[${WAKE_COUNT}]; // radius, angle, PG emission time, deposited energy
-uniform vec4 uWakeDirections[${WAKE_COUNT}]; // relative direction, swept length, cut/impact
-uniform vec4 uWakeSplashes[${WAKE_COUNT * SPLASH_COUNT}]; // relative velocity, material radius, seed
+uniform int uWakeHistoryCount;
+uniform sampler2D uWakeHistory; // each row: source, material direction, three fragments
+
+int wakeBefore(float emissionTime) {
+  int low = 0;
+  int high = uWakeHistoryCount;
+  for (int step = 0; step < 11; step++) {
+    if (low >= high) break;
+    int mid = (low + high) / 2;
+    float birth = texelFetch(uWakeHistory, ivec2(0, mid), 0).z;
+    if (birth <= emissionTime + 0.005) low = mid + 1;
+    else high = mid;
+  }
+  return low - 1;
+}
 
 float wakeRidge(float distance, float radius, float width) {
   float edge = abs(distance - radius);
@@ -213,15 +302,18 @@ float wakeRidge(float distance, float radius, float width) {
 vec4 diskWake(float r, float psi, float emissionTime, out float splashes) {
   vec4 response = vec4(0.0);
   splashes = 0.0;
+  int last = wakeBefore(emissionTime);
   for (int i = 0; i < ${WAKE_COUNT}; i++) {
-    if (i >= uWakeCount) break;
-    vec4 source = uWakes[i];
+    int event = last - i;
+    if (event < 0) break;
+    vec4 source = texelFetch(uWakeHistory, ivec2(0, event), 0);
     float age = emissionTime - source.z;
     // Permit only rounding error between CPU picking and GPU ray interpolation.
-    if (age < -0.005 || age > ${WAVE_LIFETIME.toFixed(1)}) continue;
+    if (age > ${WAVE_LIFETIME.toFixed(1)}) break;
+    if (age < -0.005) continue;
     age = max(0.0, age);
     float properAge = age * sqrt(1.0 - 1.5 / source.x);
-    vec4 stroke = uWakeDirections[i];
+    vec4 stroke = texelFetch(uWakeHistory, ivec2(1, event), 0);
     float front = 0.16 + ${WAVE_SPEED.toFixed(2)} * properAge;
     float width = 0.095 + 0.009 * properAge;
     float lapse = sqrt(1.0 - 1.0 / source.x);
@@ -260,7 +352,7 @@ vec4 diskWake(float r, float psi, float emissionTime, out float splashes) {
     // Hot fragments remain in the disk, advect with it and move slower than the pressure front.
     if (properAge < 12.0) {
       for (int particle = 0; particle < ${SPLASH_COUNT}; particle++) {
-        vec4 spark = uWakeSplashes[i * ${SPLASH_COUNT} + particle];
+        vec4 spark = texelFetch(uWakeHistory, ivec2(2 + particle, event), 0);
         vec2 velocity = direction * spark.x + vec2(-direction.y, direction.x) * spark.y;
         vec2 origin = -direction * tailLength * spark.w + vec2(-direction.y, direction.x) * (spark.w - 0.5) * 0.1;
         vec2 head = origin + velocity * properAge;

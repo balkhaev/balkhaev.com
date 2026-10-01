@@ -9,7 +9,13 @@ import {
   HOLE_QUALITY,
   type HoleQuality,
 } from "./black-hole-quality";
-import { createDiskWake, DISK_WAKE_SHADER, pickDisk } from "./disk-wake";
+import {
+  createDiskWake,
+  DISK_WAKE_SHADER,
+  pickDisk,
+  WAKE_HISTORY,
+  WAKE_TEXELS,
+} from "./disk-wake";
 import {
   createPointSky,
   firstSkyRow,
@@ -17,6 +23,11 @@ import {
   SKY_VERTEX,
 } from "./distant-sky";
 import { infallTable, radialClock } from "./infall-geodesics";
+import {
+  createPlungingFlow,
+  PLUNGE_SAMPLES,
+  PLUNGE_SHADER,
+} from "./plunging-flow";
 import { cameraOf, OBSERVER_RADIUS, type SceneView } from "./scene-geometry";
 import { createSpectrum, SPECTRUM_SAMPLES, SPECTRUM_SHADER } from "./spectrum";
 import { createStellarOrbit, STAR_SAMPLES } from "./stellar-orbit";
@@ -153,6 +164,7 @@ float densityNoise(vec2 p);
 float filteredDensity(vec2 p);
 ${STELLAR_SHADER}
 ${DISK_WAKE_SHADER}
+${PLUNGE_SHADER}
 
 /** Where the ray ends: the angle it escapes at, or minus the angle it falls in at. */
 float endOf(float row) {
@@ -222,12 +234,20 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	// A coherent hot eddy orbits and shears; delayed higher-order images follow it.
 	float eddyAngle = atan(sin(phase + 2.35), cos(phase + 2.35));
 	float eddy = exp(-pow((r - 4.9) / 0.38, 2.0) - pow(eddyAngle / 0.12, 2.0));
-	float flare = pow(0.5 + 0.5 * sin((uTime - delay + EPOCH) * 0.075), 4.0);
+	// Local heat injection followed by proper-time cooling. Every image samples this same event.
+	float eventAge = mod(uTime - delay + EPOCH - 8.0, 72.0) * sqrt(1.0 - 1.5 / 4.9);
+	float flare = (1.0 - exp(-eventAge / 0.65)) * exp(-eventAge / 3.5);
 	float tracer = smoothstep(0.04, 0.22, matter.g);
-	float t = T_PEAK * pow(flux, 0.25) * (1.0 + 0.09 * ember * breathing + 0.18 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
-	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
+	// A finite emitting inner boundary feeds the plunge, instead of a black gap at the ISCO.
+	float feed = 1.0 - smoothstep(3.0, 3.8, r);
+	vec4 injection = inflowMaterial(phase, uTime - delay + EPOCH);
+	float innerTemperature = 2050.0 * (0.86 + 0.17 * injection.x + 0.13 * injection.z + injection.w * 0.08);
+	float temperature = mix(T_PEAK * pow(flux, 0.25), innerTemperature, feed);
+	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.45 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
+	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
 	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
 	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
+	alpha = mix(alpha, 1.0 - exp(-(0.015 + 1.4 * pow(injection.y, 3.0) + 1.8 * injection.w) * 0.9), feed);
 	vec3 radiance = blackbody(t) * (0.85 + 0.4 * strand + tracer * wake.y * 0.35);
 	radiance += blackbody(T_PEAK * pow(flux, 0.25) * 1.52 * g) * splashes * 0.18;
 	return vec4(radiance * uAccretion, alpha);
@@ -254,14 +274,24 @@ vec3 distantGalaxy(vec3 dir, vec3 dx, vec3 dy, float shift) {
   vec2 fieldY = dy.xy + vec2(dy.z * 0.7, -dy.z * 0.9);
   float clouds = skyDensity(field * 17.0, fieldX * 17.0, fieldY * 17.0);
   float detail = skyDensity(field * 61.0 + vec2(clouds * 2.0, 0.0), fieldX * 61.0, fieldY * 61.0);
+  float knots = skyDensity(field * 143.0, fieldX * 143.0, fieldY * 143.0);
   float lane = (clouds - 0.5) * 0.045;
   // Integrate the narrow emitting band and its dust lane over the same pixel footprint.
   float band = filteredGaussian(latitude, 0.009, variance);
   float absorbed = exp(-lane * lane / (0.009 + 0.000324))
     * filteredGaussian(latitude + lane * 0.009 / (0.009 + 0.000324), 0.009 * 0.000324 / (0.009 + 0.000324), variance);
-  float density = max(0.0, band - 0.82 * absorbed) * (0.25 + 0.75 * clouds) * (0.4 + 0.6 * detail);
-  vec3 spectrum = 0.8 * shiftedSpectrum(4300.0, shift) + 0.2 * shiftedSpectrum(9000.0, shift);
-  return spectrum * density * 0.0025;
+  float density = max(0.0, band - 0.94 * absorbed) * (0.08 + 1.1 * clouds * clouds) * (0.22 + 0.78 * detail);
+  // A resolved stellar bulge and young patches provide fixed landmarks in the same external sky.
+  vec3 center = normalize(vec3(0.91, -0.40, 0.045));
+  vec3 meridian = normalize(cross(axis, center));
+  float along = dot(dir, meridian);
+  vec2 alongGradient = vec2(dot(dx, meridian), dot(dy, meridian));
+  float bulge = filteredGaussian(along, 0.045, dot(alongGradient, alongGradient) / 12.0)
+    * filteredGaussian(latitude, 0.022, variance) * smoothstep(0.0, 0.65, dot(dir, center));
+  float obscuredBulge = max(0.0, bulge - bulge * (absorbed / max(band, 1e-6)) * 0.86);
+  float young = density * smoothstep(0.55, 0.85, detail) * (0.2 + 0.8 * knots);
+  return shiftedSpectrum(4300.0, shift) * (density + obscuredBulge * 0.6) * 0.0038
+    + shiftedSpectrum(9000.0, shift) * young * 0.00022;
 }
 
 void main() {
@@ -303,7 +333,7 @@ void main() {
 				break;
 			}
 			float u = inverseRadius(row, phi);
-			if (u <= 0.0 || u >= 1.0) {
+			if (u <= 0.0 || u > 1.0 / PLUNGE_MIN) {
 				continue;
 			}
 			float r = 1.0 / u;
@@ -318,8 +348,11 @@ void main() {
         vec3 photonCovector = radialCovector * radial - angular * u * tangent;
 				emission = photosphere(hit, uTime - delay + EPOCH, photonCovector, energy);
 			} else {
-				if (r < DISK_IN || r > DISK_OUT) continue;
-				emission = disk(r, atan(hit.z, hit.x), -angular * normal.y, energy, delay);
+				if (r > DISK_OUT) continue;
+				float psi = atan(hit.z, hit.x);
+				float lambda = -angular * normal.y;
+				if (r >= DISK_IN) emission = disk(r, psi, lambda, energy, delay);
+				else emission = plungingDisk(r, psi, lambda, angular, energy, pathSlope(row, phi, phiEnd, angular, energy), delay);
 			}
 			light += through * emission.rgb * emission.a;
 			through *= 1.0 - emission.a;
@@ -361,6 +394,37 @@ void main() {
 	outColor = sum;
 }`;
 
+const METER = `#version 300 es
+precision highp float;
+uniform sampler2D uSource;
+uniform vec2 uTexel;
+in vec2 vUv;
+out vec4 outColor;
+void main() {
+  vec3 light = (texture(uSource, vUv + uTexel * vec2(-1.0, -1.0)).rgb
+    + texture(uSource, vUv + uTexel * vec2(1.0, -1.0)).rgb
+    + texture(uSource, vUv + uTexel * vec2(-1.0, 1.0)).rgb
+    + texture(uSource, vUv + uTexel * vec2(1.0, 1.0)).rgb) * 0.25;
+  float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
+  float weight = smoothstep(0.003, 0.03, luminance);
+  // Weighted log light: empty space and a single point source cannot dominate the exposure.
+  outColor = vec4((log(max(luminance, 1e-8)) + 20.0) / 40.0 * weight, weight, 0.0, 1.0);
+}`;
+
+const ADAPT = `#version 300 es
+precision highp float;
+uniform sampler2D uMeter;
+uniform sampler2D uPrevious;
+uniform float uBlend;
+out vec4 outColor;
+void main() {
+  vec2 meter = texelFetch(uMeter, ivec2(0), 0).rg;
+  float mean = meter.y > 1e-6 ? exp(meter.x / meter.y * 40.0 - 20.0) : 0.0;
+  float target = (log(5.0 / (1.0 + mean / 0.18)) + 24.0) / 28.0;
+  float previous = texelFetch(uPrevious, ivec2(0), 0).r;
+  outColor = vec4(mix(previous, target, uBlend), 0.0, 0.0, 1.0);
+}`;
+
 const COMPOSE = `#version 300 es
 precision highp float;
 uniform sampler2D uScene;
@@ -369,7 +433,7 @@ uniform sampler2D uGlow1;
 uniform sampler2D uGlow2;
 uniform sampler2D uGlow3;
 uniform sampler2D uGlow4;
-uniform float uExposure;
+uniform sampler2D uExposure;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -384,7 +448,7 @@ vec3 encode(vec3 linear) {
 void main() {
 	vec4 scene = texture(uScene, vUv);
 	vec3 glow = texture(uGlow0, vUv).rgb * 0.6 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.1 + texture(uGlow3, vUv).rgb * 0.04 + texture(uGlow4, vUv).rgb * 0.01;
-	vec3 light = mix(scene.rgb, glow, 0.018) * uExposure;
+	vec3 light = mix(scene.rgb, glow, 0.018) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
 	// Luminance tone mapping preserves the thermal colour in bright filaments.
 	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
 	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
@@ -496,6 +560,8 @@ export function createHoleRenderer(
   let compose: Program;
   let particleProgram: Program;
   let skyProgram: Program;
+  let meterProgram: Program;
+  let adaptProgram: Program;
   try {
     scene = compile(gl, SCENE, [
       "uTable",
@@ -519,13 +585,15 @@ export function createHoleRenderer(
       "uSpin",
       "uStars",
       "uPointSky",
-      "uWakeCount",
-      "uWakes[0]",
-      "uWakeDirections[0]",
-      "uWakeSplashes[0]",
+      "uPlunge",
+      "uPlungeClock",
+      "uWakeHistoryCount",
+      "uWakeHistory",
     ]);
     downsample = compile(gl, DOWNSAMPLE, ["uSource", "uTexel"]);
     blur = compile(gl, BLUR, ["uSource", "uStep"]);
+    meterProgram = compile(gl, METER, ["uSource", "uTexel"]);
+    adaptProgram = compile(gl, ADAPT, ["uMeter", "uPrevious", "uBlend"]);
     compose = compile(gl, COMPOSE, [
       "uScene",
       "uGlow0",
@@ -578,7 +646,16 @@ export function createHoleRenderer(
   const sky = createPointSky(gl);
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
-  let previousTime = 0;
+  const wakeTexture = dataTexture(
+    gl,
+    WAKE_TEXELS,
+    WAKE_HISTORY,
+    wake.textureData,
+    true
+  );
+  let wakeRevision = wake.revision;
+  const plunge = createPlungingFlow();
+  const plungeTexture = dataTexture(gl, PLUNGE_SAMPLES, 1, plunge.data, true);
   const gpu = createGpuClock(gl);
   let quality: HoleQuality = "balanced";
   const vao = gl.createVertexArray();
@@ -631,6 +708,14 @@ export function createHoleRenderer(
   let skyTarget: Target | null = null;
   /** Per level: the downsampled picture and the one it is blurred through. */
   let glow: [Target, Target][] = [];
+  const meterFirst = target(64, 64);
+  const meterTargets = [
+    meterFirst,
+    ...[32, 16, 8, 4, 2, 1].map((size) => target(size, size)),
+  ];
+  const exposures = [target(1, 1), target(1, 1)] as const;
+  let exposureIndex: 0 | 1 = 0;
+  let lastExposure = 0;
 
   const bind = (program: Program) => {
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram, not a React hook
@@ -647,18 +732,62 @@ export function createHoleRenderer(
     gl.bindTexture(gl.TEXTURE_2D, source);
   };
 
+  // Global adaptation follows actual scene light and applies one exposure to the entire frame.
+  const adaptExposure = (source: Target) => {
+    const meterAt = bind(meterProgram);
+    texture(0, source.texture);
+    gl.uniform1i(meterAt("uSource"), 0);
+    gl.uniform2f(meterAt("uTexel"), 0.25 / source.width, 0.25 / source.height);
+    let meterSource = meterFirst;
+    pass(meterSource);
+    for (const down of meterTargets.slice(1)) {
+      const shrink = bind(downsample);
+      texture(0, meterSource.texture);
+      gl.uniform1i(shrink("uSource"), 0);
+      gl.uniform2f(
+        shrink("uTexel"),
+        0.5 / meterSource.width,
+        0.5 / meterSource.height
+      );
+      pass(down);
+      meterSource = down;
+    }
+    const previous = exposures[exposureIndex];
+    exposureIndex = exposureIndex === 0 ? 1 : 0;
+    const exposure = exposures[exposureIndex];
+    const adaptAt = bind(adaptProgram);
+    texture(0, meterSource.texture);
+    texture(1, previous.texture);
+    gl.uniform1i(adaptAt("uMeter"), 0);
+    gl.uniform1i(adaptAt("uPrevious"), 1);
+    const now = performance.now();
+    gl.uniform1f(
+      adaptAt("uBlend"),
+      lastExposure
+        ? 1 - Math.exp(-Math.max(0, (now - lastExposure) / 1000) * 2)
+        : 1
+    );
+    lastExposure = now;
+    pass(exposure);
+    return exposure;
+  };
+
   return {
     dispose() {
       free([
         ...(sceneTarget ? [sceneTarget] : []),
         ...(skyTarget ? [skyTarget] : []),
         ...glow.flat(),
+        ...meterTargets,
+        ...exposures,
       ]);
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
       gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
+      gl.deleteTexture(plungeTexture);
+      gl.deleteTexture(wakeTexture);
       sky.dispose();
       particles.dispose();
       gpu.dispose();
@@ -670,6 +799,8 @@ export function createHoleRenderer(
         compose,
         particleProgram,
         skyProgram,
+        meterProgram,
+        adaptProgram,
       ]) {
         gl.deleteProgram(each.program);
       }
@@ -693,10 +824,24 @@ export function createHoleRenderer(
         return;
       }
       gpu.begin();
-      if (time < previousTime) {
-        wake.clear();
+      wake.seek(time + DISTANCE);
+      if (wakeRevision !== wake.revision) {
+        gl.bindTexture(gl.TEXTURE_2D, wakeTexture);
+        gl.texSubImage2D(
+          gl.TEXTURE_2D,
+          0,
+          0,
+          0,
+          WAKE_TEXELS,
+          WAKE_HISTORY,
+          gl.RGBA,
+          gl.FLOAT,
+          wake.textureData
+        );
+        wakeRevision = wake.revision;
       }
-      previousTime = time;
+      canvas.dataset.diskImpulses = String(wake.count);
+      canvas.dataset.diskHistory = String(wake.historyCount);
 
       const { basis, eye } = cameraOf(view);
       particles.draw(time + DISTANCE, view.spin);
@@ -749,6 +894,8 @@ export function createHoleRenderer(
       texture(4, timesTexture);
       texture(5, orbitTexture);
       texture(6, skyTarget.texture);
+      texture(7, plungeTexture);
+      texture(8, wakeTexture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
@@ -756,6 +903,9 @@ export function createHoleRenderer(
       gl.uniform1i(at("uTimes"), 4);
       gl.uniform1i(at("uOrbit"), 5);
       gl.uniform1i(at("uPointSky"), 6);
+      gl.uniform1i(at("uPlunge"), 7);
+      gl.uniform2f(at("uPlungeClock"), plunge.clock, plunge.proper);
+      gl.uniform1i(at("uWakeHistory"), 8);
       gl.uniform4f(
         at("uOrbitClock"),
         orbit.period,
@@ -787,10 +937,7 @@ export function createHoleRenderer(
       gl.uniform1f(at("uAccretion"), accretion);
       gl.uniform1f(at("uSpin"), view.spin);
       gl.uniform1f(at("uStars"), view.stars);
-      gl.uniform1i(at("uWakeCount"), wake.count);
-      gl.uniform4fv(at("uWakes[0]"), wake.data);
-      gl.uniform4fv(at("uWakeDirections[0]"), wake.directions);
-      gl.uniform4fv(at("uWakeSplashes[0]"), wake.splashes);
+      gl.uniform1i(at("uWakeHistoryCount"), wake.historyCount);
       pass(sceneTarget);
 
       let source = sceneTarget;
@@ -811,6 +958,8 @@ export function createHoleRenderer(
         source = down;
       }
 
+      const exposure = adaptExposure(source);
+
       const finish = bind(compose);
       texture(0, sceneTarget.texture);
       for (let level = 0; level < 5; level += 1) {
@@ -825,7 +974,8 @@ export function createHoleRenderer(
       gl.uniform1i(finish("uGlow2"), 3);
       gl.uniform1i(finish("uGlow3"), 4);
       gl.uniform1i(finish("uGlow4"), 5);
-      gl.uniform1f(finish("uExposure"), 5.0);
+      texture(6, exposure.texture);
+      gl.uniform1i(finish("uExposure"), 6);
       pass(null);
       gpu.end();
     },

@@ -4,6 +4,8 @@ import {
   pickDisk,
   SPLASH_COUNT,
   WAKE_COUNT,
+  WAKE_HISTORY,
+  WAKE_TEXELS,
   WAVE_SPEED,
 } from "./disk-wake";
 import { infallTable } from "./infall-geodesics";
@@ -20,6 +22,54 @@ const view: SceneView = {
 };
 
 describe("disk interaction", () => {
+  test("replay retains emission events and restores the same material data without joining a new stroke to the future", () => {
+    const wake = createDiskWake();
+    const hit = { angle: 0.2, delay: 10, radius: 6 };
+    for (let i = 0; i < 60; i += 1) {
+      wake.push(hit, i, 1, { observedTime: i + 10 });
+    }
+    wake.seek(25);
+    const data = wake.data.slice();
+    const directions = wake.directions.slice();
+    const splashes = wake.splashes.slice();
+    const archive = wake.textureData.slice();
+    wake.seek(55);
+    wake.seek(25);
+    expect(wake.data).toEqual(data);
+    expect(wake.directions).toEqual(directions);
+    expect(wake.splashes).toEqual(splashes);
+    expect(wake.textureData).toEqual(archive);
+    expect(wake.historyCount).toBe(60);
+    wake.push({ ...hit, angle: 0.21 }, 15, 1, { observedTime: 25 });
+    const births = Array.from(
+      { length: wake.historyCount },
+      (_, i) => wake.textureData[i * WAKE_TEXELS * 4 + 2] ?? 0
+    );
+    expect(births).toEqual([...births].sort((a, b) => a - b));
+    const added = births.lastIndexOf(15) * WAKE_TEXELS * 4;
+    expect(wake.textureData[added + 6]).toBe(0);
+  });
+
+  test("the emission archive is bounded independently of the per-image GPU window and can supply earlier echoes", () => {
+    const wake = createDiskWake();
+    const hit = { angle: 0.2, delay: 10, radius: 6 };
+    for (let i = 0; i < WAKE_HISTORY + 7; i += 1) {
+      wake.push(hit, i, 1);
+    }
+    expect(wake.historyCount).toBe(WAKE_HISTORY);
+    expect(wake.textureData[2]).toBe(7);
+    expect(wake.textureData[(WAKE_HISTORY - 1) * WAKE_TEXELS * 4 + 2]).toBe(
+      WAKE_HISTORY + 6
+    );
+    wake.seek(30);
+    expect(wake.count).toBe(WAKE_COUNT);
+    expect(wake.data[2]).toBe(7);
+    expect(wake.data[(WAKE_COUNT - 1) * 4 + 2]).toBe(30);
+    wake.clear();
+    expect(wake.historyCount).toBe(0);
+    expect(wake.textureData.every((value) => value === 0)).toBe(true);
+  });
+
   test("picks mirrored disk intersections with the same light-travel time, rejecting empty sky and shadow", () => {
     const table = infallTable(view.distance);
     expect(pickDisk(table, view, 1280, 720, 0.5, 0.5)).toBeNull();
