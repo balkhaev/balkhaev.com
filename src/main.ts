@@ -163,7 +163,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       if (a && b) {
         const distance = Math.hypot(a.x - b.x, a.y - b.y);
         if (gesture.distance > 0) {
-          travel(Math.log(distance / gesture.distance));
+          travel(Math.log(distance / gesture.distance) * 0.8);
         }
         gesture.distance = distance;
         gesture.dragged = true;
@@ -172,8 +172,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
           dy = event.clientY - gesture.y;
         if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
           gesture.dragged = true;
-          view.yaw -= dx * 0.19;
-          view.pitch = Math.max(-89, Math.min(89, view.pitch + dy * 0.19));
+          view.yaw -= dx * 0.15;
+          view.pitch = Math.max(-89, Math.min(89, view.pitch + dy * 0.15));
           gesture.x = event.clientX;
           gesture.y = event.clientY;
         }
@@ -212,7 +212,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       } else if (event.deltaMode === 2) {
         unit = surface.clientHeight;
       }
-      travel(event.deltaY * unit * 0.0025);
+      travel(event.deltaY * unit * 0.002);
       draw();
     },
     { passive: false }
@@ -224,17 +224,17 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       return;
     }
     if (event.key === "ArrowLeft") {
-      view.yaw -= 5;
+      view.yaw -= 4;
     } else if (event.key === "ArrowRight") {
-      view.yaw += 5;
+      view.yaw += 4;
     } else if (event.key === "ArrowUp") {
-      view.pitch = Math.min(89, view.pitch + 5);
+      view.pitch = Math.min(89, view.pitch + 4);
     } else if (event.key === "ArrowDown") {
-      view.pitch = Math.max(-89, view.pitch - 5);
+      view.pitch = Math.max(-89, view.pitch - 4);
     } else if (event.key === "+" || event.key === "=") {
-      travel(0.3);
+      travel(0.24);
     } else if (event.key === "-") {
-      travel(-0.3);
+      travel(-0.24);
     } else {
       return;
     }

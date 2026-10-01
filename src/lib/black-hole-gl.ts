@@ -16,6 +16,7 @@ import {
   OBSERVER_RADIUS,
   type SceneView,
 } from "./scene-geometry";
+import { createSpectrum, SPECTRUM_SAMPLES, SPECTRUM_SHADER } from "./spectrum";
 import { createStellarOrbit, STAR_SAMPLES } from "./stellar-orbit";
 import { STELLAR_SHADER } from "./stellar-shader";
 
@@ -98,8 +99,6 @@ const float DISK_IN = ${DISK_IN.toFixed(1)};
 const float DISK_OUT = ${DISK_OUT.toFixed(1)};
 // Peak of the zero-torque Schwarzschild thin-disk flux, at r = 4.7755 r_s.
 const float FLUX_PEAK = 0.00011458947;
-// Planck's law at the three primaries for 6500 K: the white the colours are balanced to.
-const vec3 WHITE = vec3(0.32205, 0.36152, 0.39627);
 // The hottest gas, kelvin, before any shift.
 const float T_PEAK = 3200.0;
 
@@ -123,7 +122,7 @@ float tableValue(sampler2D data, float row, float phi) {
 float inverseRadius(float row, float phi) { return tableValue(uTable, row, phi); }
 float travelTime(float row, float phi) { return tableValue(uTimes, row, phi); }
 
-vec3 blackbody(float t);
+${SPECTRUM_SHADER}
 ${STELLAR_SHADER}
 
 /** Where the ray ends: the angle it escapes at, or minus the angle it falls in at. */
@@ -151,13 +150,6 @@ vec3 random3(vec3 cell, uint salt) {
 	v.y += v.z * v.x;
 	v.z += v.x * v.y;
 	return vec3(v) / 4294967295.0;
-}
-
-/** Three spectral samples of Planck radiance, calibrated to a 6500 K white. */
-vec3 blackbody(float t) {
-	vec3 lambda = vec3(0.611, 0.549, 0.464);
-	vec3 radiance = 1.0 / (pow(lambda, vec3(5.0)) * (exp(14387.77 / (lambda * max(t, 400.0))) - 1.0));
-	return radiance / WHITE;
 }
 
 float densityHash(ivec2 cell) {
@@ -213,11 +205,31 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
  * pixel wide on the screen, and made as much brighter as the map magnifies there. Where a pixel holds a great deal of
  * sky, by the photon ring, the stars fade instead of sparkling.
  */
-vec3 stars(vec3 dir, vec3 dx, vec3 dy) {
+float galacticBand(vec3 dir) {
+  float latitude = dot(dir, normalize(vec3(0.35, 0.82, 0.45)));
+  return exp(-latitude * latitude / 0.009);
+}
+
+// An extended source at infinity makes aberration and multiple lensed images visible.
+// Surface brightness gets a spectral shift, never the point-source magnification factor.
+vec3 distantGalaxy(vec3 dir, float shift) {
+  float latitude = dot(dir, normalize(vec3(0.35, 0.82, 0.45)));
+  vec2 field = dir.xy + vec2(dir.z * 0.7, -dir.z * 0.9);
+  float clouds = filteredDensity(field * 17.0);
+  float detail = filteredDensity(field * 61.0 + vec2(clouds * 2.0, 0.0));
+  float lane = (latitude + (clouds - 0.5) * 0.045) / 0.018;
+  float dust = 1.0 - 0.82 * exp(-lane * lane);
+  float density = galacticBand(dir) * (0.25 + 0.75 * clouds) * (0.4 + 0.6 * detail) * dust;
+  vec3 spectrum = 0.8 * shiftedSpectrum(4300.0, shift) + 0.2 * shiftedSpectrum(9000.0, shift);
+  return spectrum * density * 0.0025;
+}
+
+vec3 stars(vec3 dir, vec3 dx, vec3 dy, float cameraArea, float shift) {
 	const float CELLS = 150.0;
 	vec3 id = floor(dir * CELLS);
 	vec3 draw = random3(id, 0u);
-	if (draw.x > 0.005) {
+	float population = galacticBand(normalize(id + vec3(0.5)));
+	if (draw.x > 0.005 + 0.009 * population) {
 		return vec3(0.0);
 	}
 	vec3 star = normalize((id + 0.3 + 0.4 * random3(id, 7u)) / CELLS);
@@ -229,11 +241,10 @@ vec3 stars(vec3 dir, vec3 dx, vec3 dy) {
 		return vec3(0.0);
 	}
 	vec2 spot = inverse(map) * vec2(dot(star - dir, t1), dot(star - dir, t2));
-	float pixel = 1.0 / uFocal;
-	float gain = min(5.0, pixel * pixel / area);
-	float energy = pow(draw.y, 7.0) * 3.0 + 0.04;
-	vec3 tint = mix(vec3(1.0, 0.82, 0.66), vec3(0.72, 0.84, 1.0), draw.z);
-	return tint * energy * gain * exp(-dot(spot, spot) / 0.45);
+	float gain = min(12.0, cameraArea / area);
+	float brightness = pow(draw.y, 7.0) * 3.0 + 0.04;
+	float temperature = mix(3200.0, 14000.0, draw.z * draw.z);
+	return shiftedSpectrum(temperature, shift) * brightness * gain * exp(-dot(spot, spot) / 0.45);
 }
 
 void main() {
@@ -252,6 +263,7 @@ void main() {
   vec3 away = cos(phiEnd) * e1 + sin(phiEnd) * e2;
 	vec3 skyX = dFdx(away);
 	vec3 skyY = dFdy(away);
+	float cameraArea = length(cross(dFdx(dir), dFdy(dir)));
 
 	vec3 light = vec3(0.0);
 	float through = 1.0;
@@ -295,7 +307,9 @@ void main() {
 		}
 	}
 	if (end > 0.0 && uStars > 0.0) {
-		light += through * stars(away, skyX, skyY) * uStars / max(0.04, pow(energy, 3.0));
+		float shift = 1.0 / max(energy, 0.0001);
+		vec3 sky = stars(away, skyX, skyY, cameraArea, shift) + distantGalaxy(away, shift);
+		light += through * sky * uStars;
 	}
 	float opacity = end < 0.0 ? 1.0 : 1.0 - through;
 	outColor = vec4(light, opacity);
@@ -468,6 +482,7 @@ export function createHoleRenderer(
       "uEnds",
       "uParticles",
       "uTimes",
+      "uSpectrum",
       "uOrbit",
       "uOrbitClock",
       "uImages",
@@ -505,6 +520,13 @@ export function createHoleRenderer(
   const tableTexture = dataTexture(gl, table.phiCount, table.rows, table.u);
   const endsTexture = dataTexture(gl, table.rows, 1, table.ends);
   const timesTexture = dataTexture(gl, table.phiCount, table.rows, table.times);
+  const spectrumTexture = dataTexture(
+    gl,
+    SPECTRUM_SAMPLES,
+    1,
+    createSpectrum(),
+    true
+  );
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
   const particles = createDiskParticles(gl, particleProgram.program);
@@ -581,6 +603,7 @@ export function createHoleRenderer(
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
+      gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
       particles.dispose();
       gpu.dispose();
@@ -604,11 +627,13 @@ export function createHoleRenderer(
       texture(0, tableTexture);
       texture(1, endsTexture);
       texture(2, particles.texture);
+      texture(3, spectrumTexture);
       texture(4, timesTexture);
       texture(6, orbitTexture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
+      gl.uniform1i(at("uSpectrum"), 3);
       gl.uniform1i(at("uTimes"), 4);
       gl.uniform1i(at("uOrbit"), 6);
       gl.uniform4f(

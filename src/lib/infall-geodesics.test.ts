@@ -8,6 +8,32 @@ import {
   shadowAngle,
 } from "./infall-geodesics";
 
+test("sky frequency shift agrees with independent static-frame gravity and Lorentz factors", () => {
+  for (const radius of [12.5, 5, 2, 1.001]) {
+    const velocity = 1 / Math.sqrt(radius);
+    const lapse = 1 - 1 / radius;
+    for (const cosine of [-0.5, 0, 0.5, 0.95]) {
+      const angle = Math.acos(-cosine);
+      const ray = rainRay(radius, angle);
+      const staticCosine = (cosine + velocity) / (1 + velocity * cosine);
+      const gravity = 1 / Math.sqrt(lapse);
+      const lorentz =
+        (1 - velocity * staticCosine) / Math.sqrt(1 - velocity ** 2);
+      expect(1 / ray.energy).toBeCloseTo(gravity * lorentz, 8);
+    }
+  }
+});
+
+test("sky redshift is continuous across the horizon and increases when looking behind during infall", () => {
+  const ratios = [12.5, 5, 2, 1.001, 1, 0.999, 0.5].map(
+    (radius) => 1 / rainRay(radius, Math.acos(-0.95)).energy
+  );
+  for (let i = 1; i < ratios.length; i += 1) {
+    expect(ratios[i] ?? 0).toBeLessThan(ratios[i - 1] ?? 0);
+  }
+  expect(Math.abs((ratios[3] ?? 0) - (ratios[5] ?? 0))).toBeLessThan(0.001);
+});
+
 test("initial photon momentum is null and has unit frequency in the falling observer frame", () => {
   for (const r of [12.5, 3, 1.001, 1, 0.999, 0.2]) {
     for (const angle of [0.03, 0.5, 1.5, 3]) {
