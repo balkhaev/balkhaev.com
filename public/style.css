@@ -25,10 +25,12 @@ main {
   height: 100svh;
   min-height: 320px;
   overflow: clip;
+  isolation: isolate;
 }
 #hole {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   opacity: 0;
@@ -74,6 +76,7 @@ main {
   padding: max(24px, env(safe-area-inset-top)) var(--gutter) 64px;
   pointer-events: none;
   background: linear-gradient(#0009, transparent);
+  transform: translateZ(0);
 }
 h1 {
   margin: 0;
@@ -136,6 +139,7 @@ h1 span {
   color: #b0a89c;
   pointer-events: none;
   background: linear-gradient(transparent, #000b);
+  transform: translateZ(0);
 }
 #hint {
   display: flex;
