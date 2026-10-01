@@ -55,7 +55,13 @@ export interface HoleFrame {
 export interface HoleRenderer {
   dispose: () => void;
   /** Screen position in normalized CSS coordinates; energy is bounded locally. */
-  disturb: (x: number, y: number, time: number, strength: number) => boolean;
+  disturb: (
+    x: number,
+    y: number,
+    time: number,
+    strength: number,
+    impact?: boolean
+  ) => boolean;
   draw: (frame: HoleFrame) => void;
   gpuTime: () => number | null;
   quality: (level: HoleQuality) => void;
@@ -189,17 +195,21 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float flux = max(0.0, integral / (pow(x, 5.0) * (x*x - 3.0))) / FLUX_PEAK;
 	float omega = sqrt(0.5 / (r * r * r));
 	float g = sqrt(max(0.0, 1.0 - 1.5 / r)) / (max(0.00001, energy - omega * lambda * uSpin));
-	vec3 matter = textureLod(uParticles, vec2((psi - omega * uSpin * delay) / TAU + 0.5, (r - DISK_IN) / (DISK_OUT - DISK_IN)), 0.0).rgb;
+	float splashes;
+	vec4 wake = diskWake(r, psi, uTime - delay + EPOCH, splashes);
+	float materialRadius = clamp(r - wake.z * sqrt(1.0 - 1.0 / r), DISK_IN, DISK_OUT);
+	float materialOmega = sqrt(0.5 / pow(materialRadius, 3.0));
+	float materialAngle = psi - wake.w / r;
+	vec3 matter = textureLod(uParticles, vec2((materialAngle - materialOmega * uSpin * delay) / TAU + 0.5, (materialRadius - DISK_IN) / (DISK_OUT - DISK_IN)), 0.0).rgb;
 	float n = 1.0 - exp(-matter.r * 3.0);
-	vec2 wake = diskWake(r, psi, uTime - delay + EPOCH);
 	// Advected density filaments: each annulus keeps its own Keplerian angular rate.
 	float phase = psi + omega * uSpin * (uTime - delay + EPOCH);
-	vec2 flow = vec2(cos(phase), sin(phase)) * (9.0 + wake.x * 0.22);
+	vec2 flow = vec2(cos(phase - wake.w / r), sin(phase - wake.w / r)) * (9.0 - wake.z * 1.2);
 	float clouds = filteredDensity(flow * 0.75 + vec2(r * 3.7, 0.0));
 	float wisps = filteredDensity(flow * 2.5 + vec2(r * 24.0 + clouds * 3.0, r * 2.0));
 	float fine = filteredDensity(flow * 14.0 + vec2(r * 70.0, r * 15.0));
 	float structure = smoothstep(0.18, 0.82, 0.35 * clouds + 0.45 * wisps + 0.2 * fine);
-	float strandPhase = r * 47.0 + clouds * 9.0 + sin(phase * 4.0) * 1.4;
+	float strandPhase = (r - wake.z) * 47.0 + clouds * 9.0 + sin(phase * 4.0) * 1.4;
 	float strand = pow(0.5 + 0.5 * sin(strandPhase), 14.0);
 	strand = mix(strand, 0.15, smoothstep(0.8, 2.0, fwidth(strandPhase)));
 	// Small thermal eddies co-rotate with the disk; compression heats the wake's edges.
@@ -209,10 +219,14 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float eddyAngle = atan(sin(phase + 2.35), cos(phase + 2.35));
 	float eddy = exp(-pow((r - 4.9) / 0.38, 2.0) - pow(eddyAngle / 0.12, 2.0));
 	float flare = pow(0.5 + 0.5 * sin((uTime - delay + EPOCH) * 0.075), 4.0);
-	float t = T_PEAK * pow(flux, 0.25) * (1.0 + 0.09 * ember * breathing + 0.18 * eddy * flare + 0.22 * wake.y) * g;
+	float tracer = smoothstep(0.04, 0.22, matter.g);
+	float t = T_PEAK * pow(flux, 0.25) * (1.0 + 0.09 * ember * breathing + 0.18 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
 	float edge = smoothstep(DISK_IN, DISK_IN + 0.45, r) * (1.0 - smoothstep(7.0, DISK_OUT, r));
-	float alpha = edge * clamp(0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand + 0.72 * wake.x, 0.015, 1.0);
-	return vec4(blackbody(t) * uAccretion * (0.85 + 0.4 * strand), alpha);
+	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
+	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
+	vec3 radiance = blackbody(t) * (0.85 + 0.4 * strand + tracer * wake.y * 0.35);
+	radiance += blackbody(T_PEAK * pow(flux, 0.25) * 1.52 * g) * splashes * 0.18;
+	return vec4(radiance * uAccretion, alpha);
 }
 
 /**
@@ -516,6 +530,7 @@ export function createHoleRenderer(
       "uWakeCount",
       "uWakes[0]",
       "uWakeDirections[0]",
+      "uWakeSplashes[0]",
     ]);
     downsample = compile(gl, DOWNSAMPLE, ["uSource", "uTexel"]);
     blur = compile(gl, BLUR, ["uSource", "uStep"]);
@@ -634,12 +649,16 @@ export function createHoleRenderer(
         gl.deleteProgram(each.program);
       }
     },
-    disturb(x, y, time, strength) {
+    disturb(x, y, time, strength, impact = false) {
       const hit = pickDisk(table, view, width, height, x, y);
       if (!hit) {
         return false;
       }
-      wake.push(hit, time - hit.delay + DISTANCE, strength);
+      wake.push(hit, time - hit.delay + DISTANCE, strength, {
+        impact,
+        observedTime: time,
+        spin: view.spin,
+      });
       canvas.dataset.diskImpulses = String(wake.count);
       return true;
     },
@@ -697,7 +716,8 @@ export function createHoleRenderer(
       gl.uniform1f(at("uStars"), view.stars);
       gl.uniform1i(at("uWakeCount"), wake.count);
       gl.uniform4fv(at("uWakes[0]"), wake.data);
-      gl.uniform2fv(at("uWakeDirections[0]"), wake.directions);
+      gl.uniform4fv(at("uWakeDirections[0]"), wake.directions);
+      gl.uniform4fv(at("uWakeSplashes[0]"), wake.splashes);
       pass(sceneTarget);
 
       let source = sceneTarget;

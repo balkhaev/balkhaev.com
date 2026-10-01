@@ -6,30 +6,46 @@ layout(location=0) in vec4 aSeed;
 uniform float uTime;
 uniform float uSpin;
 uniform float uPointScale;
+uniform vec2 uAtlasSize;
+uniform float uWrap;
 out float vLight;
+out vec2 vLocal;
+out float vSeed;
 const float TAU = 6.28318530718;
+const vec2 CORNERS[6] = vec2[6](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0),
+  vec2(-1.0,1.0), vec2(1.0,-1.0), vec2(1.0,1.0));
 void main() {
   float radius = aSeed.x;
   float omega = sqrt(0.5 / (radius * radius * radius));
+  vec2 corner = CORNERS[gl_VertexID];
+  vLocal = corner * 0.5 + 0.5;
+  float duration = 1.5 + aSeed.z * 2.5;
   float angle = aSeed.y - uSpin * omega * uTime;
-  float wrap = float(gl_InstanceID) - 1.0;
-  vec2 uv = vec2(fract(angle / TAU + 0.5) + wrap, (radius - 3.0) / 8.0);
+  float arc = (1.0 - vLocal.x) * omega * duration / TAU;
+  float halfWidth = max(1.0 / uAtlasSize.y, (0.025 + aSeed.w * 0.035) / 8.0) * uPointScale;
+  vec2 uv = vec2(fract(angle / TAU + 0.5) + uWrap + uSpin * arc,
+    (radius - 3.0) / 8.0 + corner.y * halfWidth);
   gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
-  gl_PointSize = (4.0 + aSeed.z * 3.0) * uPointScale;
-  vLight = (0.75 + aSeed.w * 0.25) * 0.2;
+  vLight = (0.65 + aSeed.w * 0.35) * 0.16;
+  vSeed = aSeed.w;
 }`;
 
 export const PARTICLE_FRAGMENT = `#version 300 es
 precision highp float;
 in float vLight;
+in vec2 vLocal;
+in float vSeed;
 out vec4 outColor;
 void main() {
-  vec2 p = gl_PointCoord * 2.0 - 1.0;
-  float spot = exp(-dot(p, p) * 4.0) * vLight;
-  outColor = vec4(spot, 0.0, 0.0, 1.0);
+  float transverse = (vLocal.y - 0.5) / (0.12 + vLocal.x * 0.1);
+  float tail = exp(-transverse * transverse) * smoothstep(0.0, 0.18, vLocal.x) * (1.0 - smoothstep(0.8, 1.0, vLocal.x));
+  float head = exp(-pow((vLocal.x - 0.82) / 0.12, 2.0) - pow((vLocal.y - 0.5) / 0.23, 2.0));
+  float density = (tail * 0.45 + head) * vLight;
+  // A second channel preserves the resolved bright heads without colouring the gas in RGB.
+  outColor = vec4(density, head * vLight * (0.4 + pow(vSeed, 3.0)), 0.0, 1.0);
 }`;
 
-/** Passive circular tracers; cursor pressure packets modulate the rendered disk layer separately. */
+/** Circular emissive filaments, sampled through the curved rays at each image's emission time. */
 export function createDiskParticles(
   gl: WebGL2RenderingContext,
   program: WebGLProgram
@@ -58,10 +74,13 @@ export function createDiskParticles(
   gl.bufferData(gl.ARRAY_BUFFER, seeds, gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(0, 1);
   const uniforms = {
+    atlas: gl.getUniformLocation(program, "uAtlasSize"),
     scale: gl.getUniformLocation(program, "uPointScale"),
     spin: gl.getUniformLocation(program, "uSpin"),
     time: gl.getUniformLocation(program, "uTime"),
+    wrap: gl.getUniformLocation(program, "uWrap"),
   };
   let quality: HoleQuality = "balanced";
   const setQuality = (next: HoleQuality) => {
@@ -113,13 +132,17 @@ export function createDiskParticles(
       gl.blendFunc(gl.ONE, gl.ONE);
       gl.uniform1f(uniforms.time, time);
       gl.uniform1f(uniforms.spin, spin);
+      gl.uniform2f(uniforms.atlas, level.atlasWidth, level.atlasHeight);
       gl.uniform1f(
         uniforms.scale,
         Math.sqrt(
           (level.atlasWidth * level.atlasHeight) / level.particles / 9.36
         )
       );
-      gl.drawArraysInstanced(gl.POINTS, 0, level.particles, 3);
+      for (const wrap of [-1, 0, 1]) {
+        gl.uniform1f(uniforms.wrap, wrap);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, level.particles);
+      }
       gl.disable(gl.BLEND);
     },
     setQuality,

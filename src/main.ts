@@ -126,6 +126,27 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     renderer.quality(quality.level);
     fit();
+    // Deterministic material-interaction frames for local visual review only.
+    if (previewStill) {
+      const params = new URLSearchParams(location.search);
+      const effect = params.get("preview-effect");
+      const requestedAge = Number(params.get("preview-age") ?? 3);
+      const age = Number.isFinite(requestedAge)
+        ? Math.max(0, Math.min(30, requestedAge))
+        : 3;
+      if (effect === "impact") {
+        renderer.disturb(0.69, 0.57, time - age, 1.4, true);
+      } else if (effect === "stream") {
+        for (let i = 0; i < 12; i += 1) {
+          renderer.disturb(
+            0.58 + i * 0.014,
+            0.57,
+            time - age - (11 - i) * 0.18,
+            0.8
+          );
+        }
+      }
+    }
     resume();
   };
   const dismissHint = () => {
@@ -145,7 +166,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         Math.max(16, now - pointer.at)
       : 0.3;
     pointer = { at: now, x: event.clientX, y: event.clientY };
-    if (!tap && (now - lastImpulse < 65 || speed < 0.035)) {
+    if (!tap && (now - lastImpulse < 50 || speed < 0.035)) {
       return;
     }
     if (
@@ -153,7 +174,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         x,
         y,
         time,
-        tap ? 1.25 : 0.65 + Math.min(0.85, speed * 0.6)
+        tap ? 1.4 : 0.55 + Math.min(0.8, speed * 0.55),
+        tap
       )
     ) {
       lastImpulse = now;
