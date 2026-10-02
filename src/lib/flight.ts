@@ -1,9 +1,120 @@
 export const START_RADIUS = 12.5;
 export const END_RADIUS = 0.02;
 export const HORIZON_PROGRESS = Math.log(START_RADIUS);
-export const END_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
+export const MODEL_END_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
+export const ARTISTIC_LENGTH = 2.8;
+export const END_PROGRESS = MODEL_END_PROGRESS + ARTISTIC_LENGTH;
 export const HORIZON_TIME = (2 / 3) * (START_RADIUS ** 1.5 - 1);
 export const END_TIME = (2 / 3) * (START_RADIUS ** 1.5 - END_RADIUS ** 1.5);
+
+const FRAME_LIMIT = 0.1;
+const INTEGRATION_STEP = 1 / 120;
+const SETTLE_EPSILON = 1e-7;
+
+const CHAPTERS = [
+  {
+    description: "Свет огибает бездну. Диск медленно заполняет обзор.",
+    id: "approach",
+    radius: 3,
+    title: "Погружение",
+  },
+  {
+    description: "За внутренним краем плазма закручивается в падающие потоки.",
+    id: "isco",
+    radius: 1.5,
+    title: "Под внутренним краем",
+  },
+  {
+    description:
+      "Свет делает обороты вокруг дыры. Знакомые звёзды появляются снова.",
+    id: "photon-sphere",
+    radius: 1.12,
+    title: "Сфера света",
+  },
+  {
+    description: "Здесь нет поверхности. Только свет и непрерывное падение.",
+    id: "horizon",
+    radius: 1,
+    title: "Перед горизонтом",
+  },
+  {
+    description:
+      "Свет внешнего мира ещё достигает вас. Все будущие пути ведут глубже.",
+    id: "interior",
+    radius: 0.25,
+    title: "За горизонтом событий",
+  },
+  {
+    description:
+      "Внешний мир сжимается в тонкую полосу. Оглянитесь — он ещё здесь.",
+    id: "deep-interior",
+    radius: END_RADIUS,
+    title: "Следы света",
+  },
+] as const;
+
+// The geodesic stops at END_RADIUS; these chapters continue its visual story.
+const ARTISTIC_CHAPTERS = [
+  {
+    description:
+      "Далёкие звёзды оставили световые дуги. Их эхо медленно проходит сквозь тьму.",
+    id: "memory",
+    threshold: 0.35,
+    title: "Память света",
+  },
+  {
+    description:
+      "Свет собирается в складки. Пространство раскрывается вокруг, теряя привычные направления.",
+    id: "folds",
+    threshold: 0.75,
+    title: "Складки пространства",
+  },
+  {
+    description:
+      "В глубине остаётся тихое свечение. Волны сходятся к сердцу темноты.",
+    id: "heart",
+    threshold: 1,
+    title: "Тихое ядро",
+  },
+  {
+    description:
+      "Падение завершено. Свет продолжает дышать в глубине. Оглядитесь или вернитесь к звёздам.",
+    id: "end",
+    threshold: Number.POSITIVE_INFINITY,
+    title: "На дне света",
+  },
+] as const;
+
+// Presentation pace changes smoothly; the sampled worldline and its proper clock do not.
+const PACE_POINTS = [
+  [0, 0.078],
+  [Math.log(START_RADIUS / 3), 0.15],
+  [Math.log(START_RADIUS / 1.5), 0.135],
+  [HORIZON_PROGRESS, 0.048],
+  [Math.log(START_RADIUS / 0.55), 0.13],
+  [Math.log(START_RADIUS / 0.25), 0.18],
+  [Math.log(START_RADIUS / 0.06), 0.19],
+  [MODEL_END_PROGRESS, 0.105],
+  [MODEL_END_PROGRESS + ARTISTIC_LENGTH * 0.35, 0.125],
+  [MODEL_END_PROGRESS + ARTISTIC_LENGTH * 0.75, 0.12],
+  [END_PROGRESS, 0.085],
+] as const;
+
+function playbackPace(phase: number) {
+  let previous: readonly [number, number] = PACE_POINTS[0];
+  for (const current of PACE_POINTS.slice(1)) {
+    if (phase <= current[0]) {
+      const fraction = Math.max(
+        0,
+        (phase - previous[0]) / (current[0] - previous[0])
+      );
+      const blend = fraction * fraction * (3 - 2 * fraction);
+      return previous[1] + (current[1] - previous[1]) * blend;
+    }
+    previous = current;
+  }
+  return previous[1];
+}
 
 /** Radial rain geodesic: dr/dτ = -1/sqrt(r), dT_PG/dτ = 1. */
 export const flightRadius = (properTime: number) =>
@@ -12,25 +123,46 @@ export const flightRadius = (properTime: number) =>
     Math.max(0, START_RADIUS ** 1.5 - 1.5 * properTime) ** (2 / 3)
   );
 
-/** The trajectory ends at a finite interior radius. Navigation scrubs its display time in either direction. */
+/** Navigation samples the geodesic, then continues beyond its boundary as a visual story. */
 export function journeyAt(progress: number) {
-  const phase = Math.max(0, Math.min(END_PROGRESS, progress));
-  const radius = START_RADIUS * Math.exp(-phase);
-  const finished = phase >= END_PROGRESS - 1e-7;
-  let stage = "Погружение";
-  if (finished) {
-    stage = "Последний кадр";
-  } else if (radius < 0.25) {
-    stage = "Небо сжимается";
-  } else if (phase >= HORIZON_PROGRESS) {
-    stage = "За горизонтом событий";
-  }
+  const phase = Number.isNaN(progress)
+    ? 0
+    : Math.max(0, Math.min(END_PROGRESS, progress));
+  const physicalPhase = Math.min(phase, MODEL_END_PROGRESS);
+  const radius =
+    physicalPhase >= MODEL_END_PROGRESS
+      ? END_RADIUS
+      : START_RADIUS * Math.exp(-physicalPhase);
+  const finished = phase >= END_PROGRESS;
+  const artisticProgress = Math.max(
+    0,
+    Math.min(1, (phase - MODEL_END_PROGRESS) / ARTISTIC_LENGTH)
+  );
+  const chapter =
+    (phase >= MODEL_END_PROGRESS
+      ? ARTISTIC_CHAPTERS.find(
+          (candidate) => artisticProgress < candidate.threshold
+        )
+      : CHAPTERS.find(
+          (candidate) => phase < Math.log(START_RADIUS / candidate.radius)
+        )) ?? ARTISTIC_CHAPTERS[3];
+  const clock =
+    physicalPhase >= MODEL_END_PROGRESS
+      ? END_TIME
+      : (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5);
   return {
-    clock: (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5),
+    artistic: phase >= MODEL_END_PROGRESS,
+    artisticProgress,
+    clock,
+    completion: phase / END_PROGRESS,
+    description: chapter.description,
     finished,
+    modelCompletion: physicalPhase / MODEL_END_PROGRESS,
     phase,
     radius,
-    stage,
+    remainingProperTime: Math.max(0, END_TIME - clock),
+    stage: chapter.title,
+    stageId: chapter.id,
   };
 }
 
@@ -40,32 +172,47 @@ export function createFlight() {
   let active = false;
   let playing = false;
   const properTime = () => journeyAt(progress).clock;
+  const pause = () => {
+    playing = false;
+    target = progress;
+  };
+  const resume = () => {
+    if (journeyAt(progress).finished) {
+      return false;
+    }
+    active = true;
+    target = progress;
+    playing = true;
+    return true;
+  };
   return {
     get active() {
       return active;
     },
     advance(seconds: number, reducedMotion = false) {
-      if (!(Number.isFinite(seconds) && seconds > 0)) {
+      if (!(Number.isFinite(seconds) && seconds > 0) || reducedMotion) {
         return 0;
       }
-      const journey = journeyAt(progress);
-      if (playing && !reducedMotion) {
-        const pace =
-          journey.phase < HORIZON_PROGRESS
-            ? Math.min(0.55, 3.8 / journey.radius ** 1.5)
-            : 0.19;
-        target = Math.min(END_PROGRESS, target + seconds * pace);
-      }
       const previous = properTime();
-      let step = (target - progress) * (1 - Math.exp(-seconds * 7));
-      if (!reducedMotion) {
-        const forwardRate = journey.phase < HORIZON_PROGRESS ? 1 : 0.45;
-        const limit = seconds * (step < 0 ? 1.2 : forwardRate);
+      // A suspended tab must not skip a chapter on its first returning frame.
+      let remaining = Math.min(seconds, FRAME_LIMIT);
+      while (remaining > 1e-10) {
+        const elapsed = Math.min(remaining, INTEGRATION_STEP);
+        if (playing) {
+          target = Math.min(
+            END_PROGRESS,
+            target + elapsed * playbackPace(progress)
+          );
+        }
+        let step = (target - progress) * (1 - Math.exp(-elapsed * 7));
+        const forwardRate = progress < HORIZON_PROGRESS ? 0.6 : 0.3;
+        const limit = elapsed * (step < 0 ? 1.2 : forwardRate);
         step = Math.sign(step) * Math.min(Math.abs(step), limit);
-      }
-      progress += step;
-      if (Math.abs(target - progress) < 1e-7) {
-        progress = target;
+        progress += step;
+        if (Math.abs(target - progress) < SETTLE_EPSILON) {
+          progress = target;
+        }
+        remaining -= elapsed;
       }
       return properTime() - previous;
     },
@@ -75,11 +222,12 @@ export function createFlight() {
     get journey() {
       return journeyAt(progress);
     },
+    pause,
     get playback() {
       if (!active) {
         return "idle";
       }
-      if (target < progress - 1e-7) {
+      if (target < progress - SETTLE_EPSILON) {
         return "rewinding";
       }
       if (journeyAt(progress).finished) {
@@ -90,7 +238,15 @@ export function createFlight() {
     get radius() {
       return journeyAt(progress).radius;
     },
-    travel(amount: number, immediate = false) {
+    resume,
+    togglePlayback() {
+      if (playing) {
+        pause();
+        return false;
+      }
+      return resume();
+    },
+    travel(amount: number, immediate = false, autoplay = true) {
       if (!Number.isFinite(amount) || amount === 0) {
         return 0;
       }
@@ -98,7 +254,7 @@ export function createFlight() {
       // A direction change cancels the old queued motion and anchors the gesture to the visible frame.
       const anchor =
         amount < 0 ? Math.min(progress, target) : Math.max(progress, target);
-      playing = amount > 0 && !immediate;
+      playing = amount > 0 && !immediate && autoplay;
       target = Math.min(END_PROGRESS, Math.max(0, anchor + amount));
       const previous = properTime();
       if (immediate) {

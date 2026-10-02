@@ -168,6 +168,6 @@ vec4 plungingDisk(float r, float psi, float lambda, float angular, float energy,
   // Prescribed thermal emission with a restrained compression contribution; no luminous horizon.
   float temperature = 2050.0 * pow(max(column, 0.0001), 0.12) * pow(3.0 / r, 0.08);
   temperature *= 0.6 + 0.55 * structure.x + 0.1 * structure.z + structure.w * 0.2;
-  return vec4(blackbody(temperature * shift) * uAccretion, alpha);
+  return vec4(frequencyInspection(blackbody(temperature * shift) * uAccretion, shift), alpha);
 }
 `;

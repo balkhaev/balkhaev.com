@@ -118,6 +118,64 @@ test("light from outside reaches an interior observer with the correct regular t
   }
 });
 
+test("regular exterior escape segments agree with independent angular and PG-time quadrature", () => {
+  for (const radius of [12.5, 3, 1.001]) {
+    // A coarse output grid also checks that long winding segments retain bounded substeps.
+    const phiCount = radius < 2 ? 64 : 512;
+    const table = infallTable(radius, {
+      below: 160,
+      critical: 0,
+      distance: radius,
+      ends: new Float32Array(512),
+      phiCount,
+      rows: 512,
+      times: new Float32Array(512 * phiCount),
+      u: new Float32Array(512 * phiCount),
+    });
+    // Include a near-critical ray that spends several radians around the photon sphere.
+    const row = radius < 2 ? table.below + 4 : Math.floor(angleRow(2.4, table));
+    const ray = rainRay(radius, rowAngle(row, table));
+    const end = table.ends[row] ?? 0;
+    expect(end).toBeGreaterThan(0);
+    expect(ray.slope).toBeLessThan(0);
+    for (const fraction of [0.35, 0.59, 0.78]) {
+      const column = Math.round(fraction * (table.phiCount - 1));
+      const emitterRadius = 1 / (table.u[row * table.phiCount + column] ?? 0);
+      // Schwarzschild's null first integral determines both derivatives independently
+      // of the RK orbit equation and the residual-clock integrator used by the table.
+      const integrands = (r: number) => {
+        const radial = Math.sqrt(
+          ray.energy ** 2 - ((1 - 1 / r) * ray.angular ** 2) / r ** 2
+        );
+        return {
+          angle: ray.angular / (r * r * radial),
+          time:
+            (ray.energy ** 2 + ray.angular ** 2 / r ** 3) /
+            (radial * (ray.energy + radial / Math.sqrt(r))),
+        };
+      };
+      const steps = 50_000;
+      const h = (emitterRadius - radius) / steps;
+      const first = integrands(radius);
+      const last = integrands(emitterRadius);
+      let angle = first.angle + last.angle;
+      let time = first.time + last.time;
+      for (let step = 1; step < steps; step += 1) {
+        const sample = integrands(radius + step * h);
+        const weight = step % 2 ? 4 : 2;
+        angle += sample.angle * weight;
+        time += sample.time * weight;
+      }
+      const phi = columnPhi(column, end, table.phiCount);
+      const tolerance = radius < 2 ? 1e-5 : 2e-6;
+      expect(Math.abs(phi - (angle * h) / 3)).toBeLessThan(tolerance);
+      expect(
+        Math.abs(infallDelay(table, row, phi) - (time * h) / 3)
+      ).toBeLessThan(tolerance);
+    }
+  }
+});
+
 test("deep interior rays preserve the visible external sky and agree with independent angular quadrature", () => {
   const table = infallTable(0.02);
   expect(table.u.every(Number.isFinite)).toBe(true);

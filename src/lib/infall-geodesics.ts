@@ -138,6 +138,7 @@ function advance(state: State, k: number, h: number, clock: boolean) {
 
 function rayEnd(initial: ReturnType<typeof rainRay>) {
   const state: State = { slope: initial.slope, time: 0, u: initial.u };
+  const k = initial.energy / initial.angular;
   let phi = 0;
   for (let step = 0; step < 1800 && phi < 3.3 * Math.PI; step += 1) {
     const h = Math.min(
@@ -145,7 +146,7 @@ function rayEnd(initial: ReturnType<typeof rainRay>) {
       (0.02 * Math.max(1, state.u)) / Math.max(Math.abs(state.slope), 0.01)
     );
     const before = state.u;
-    advance(state, initial.energy / initial.angular, h, false);
+    advance(state, k, h, false);
     if (state.u <= 0) {
       return phi + (h * before) / (before - state.u);
     }
@@ -176,8 +177,14 @@ export function infallTable(
   };
   table.distance = distance;
   table.critical = shadowAngle(distance);
+  // The observer and far-emitter spacing is shared by every ray. Keep it in double precision.
+  const fractions = new Float64Array(table.phiCount);
+  for (let column = 1; column < table.phiCount; column += 1) {
+    fractions[column] = columnPhi(column, 1, table.phiCount);
+  }
   for (let row = 0; row < table.rows; row += 1) {
     const ray = rainRay(distance, rowAngle(row, table));
+    const k = ray.energy / ray.angular;
     const traced = rayEnd(ray);
     const end = traced <= 0 ? Math.min(-1e-7, traced) : traced;
     table.ends[row] = end;
@@ -188,8 +195,13 @@ export function infallTable(
     table.times[offset] = 0;
     for (let column = 1; column < table.phiCount; column += 1) {
       // Quadratic spacing resolves both the observer and distant emitters close to escape.
-      const target = columnPhi(column, end, table.phiCount);
-      const maxStep = Math.min(0.018, (target - phi) * 0.5);
+      const target = Math.abs(end) * (fractions[column] ?? 0);
+      // RK4 needs one bounded step on regular escaping segments. Preserve the finer
+      // integration inside the horizon and on captured paths, where the PG clock is stiff.
+      const maxStep = Math.min(
+        0.018,
+        (target - phi) * (end > 0 && state.u <= 1 ? 1 : 0.5)
+      );
       // Resolve the high curvature at small r without wasting the ray-end iteration budget.
       while (phi < target) {
         const h = Math.min(
@@ -197,7 +209,7 @@ export function infallTable(
           target - phi,
           (0.02 * Math.max(1, state.u)) / Math.max(Math.abs(state.slope), 0.01)
         );
-        advance(state, ray.energy / ray.angular, h, true);
+        advance(state, k, h, true);
         phi += h;
       }
       table.u[offset + column] = Math.max(0, state.u);

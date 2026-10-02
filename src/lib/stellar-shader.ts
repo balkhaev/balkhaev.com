@@ -92,6 +92,7 @@ vec4 photosphere(vec3 hit, float time, vec3 photonCovector, float energy) {
     filteredDensity(local.yz * 31.0 + time * 0.014),
     filteredDensity(local.xz * 31.0 + time * 0.014),
     filteredDensity(local.xy * 31.0 + time * 0.014)));
-  return vec4(blackbody(11800.0 * (0.94 + 0.12 * granules) * g) * (0.42 + 0.58 * limb), 1.0);
+  vec3 radiance = blackbody(11800.0 * (0.94 + 0.12 * granules) * g) * (0.42 + 0.58 * limb);
+  return vec4(frequencyInspection(radiance, g), 1.0);
 }
 `;

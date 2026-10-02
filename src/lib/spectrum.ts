@@ -1,3 +1,5 @@
+import { FREQUENCY_INSPECTION_SHADER } from "./frequency-inspection";
+
 export const SPECTRUM_SAMPLES = 2048;
 export const MIN_TEMPERATURE = 400;
 export const MAX_TEMPERATURE = 20_000_000;
@@ -30,6 +32,7 @@ export function createSpectrum() {
 
 export const SPECTRUM_SHADER = `
 uniform sampler2D uSpectrum;
+${FREQUENCY_INSPECTION_SHADER}
 vec3 blackbody(float temperature) {
   float at = clamp(log(max(temperature, ${MIN_TEMPERATURE.toFixed(1)}) / ${MIN_TEMPERATURE.toFixed(1)}) / ${Math.log(MAX_TEMPERATURE / MIN_TEMPERATURE).toFixed(12)}, 0.0, 1.0) * ${SPECTRUM_SAMPLES - 1}.0;
   int low = int(floor(at));
@@ -38,6 +41,6 @@ vec3 blackbody(float temperature) {
 // The temperature shift includes beaming through invariance of I_nu / nu^3.
 vec3 shiftedSpectrum(float temperature, float shift) {
   float normalization = dot(blackbody(temperature), vec3(0.2126, 0.7152, 0.0722));
-  return blackbody(temperature * shift) / max(normalization, 1e-8);
+  return frequencyInspection(blackbody(temperature * shift) / max(normalization, 1e-8), shift);
 }
 `;

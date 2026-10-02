@@ -4,8 +4,12 @@ import {
   type HoleView,
 } from "./lib/black-hole-gl";
 import { createHoleQuality } from "./lib/black-hole-quality";
-import { createFlight } from "./lib/flight";
-import { CLOCK_RATE, OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
+import { createFlight, END_PROGRESS, HORIZON_PROGRESS } from "./lib/flight";
+import { createFlightAudio } from "./lib/flight-audio";
+import { createObserverLook } from "./lib/observer-look";
+import { createPhysicsPanel } from "./lib/physics-panel";
+import { OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
+import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
@@ -13,29 +17,25 @@ const hint = document.querySelector<HTMLElement>("#hint");
 
 function flightLabel(flight: ReturnType<typeof createFlight>) {
   if (!flight.active) {
-    return "";
+    return "На краю тишины";
   }
   if (flight.playback === "rewinding") {
-    return "Перемотка назад";
+    return "К меньшей глубине";
   }
   if (flight.playback === "paused") {
-    return flight.journey.phase > 0
-      ? `Пауза · ${flight.journey.stage.toLowerCase()}`
-      : "Начало полёта";
+    return flight.journey.phase > 0 ? flight.journey.stage : "Начало полёта";
   }
   return flight.journey.stage;
 }
 
 function flightInstruction(flight: ReturnType<typeof createFlight>) {
-  if (flight.playback === "ended") {
-    return "Потяните — обзор · Скролл вверх — перемотка";
+  if (!flight.active) {
+    return "Один путь. Всё ближе к горизонту.";
   }
-  if (flight.playback === "paused" || flight.playback === "rewinding") {
-    return "Скролл вниз — продолжить падение";
+  if (flight.playback === "rewinding") {
+    return "Скролл ↓ — ближе · ↑ — дальше. Время идёт вперёд.";
   }
-  return flight.crossed
-    ? "Потяните, чтобы увидеть внешнее небо сбоку и сзади"
-    : "";
+  return flight.journey.description;
 }
 
 function updateText(element: HTMLElement | null, value: string) {
@@ -44,17 +44,26 @@ function updateText(element: HTMLElement | null, value: string) {
   }
 }
 
+function travelAction(
+  flight: ReturnType<typeof createFlight>,
+  staticMotion: boolean
+) {
+  if (flight.journey.finished) {
+    return "На дне света";
+  }
+  if (staticMotion) {
+    return "Следующий момент";
+  }
+  if (flight.playback === "playing") {
+    return "Пауза";
+  }
+  return flight.active ? "Продолжить" : "Начать падение";
+}
+
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
-  const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
-    ? new URLSearchParams(location.search).get("preview-stage")
-    : null;
-  const previewProgress = Number(localPreview);
-  const previewStill =
-    localPreview !== null &&
-    Number.isFinite(previewProgress) &&
-    previewProgress >= 0 &&
-    previewProgress <= 20;
+  const preview = scenePreview(location.hostname, location.search);
+  const previewStill = preview.still;
   const view: HoleView = {
     distance: OBSERVER_RADIUS,
     fov: 64,
@@ -68,17 +77,43 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const quality = createHoleQuality();
   const flight = createFlight();
-  if (previewStill && previewProgress > 0) {
-    flight.travel(previewProgress, true);
+  const look = createObserverLook();
+  const audio = createFlightAudio();
+  if (preview.phase !== null && preview.phase > 0) {
+    flight.travel(preview.phase, true, false);
     hint?.classList.add("dismissed");
   }
   const flightStatus = document.querySelector<HTMLElement>("#flight-status");
   const flightNote = document.querySelector<HTMLElement>("#flight-note");
+  const travelToggle =
+    document.querySelector<HTMLButtonElement>("#travel-toggle");
+  const travelLabel = document.querySelector<HTMLElement>("#travel-label");
+  const gazeToggle = document.querySelector<HTMLButtonElement>("#gaze-toggle");
+  const soundToggle =
+    document.querySelector<HTMLButtonElement>("#sound-toggle");
+  const fullscreenToggle =
+    document.querySelector<HTMLButtonElement>("#fullscreen-toggle");
+  const radiusLabel = document.querySelector<HTMLElement>("#journey-radius");
+  const radiusUnit = document.querySelector<HTMLElement>("#journey-unit");
+  const position = document.querySelector<HTMLElement>(".journey-position");
+  const horizonTick = document.querySelector<HTMLElement>(".horizon-tick");
+  if (horizonTick) {
+    horizonTick.style.left = `${(HORIZON_PROGRESS / END_PROGRESS) * 100}%`;
+  }
+  const journeyProgress =
+    document.querySelector<HTMLElement>("#journey-progress");
+  if (soundToggle) {
+    soundToggle.disabled = !audio.available;
+  }
+  if (fullscreenToggle) {
+    fullscreenToggle.hidden = !document.fullscreenEnabled;
+  }
   let renderer: HoleRenderer | null = null;
   let frame = 0;
   let last = 0;
-  let time = previewStill ? flight.journey.clock : 0;
-  let lookYaw = 0;
+  let time = 0;
+  let animationTime = 0;
+  const physics = createPhysicsPanel(() => redraw());
   let pointer: { x: number; y: number; at: number } | null = null;
   let lastImpulse = 0;
   const touches = new Map<number, { x: number; y: number }>();
@@ -93,7 +128,15 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     const { journey } = flight;
     view.distance = journey.radius;
     Object.assign(view, opticsAt(journey.radius));
-    view.yaw = lookYaw;
+    Object.assign(
+      view,
+      look.advance(
+        journey.radius,
+        0,
+        still.matches || previewStill,
+        journey.artisticProgress
+      )
+    );
     view.x = 0.5;
     view.y = 0.5;
     surface.dataset.observerRadius = view.distance.toFixed(4);
@@ -101,8 +144,47 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.journeyStage = flight.active ? journey.stage : "Обзор";
     surface.dataset.journeyPhase = journey.phase.toFixed(3);
     surface.dataset.playback = flight.playback;
+    surface.dataset.sceneTime = time.toFixed(4);
+    surface.dataset.animationTime = animationTime.toFixed(4);
+    surface.dataset.artisticProgress = journey.artisticProgress.toFixed(4);
+    surface.dataset.gaze = look.guided ? "guided" : "free";
     updateText(flightStatus, flightLabel(flight));
     updateText(flightNote, flightInstruction(flight));
+    updateText(
+      radiusLabel,
+      journey.artistic ? "Вне времени" : journey.radius.toFixed(2)
+    );
+    if (radiusUnit) {
+      radiusUnit.hidden = journey.artistic;
+    }
+    position?.toggleAttribute("data-artistic", journey.artistic);
+    if (journeyProgress) {
+      journeyProgress.style.transform = `scaleX(${journey.completion})`;
+    }
+    const playing = flight.playback === "playing";
+    if (travelToggle) {
+      travelToggle.toggleAttribute("data-playing", playing);
+      travelToggle.disabled = journey.finished;
+    }
+    updateText(
+      travelLabel,
+      travelAction(flight, still.matches || previewStill)
+    );
+    gazeToggle?.setAttribute("aria-pressed", String(look.guided));
+    audio.update({
+      artisticProgress: journey.artisticProgress,
+      finished: journey.finished,
+      playing,
+      radius: journey.radius,
+      yaw: view.yaw,
+    });
+    physics.update({
+      artistic: journey.artistic,
+      pitch: view.pitch,
+      radius: journey.radius,
+      time,
+      yaw: view.yaw,
+    });
     renderer?.view(view);
   };
 
@@ -111,8 +193,20 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       return;
     }
     frameView();
-    renderer.draw({ accretion: 1, time });
+    renderer.draw({
+      accretion: 1,
+      animationTime,
+      journeyPhase: flight.journey.phase,
+      spectral: physics.spectral,
+      time,
+    });
     document.documentElement.classList.add("rendered");
+  };
+  const redraw = () => {
+    // Animated input is collected by the next frame; static modes draw explicitly.
+    if (!frame || still.matches || previewStill) {
+      draw();
+    }
   };
 
   const fit = () => {
@@ -123,15 +217,28 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
 
   const tick = (now: number) => {
     frame = requestAnimationFrame(tick);
-    if (now - last < 1000 / 30 - 1) {
+    if (now - last < 1000 / 60 - 1) {
       return;
     }
-    const seconds = last ? (now - last) / 1000 : 0;
+    const elapsed = last ? (now - last) / 1000 : 0;
+    const seconds = Math.min(0.1, elapsed);
     last = now;
-    time += flight.active ? flight.advance(seconds) : seconds * CLOCK_RATE;
-    if (quality.sample(seconds, renderer?.gpuTime() ?? null)) {
+    flight.advance(seconds);
+    time += sceneTimeStep(seconds);
+    animationTime += seconds;
+    Object.assign(
+      view,
+      look.advance(
+        flight.radius,
+        seconds,
+        false,
+        flight.journey.artisticProgress
+      )
+    );
+    if (quality.sample(elapsed, renderer?.gpuTime() ?? null)) {
       renderer?.quality(quality.level);
       fit();
+      return;
     }
     draw();
   };
@@ -143,6 +250,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const resume = () => {
     stop();
+    audio.setAudible(!document.hidden && Boolean(renderer));
     if (document.hidden || !renderer) {
       return;
     }
@@ -154,6 +262,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const mount = () => {
     renderer = createHoleRenderer(surface, view);
     if (!renderer) {
+      audio.setAudible(false);
       return;
     }
     renderer.quality(quality.level);
@@ -185,8 +294,54 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     hint?.classList.add("dismissed");
   };
   const travel = (amount: number) => {
-    time += flight.travel(amount, still.matches || previewStill);
+    flight.travel(amount, still.matches || previewStill, false);
   };
+  const toggleTravel = () => {
+    dismissHint();
+    if (still.matches || previewStill) {
+      travel(0.24);
+    } else {
+      flight.togglePlayback();
+    }
+    redraw();
+  };
+  const toggleSound = async () => {
+    if (!soundToggle || soundToggle.disabled) {
+      return;
+    }
+    soundToggle.disabled = true;
+    const enabled = await audio.setEnabled(!audio.enabled);
+    soundToggle.setAttribute("aria-pressed", String(enabled));
+    soundToggle.title = enabled
+      ? "Выключить звуковую атмосферу · M"
+      : "Включить звуковую атмосферу · M";
+    soundToggle.disabled = !audio.available;
+  };
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (document.fullscreenEnabled) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // The scene remains interactive when the browser declines fullscreen.
+    }
+  };
+  travelToggle?.addEventListener("click", toggleTravel);
+  soundToggle?.addEventListener("click", toggleSound);
+  fullscreenToggle?.addEventListener("click", toggleFullscreen);
+  gazeToggle?.addEventListener("click", () => {
+    look.setGuided(!look.guided);
+    redraw();
+  });
+  document.addEventListener("fullscreenchange", () => {
+    fullscreenToggle?.setAttribute(
+      "aria-pressed",
+      String(Boolean(document.fullscreenElement))
+    );
+    fit();
+  });
 
   const disturb = (event: PointerEvent, tap = false) => {
     const now = event.timeStamp;
@@ -259,16 +414,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
           dy = event.clientY - gesture.y;
         if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
           gesture.dragged = true;
-          lookYaw -= dx * 0.15;
-          view.pitch = Math.max(-89, Math.min(89, view.pitch + dy * 0.15));
+          look.turn(-dx * 0.15, dy * 0.15, still.matches || previewStill);
           gesture.x = event.clientX;
           gesture.y = event.clientY;
         }
       }
     }
-    if (still.matches || gesture) {
-      draw();
-    }
+    redraw();
   });
   input.addEventListener("pointerleave", () => {
     pointer = null;
@@ -303,38 +455,80 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         unit = surface.clientHeight;
       }
       travel(event.deltaY * unit * 0.002);
-      draw();
+      redraw();
     },
     { passive: false }
   );
+  const keyActions: Record<string, () => void> = {
+    " ": toggleTravel,
+    "-": () => travel(-0.24),
+    "+": () => travel(0.24),
+    "=": () => travel(0.24),
+    ArrowDown: () => look.turn(0, -4, still.matches || previewStill),
+    ArrowLeft: () => look.turn(-4, 0, still.matches || previewStill),
+    ArrowRight: () => look.turn(4, 0, still.matches || previewStill),
+    ArrowUp: () => look.turn(0, 4, still.matches || previewStill),
+  };
   input.addEventListener("keydown", (event) => {
     delete input.dataset.pointerFocused;
-    if (event.key === "ArrowLeft") {
-      lookYaw -= 4;
-    } else if (event.key === "ArrowRight") {
-      lookYaw += 4;
-    } else if (event.key === "ArrowUp") {
-      view.pitch = Math.min(89, view.pitch + 4);
-    } else if (event.key === "ArrowDown") {
-      view.pitch = Math.max(-89, view.pitch - 4);
-    } else if (event.key === "+" || event.key === "=") {
-      travel(0.24);
-    } else if (event.key === "-") {
-      travel(-0.24);
-    } else {
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const action = keyActions[key];
+    if (!action || event.altKey || event.ctrlKey || event.metaKey) {
       return;
     }
     event.preventDefault();
+    if (event.repeat && key === " ") {
+      return;
+    }
+    action();
     dismissHint();
-    draw();
+    redraw();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey
+    ) {
+      return;
+    }
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target?.closest("input, textarea, select, [contenteditable]")) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    let action: (() => void) | undefined;
+    if (key === "m") {
+      action = toggleSound;
+    } else if (key === "f") {
+      action = toggleFullscreen;
+    } else if (key === "p") {
+      action = physics.toggle;
+    } else if (key === " " && !target?.closest("button, a")) {
+      action = toggleTravel;
+    }
+    if (!action) {
+      return;
+    }
+    event.preventDefault();
+    if (!event.repeat) {
+      action();
+    }
   });
   const resize = new ResizeObserver(fit);
   resize.observe(surface);
-  still.addEventListener("change", resume);
+  still.addEventListener("change", () => {
+    if (still.matches) {
+      flight.pause();
+    }
+    resume();
+  });
   document.addEventListener("visibilitychange", resume);
   surface.addEventListener("webglcontextlost", (event) => {
     event.preventDefault();
     stop();
+    audio.setAudible(false);
     renderer?.dispose();
     renderer = null;
     document.documentElement.classList.remove("rendered");
@@ -342,8 +536,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   surface.addEventListener("webglcontextrestored", mount);
   window.addEventListener("pagehide", (event) => {
     stop();
+    audio.setAudible(false);
     if (!event.persisted) {
       resize.disconnect();
+      audio.dispose();
       renderer?.dispose();
       renderer = null;
     }

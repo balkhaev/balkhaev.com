@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  ARTISTIC_LENGTH,
   createFlight,
   END_PROGRESS,
   END_RADIUS,
@@ -8,6 +9,7 @@ import {
   HORIZON_PROGRESS,
   HORIZON_TIME,
   journeyAt,
+  MODEL_END_PROGRESS,
   START_RADIUS,
 } from "./flight";
 
@@ -58,9 +60,15 @@ test("forward playback reaches an explicit final frame and holds without a cycle
   }
   expect(stages).toEqual([
     "Погружение",
+    "Под внутренним краем",
+    "Сфера света",
+    "Перед горизонтом",
     "За горизонтом событий",
-    "Небо сжимается",
-    "Последний кадр",
+    "Следы света",
+    "Память света",
+    "Складки пространства",
+    "Тихое ядро",
+    "На дне света",
   ]);
   expect(radius).toBeCloseTo(END_RADIUS, 12);
   expect(clock).toBeCloseTo(END_TIME, 12);
@@ -94,6 +102,50 @@ test("reverse input cancels queued infall, settles on the requested frame and st
   flight.travel(0.05);
   expect(flight.playback).toBe("playing");
   expect(flight.advance(1 / 30)).toBeGreaterThan(0);
+});
+
+test("manual forward travel settles at the selected depth without autonomous infall", () => {
+  const flight = createFlight();
+  flight.travel(0.6, false, false);
+  expect(flight.active).toBe(true);
+  expect(flight.playback).toBe("paused");
+  expect(flight.journey.phase).toBe(0);
+  expect(flight.advance(1 / 30)).toBeGreaterThan(0);
+  for (let i = 0; i < 300; i += 1) {
+    flight.advance(1 / 30);
+  }
+  expect(flight.journey.phase).toBeCloseTo(0.6, 12);
+  const settled = flight.journey;
+  for (let i = 0; i < 300; i += 1) {
+    expect(flight.advance(1 / 30)).toBe(0);
+  }
+  expect(flight.journey).toEqual(settled);
+  expect(flight.resume()).toBe(true);
+  expect(flight.advance(1 / 30)).toBeGreaterThan(0);
+});
+
+test("manual direction changes cancel autonomous infall and respect pause", () => {
+  const flight = createFlight();
+  flight.travel(3, true);
+  flight.resume();
+  flight.advance(1 / 30);
+  const visible = flight.journey.phase;
+  flight.travel(-0.3, false, false);
+  expect(flight.playback).toBe("rewinding");
+  expect(flight.advance(1 / 30)).toBeLessThan(0);
+  const reversed = flight.journey.phase;
+  flight.travel(0.1, false, false);
+  expect(flight.playback).toBe("paused");
+  for (let i = 0; i < 300; i += 1) {
+    flight.advance(1 / 30);
+  }
+  expect(flight.journey.phase).toBeCloseTo(reversed + 0.1, 12);
+  expect(flight.journey.phase).toBeLessThan(visible + 0.1);
+  flight.travel(1, false, false);
+  flight.pause();
+  const paused = flight.journey;
+  expect(flight.advance(1 / 30)).toBe(0);
+  expect(flight.journey).toEqual(paused);
 });
 
 test("direction changes anchor to the visible frame and can revisit the endpoint", () => {
@@ -132,7 +184,7 @@ test("invalid gestures and elapsed times preserve the current trajectory frame",
 });
 
 test("radius and proper time remain continuous through the horizon and finite model boundary", () => {
-  for (const boundary of [HORIZON_PROGRESS, END_PROGRESS]) {
+  for (const boundary of [HORIZON_PROGRESS, MODEL_END_PROGRESS]) {
     const a = journeyAt(boundary - 1e-7);
     const b = journeyAt(boundary + 1e-7);
     expect(b.clock).toBeGreaterThan(a.clock);
@@ -143,10 +195,160 @@ test("radius and proper time remain continuous through the horizon and finite mo
   expect(journeyAt(-100)).toEqual(journeyAt(0));
 });
 
+test("the visual continuation advances without pushing the physical model toward a singularity", () => {
+  const boundary = journeyAt(MODEL_END_PROGRESS);
+  expect(boundary.finished).toBe(false);
+  expect(boundary.radius).toBe(END_RADIUS);
+  expect(boundary.clock).toBe(END_TIME);
+  expect(boundary.artistic).toBe(true);
+  expect(boundary.artisticProgress).toBe(0);
+  expect(boundary.modelCompletion).toBe(1);
+  expect(boundary.completion).toBeLessThan(1);
+  const stages: string[] = [];
+  for (const fraction of [0, 0.2, 0.5, 0.9, 1]) {
+    const journey = journeyAt(MODEL_END_PROGRESS + ARTISTIC_LENGTH * fraction);
+    expect(journey.radius).toBe(END_RADIUS);
+    expect(journey.clock).toBe(END_TIME);
+    expect(journey.remainingProperTime).toBe(0);
+    expect(journey.modelCompletion).toBe(1);
+    expect(journey.artisticProgress).toBeCloseTo(fraction, 12);
+    stages.push(journey.stageId);
+  }
+  expect(stages).toEqual(["memory", "memory", "folds", "heart", "end"]);
+  expect(journeyAt(END_PROGRESS).finished).toBe(true);
+  expect(journeyAt(END_PROGRESS).completion).toBe(1);
+  const before = journeyAt(MODEL_END_PROGRESS - 0.01);
+  expect(before.artistic).toBe(false);
+  expect(before.artisticProgress).toBe(0);
+  expect(before.modelCompletion).toBeLessThan(1);
+});
+
+test("manual travel holds and can rewind out of the artistic continuation", () => {
+  const flight = createFlight();
+  flight.travel(MODEL_END_PROGRESS + 1, true, false);
+  const visible = flight.journey;
+  expect(visible.stageId).toBe("folds");
+  expect(flight.playback).toBe("paused");
+  expect(flight.advance(1 / 30)).toBe(0);
+  expect(flight.journey).toEqual(visible);
+  expect(flight.travel(-2, true, false)).toBeLessThan(0);
+  expect(flight.journey.artistic).toBe(false);
+  expect(flight.radius).toBeGreaterThan(END_RADIUS);
+  expect(flight.journey.clock).toBeLessThan(END_TIME);
+  flight.travel(1.5, false, false);
+  for (let i = 0; i < 300; i += 1) {
+    flight.advance(1 / 30);
+  }
+  expect(flight.journey.phase).toBeCloseTo(MODEL_END_PROGRESS + 0.5, 12);
+  expect(flight.journey.artistic).toBe(true);
+  const settled = flight.journey;
+  expect(flight.advance(1 / 30)).toBe(0);
+  expect(flight.journey).toEqual(settled);
+});
+
 test("manual reduced-motion travel is immediate and has no autonomous drift", () => {
   const flight = createFlight();
   flight.travel(3, true);
   const inside = flight.journey;
   expect(flight.advance(60, true)).toBe(0);
   expect(flight.journey).toEqual(inside);
+});
+
+test("playback controls start the journey, freeze queued motion and never reset its final frame", () => {
+  const flight = createFlight();
+  expect(flight.resume()).toBe(true);
+  expect(flight.active).toBe(true);
+  expect(flight.playback).toBe("playing");
+  for (let i = 0; i < 60; i += 1) {
+    flight.advance(1 / 30);
+  }
+  expect(flight.journey.phase).toBeGreaterThan(0);
+  flight.travel(1000);
+  flight.pause();
+  const paused = flight.journey;
+  expect(flight.playback).toBe("paused");
+  expect(flight.advance(60)).toBe(0);
+  expect(flight.journey).toEqual(paused);
+  expect(flight.togglePlayback()).toBe(true);
+  expect(flight.advance(1 / 30)).toBeGreaterThan(0);
+  expect(flight.togglePlayback()).toBe(false);
+  flight.travel(1000, true);
+  const ended = flight.journey;
+  expect(flight.resume()).toBe(false);
+  expect(flight.togglePlayback()).toBe(false);
+  expect(flight.advance(60)).toBe(0);
+  expect(flight.journey).toEqual(ended);
+});
+
+test("cinematic playback visits physical and artistic chapters in order and holds its endpoint", () => {
+  const flight = createFlight();
+  flight.resume();
+  const chapters: string[] = [];
+  let horizonFrames = 0;
+  let finishedAt = 0;
+  for (let i = 0; i < 3000; i += 1) {
+    flight.advance(1 / 30);
+    const { journey } = flight;
+    if (chapters.at(-1) !== journey.stageId) {
+      chapters.push(journey.stageId);
+    }
+    if (journey.stageId === "horizon") {
+      horizonFrames += 1;
+    }
+    if (journey.finished && finishedAt === 0) {
+      finishedAt = (i + 1) / 30;
+    }
+    expect(flightRadius(journey.clock)).toBeCloseTo(journey.radius, 9);
+    expect(journey.completion).toBeGreaterThanOrEqual(0);
+    expect(journey.completion).toBeLessThanOrEqual(1);
+    expect(journey.remainingProperTime).toBeGreaterThanOrEqual(0);
+  }
+  expect(chapters).toEqual([
+    "approach",
+    "isco",
+    "photon-sphere",
+    "horizon",
+    "interior",
+    "deep-interior",
+    "memory",
+    "folds",
+    "heart",
+    "end",
+  ]);
+  // The horizon gets enough display time to perceive its smooth crossing.
+  expect(horizonFrames).toBeGreaterThan(60);
+  expect(finishedAt).toBeGreaterThan(75);
+  expect(finishedAt).toBeLessThan(85);
+  expect(flight.playback).toBe("ended");
+  expect(flight.journey.completion).toBe(1);
+  expect(flight.journey.remainingProperTime).toBe(0);
+});
+
+test("presentation pacing is independent of refresh rate and stale frames stay bounded", () => {
+  const slow = createFlight();
+  const fast = createFlight();
+  slow.resume();
+  fast.resume();
+  for (let i = 0; i < 20 * 30; i += 1) {
+    slow.advance(1 / 30);
+  }
+  for (let i = 0; i < 20 * 144; i += 1) {
+    fast.advance(1 / 144);
+  }
+  expect(slow.journey.phase).toBeCloseTo(fast.journey.phase, 3);
+  const visible = slow.journey.phase;
+  slow.advance(60);
+  expect(slow.journey.phase - visible).toBeLessThanOrEqual(0.6 * 0.1);
+});
+
+test("reduced-motion preference suppresses pending and automatic motion", () => {
+  const flight = createFlight();
+  flight.resume();
+  flight.travel(1);
+  const visible = flight.journey;
+  expect(flight.advance(60, true)).toBe(0);
+  expect(flight.journey).toEqual(visible);
+  flight.travel(0.24, true);
+  expect(flight.journey.phase).toBeGreaterThan(visible.phase);
+  expect(flight.advance(60, true)).toBe(0);
 });
