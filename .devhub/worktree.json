@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "bun run check",
+    "bun run test",
+    "bun run build"
+  ],
+  "releaseBranch": "main",
+  "stageBranch": "stage",
+  "version": 1,
+  "worktreeRoot": "D:/worktrees/balkhaev.com",
+  "mode": "mvp",
+  "deploy": "bun scripts/deploy.ts"
+}
