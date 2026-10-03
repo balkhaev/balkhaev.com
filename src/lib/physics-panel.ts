@@ -1,7 +1,6 @@
 import { relativityAt, skyShiftAt } from "./relativity";
 
 interface PhysicsFrame {
-  artistic: boolean;
   pitch: number;
   radius: number;
   time: number;
@@ -21,10 +20,6 @@ export function createPhysicsPanel(onChange: () => void) {
   const spectralToggle =
     document.querySelector<HTMLButtonElement>("#spectral-toggle");
   const legend = document.querySelector<HTMLElement>("#spectrum-legend");
-  const artNote = document.querySelector<HTMLElement>("#physics-art-note");
-  const measurements = document.querySelector<HTMLElement>(
-    "#physics-measurements"
-  );
   const frameNote = document.querySelector<HTMLElement>("#physics-frame-note");
   const labels = new Map<string, HTMLElement>();
   for (const id of [
@@ -44,7 +39,6 @@ export function createPhysicsPanel(onChange: () => void) {
     }
   }
   let spectral = false;
-  let artistic = false;
   let lastTime = -1;
   let lastFrame: PhysicsFrame | null = null;
   const text = (id: string, value: string) => {
@@ -59,7 +53,6 @@ export function createPhysicsPanel(onChange: () => void) {
       frame.yaw !== lastFrame.yaw ||
       frame.pitch !== lastFrame.pitch;
     lastFrame = frame;
-    ({ artistic } = frame);
     if (
       !panel ||
       panel.hidden ||
@@ -68,10 +61,6 @@ export function createPhysicsPanel(onChange: () => void) {
       return;
     }
     lastTime = frame.time;
-    if (artNote && measurements) {
-      artNote.hidden = !artistic;
-      measurements.hidden = artistic;
-    }
     const angle = Math.acos(
       Math.max(
         -1,
@@ -142,7 +131,7 @@ export function createPhysicsPanel(onChange: () => void) {
   });
   return {
     get spectral() {
-      return spectral && !artistic;
+      return spectral;
     },
     toggle: toggleOpen,
     update,

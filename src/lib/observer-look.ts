@@ -1,23 +1,23 @@
-import { END_RADIUS, MODEL_END_PROGRESS, START_RADIUS } from "./flight";
+import { END_RADIUS, HORIZON_PROGRESS, START_RADIUS } from "./flight";
 
 const radians = Math.PI / 180;
 
-/** A directed gaze reveals the peripheral sky; the observer's radial worldline is unchanged. */
-export function guidedLookAt(radius: number, artisticProgress = 0) {
-  const phase = Math.log(START_RADIUS / Math.max(END_RADIUS, radius));
+/** Guide towards an escaping sky ray with g=2; camera orientation never changes a ray's physics. */
+export function guidedLookAt(radius: number) {
+  const r = Math.max(END_RADIUS, Math.min(START_RADIUS, radius));
+  const phase = Math.log(START_RADIUS / r);
   const fraction = Math.max(
     0,
-    Math.min(1, (phase - 1.65) / (MODEL_END_PROGRESS - 1.65))
+    Math.min(1, (phase - 1.65) / (HORIZON_PROGRESS - 1.65))
   );
   const ease = fraction ** 3 * (10 + fraction * (6 * fraction - 15));
-  const imagined = Math.max(0, Math.min(1, artisticProgress));
-  const turn = imagined ** 3 * (10 + imagined * (6 * imagined - 15));
+  // For the rain frame g = 1 / (1 - cos(theta) / sqrt(r)). The g=2
+  // direction lies outside the shadow throughout the guided interior descent.
+  // It approaches the transverse sky band as r shrinks, without a post-end turn.
+  const skyAngle = Math.acos(Math.min(1, Math.sqrt(r) * 0.5));
   return {
-    pitch:
-      -4 * Math.sin(fraction * Math.PI) +
-      5 * Math.sin(imagined * Math.PI) -
-      turn * 4,
-    yaw: ease * 78 + turn * 22,
+    pitch: 0,
+    yaw: (ease * skyAngle) / radians,
   };
 }
 
@@ -32,14 +32,9 @@ export function createObserverLook() {
   let targetYaw = 0;
   let targetPitch = 0;
   return {
-    advance(
-      radius: number,
-      seconds: number,
-      immediate = false,
-      artisticProgress = 0
-    ) {
+    advance(radius: number, seconds: number, immediate = false) {
       if (guided) {
-        const target = guidedLookAt(radius, artisticProgress);
+        const target = guidedLookAt(radius);
         targetYaw = yaw + shortestTurn(target.yaw - yaw);
         targetPitch = target.pitch;
       }

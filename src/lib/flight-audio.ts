@@ -1,8 +1,6 @@
 import { END_RADIUS, START_RADIUS } from "./flight";
 
 export interface FlightAudioFrame {
-  /** Artistic continuation beyond the physical model, normalized to 0–1. */
-  artisticProgress?: number;
   finished?: boolean;
   playing?: boolean;
   radius: number;
@@ -32,23 +30,11 @@ interface Air {
   pan: StereoPannerNode;
 }
 
-interface Resonance extends Tone {
-  shimmer: GainNode;
-}
-
-interface Echo {
-  feedback: GainNode;
-  filter: BiquadFilterNode;
-  send: GainNode;
-}
-
 interface AudioGraph {
   air: Air[];
   context: AudioContext;
-  echoes: Echo[];
   master: GainNode;
   nodes: AudioNode[];
-  resonances: Resonance[];
   sources: AudioScheduledSourceNode[];
   tones: Tone[];
 }
@@ -101,7 +87,7 @@ function pinkNoise(context: AudioContext) {
   return buffer;
 }
 
-/** Quiet score and filtered stereo air: an artistic accompaniment, not sound in vacuum. */
+/** Quiet procedural score and filtered stereo air, independent of source physics. */
 function createGraph(context: AudioContext): AudioGraph {
   const nodes: AudioNode[] = [];
   const sources: AudioScheduledSourceNode[] = [];
@@ -191,31 +177,7 @@ function createGraph(context: AudioContext): AudioGraph {
     return { filter, gain, pan };
   });
 
-  // A suspended just-intonation chord emerges only beyond the model boundary.
-  // Its two slow native modulators keep the held scene alive without frame timers.
-  const shimmerWaves = [0.031, 0.047].map((frequency) => {
-    const wave = context.createOscillator();
-    wave.frequency.value = frequency;
-    return start(wave);
-  });
-  const resonances = [1, 1.25, 1.5, 2.5].map((ratio, index) => {
-    const oscillator = context.createOscillator();
-    oscillator.type = "sine";
-    oscillator.frequency.value = 132 * ratio;
-    const gain = keep(context.createGain());
-    gain.gain.value = 0;
-    const shimmer = keep(context.createGain());
-    shimmer.gain.value = 0;
-    shimmerWaves[index % 2]?.connect(shimmer).connect(gain.gain);
-    const pan = keep(context.createStereoPanner());
-    pan.pan.value = (index % 2 ? -1 : 1) * 0.38;
-    oscillator.connect(gain).connect(pan).connect(bus);
-    start(oscillator);
-    return { gain, oscillator, pan, shimmer };
-  });
-
   // Two damped, unequal echoes give the harmonics space without a convolution cost.
-  const echoes: Echo[] = [];
   for (const [delayTime, bearing] of [
     [0.217, -0.75],
     [0.337, 0.75],
@@ -235,9 +197,8 @@ function createGraph(context: AudioContext): AudioGraph {
     bus.connect(send).connect(delay).connect(filter).connect(feedback);
     feedback.connect(delay);
     filter.connect(pan).connect(softener);
-    echoes.push({ feedback, filter, send });
   }
-  return { air, context, echoes, master, nodes, resonances, sources, tones };
+  return { air, context, master, nodes, sources, tones };
 }
 
 function applyFrame(graph: AudioGraph, frame: FlightAudioFrame) {
@@ -248,11 +209,6 @@ function applyFrame(graph: AudioGraph, frame: FlightAudioFrame) {
     Math.log(START_RADIUS / radius) / Math.log(START_RADIUS / END_RADIUS);
   const pressure = ease(clamp(depth / 0.78, 0, 1));
   const interior = ease(clamp((depth - 0.38) / 0.62, 0, 1));
-  const artistic = Number.isFinite(frame.artisticProgress)
-    ? clamp(frame.artisticProgress ?? 0, 0, 1)
-    : 0;
-  const bloom = ease(clamp((artistic - 0.1) / 0.55, 0, 1));
-  const distance = ease(clamp((artistic - 0.72) / 0.28, 0, 1));
   const heading =
     Math.sin(
       (((Number.isFinite(frame.yaw) ? (frame.yaw ?? 0) : 0) % 360) * Math.PI) /
@@ -265,12 +221,7 @@ function applyFrame(graph: AudioGraph, frame: FlightAudioFrame) {
   for (const [index, tone] of graph.tones.entries()) {
     smooth(tone.oscillator.frequency, root * (ratios[index] ?? 1), now, 1.2);
     const thinning = index > 2 ? 1 - interior * 0.7 : 1 + pressure * 0.15;
-    smooth(
-      tone.gain.gain,
-      (levels[index] ?? 0.01) * thinning * (1 - bloom * 0.36),
-      now,
-      1.2
-    );
+    smooth(tone.gain.gain, (levels[index] ?? 0.01) * thinning, now, 1.2);
     smooth(
       tone.pan.pan,
       index === 0 ? 0 : (index % 2 ? -1 : 1) * 0.25 + heading,
@@ -280,52 +231,17 @@ function applyFrame(graph: AudioGraph, frame: FlightAudioFrame) {
   for (const [index, air] of graph.air.entries()) {
     smooth(
       air.filter.frequency,
-      (540 + 300 * pressure - 620 * interior) * (1 - bloom * 0.2),
+      540 + 300 * pressure - 620 * interior,
       now,
       1.4
     );
     smooth(
       air.gain.gain,
-      (0.045 + pressure * 0.055) * (1 - interior * 0.78) * (1 - bloom * 0.35),
+      (0.045 + pressure * 0.055) * (1 - interior * 0.78),
       now,
       1.1
     );
     smooth(air.pan.pan, (index === 0 ? -1 : 1) * 0.6 + heading, now);
-  }
-  applyResonances(graph, bloom, distance, heading);
-}
-
-function applyResonances(
-  graph: AudioGraph,
-  bloom: number,
-  distance: number,
-  heading: number
-) {
-  const now = graph.context.currentTime;
-  const chordRoot = 132 - bloom * 14 - distance * 8;
-  const chordRatios = [1, 1.25, 1.5, 2.5];
-  const chordLevels = [0.047, 0.032, 0.024, 0.012];
-  for (const [index, resonance] of graph.resonances.entries()) {
-    const level = (chordLevels[index] ?? 0.012) * bloom * (1 - distance * 0.34);
-    smooth(
-      resonance.oscillator.frequency,
-      chordRoot * (chordRatios[index] ?? 1) * (1 + index * 0.0004),
-      now,
-      2.2
-    );
-    smooth(resonance.gain.gain, level, now, 2.1);
-    smooth(resonance.shimmer.gain, level * 0.18, now, 2.1);
-    smooth(
-      resonance.pan.pan,
-      (index % 2 ? -1 : 1) * (0.38 + bloom * 0.24) + heading * 0.65,
-      now,
-      1.8
-    );
-  }
-  for (const echo of graph.echoes) {
-    smooth(echo.filter.frequency, 700 + bloom * 450, now, 2);
-    smooth(echo.send.gain, 0.16 + bloom * 0.035, now, 2);
-    smooth(echo.feedback.gain, 0.24 + bloom * 0.075, now, 2);
   }
 }
 

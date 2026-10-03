@@ -31,7 +31,7 @@ export function skyShiftAt(radius: number, angle: number) {
  * Schwarzschild readouts for the physical rain frame, in r_s = c = 1 units.
  * Static speed and lapse are defined only outside the horizon. Tidal strength
  * is relative to START_RADIUS; without a mass it is not a force in SI units.
- * The imagined continuation keeps this frame at END_RADIUS.
+ * The optical journey ends at END_RADIUS, before the singularity.
  */
 export function relativityAt(radius: number, forwardAngle = 0) {
   const r = modelRadius(radius);

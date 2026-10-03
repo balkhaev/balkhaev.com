@@ -23,7 +23,6 @@ import {
   SKY_VERTEX,
 } from "./distant-sky";
 import { infallTable, radialClock } from "./infall-geodesics";
-import { INTERIOR_FRAGMENT } from "./interior-shader";
 import {
   createPlungingFlow,
   PLUNGE_SAMPLES,
@@ -61,10 +60,6 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
-  /** Cosmetic elapsed seconds; remains independent of scroll and geodesic time. */
-  animationTime?: number;
-  /** Narrative depth. Values beyond log(12.5/.02) enter an imagined source field. */
-  journeyPhase?: number;
   /** False-colour map of actual per-source frequency ratios in the calculated region. */
   spectral?: boolean;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
@@ -107,7 +102,6 @@ uniform sampler2D uEnds;
 uniform sampler2D uParticles;
 uniform sampler2D uTimes;
 uniform sampler2D uPointSky;
-uniform sampler2D uInterior;
 uniform int uImages;
 uniform vec2 uCenter;
 uniform float uSensor;
@@ -372,9 +366,6 @@ void main() {
 	}
   light += through * texelFetch(uPointSky, ivec2(gl_FragCoord.xy), 0).rgb;
 	float opacity = end < 0.0 ? 1.0 : 1.0 - through;
-	vec4 interior = texture(uInterior, gl_FragCoord.xy / vec2(textureSize(uPointSky, 0)));
-	light = light * (1.0 - interior.a) + interior.rgb;
-	opacity = max(opacity, interior.a);
 	outColor = vec4(light, opacity);
 }`;
 
@@ -573,7 +564,6 @@ export function createHoleRenderer(
   let skyProgram: Program;
   let meterProgram: Program;
   let adaptProgram: Program;
-  let interiorProgram: Program;
   try {
     scene = compile(gl, SCENE, [
       "uTable",
@@ -598,22 +588,12 @@ export function createHoleRenderer(
       "uStars",
       "uSpectral",
       "uPointSky",
-      "uInterior",
       "uPlunge",
       "uPlungeClock",
       "uWakeHistoryCount",
       "uWakeHistory",
     ]);
     downsample = compile(gl, DOWNSAMPLE, ["uSource", "uTexel"]);
-    interiorProgram = compile(gl, INTERIOR_FRAGMENT, [
-      "uCenter",
-      "uSensor",
-      "uLens",
-      "uCamera",
-      "uPhase",
-      "uAnimationTime",
-      "uSamples",
-    ]);
     blur = compile(gl, BLUR, ["uSource", "uStep"]);
     meterProgram = compile(gl, METER, ["uSource", "uTexel"]);
     adaptProgram = compile(gl, ADAPT, ["uMeter", "uPrevious", "uBlend"]);
@@ -681,7 +661,6 @@ export function createHoleRenderer(
   const plunge = createPlungingFlow();
   const plungeTexture = dataTexture(gl, PLUNGE_SAMPLES, 1, plunge.data, true);
   const gpu = createGpuClock(gl);
-  const interiorBlank = dataTexture(gl, 1, 1, new Float32Array(4), true);
   let quality: HoleQuality = "balanced";
   const vao = gl.createVertexArray();
 
@@ -731,7 +710,6 @@ export function createHoleRenderer(
   let height = 1;
   let sceneTarget: Target | null = null;
   let skyTarget: Target | null = null;
-  let interiorTarget: Target | null = null;
   /** Per level: the downsampled picture and the one it is blurred through. */
   let glow: [Target, Target][] = [];
   const meterFirst = target(64, 64);
@@ -798,65 +776,11 @@ export function createHoleRenderer(
     return exposure;
   };
 
-  const renderInterior = (
-    frame: HoleFrame,
-    basis: Float32Array,
-    half: number
-  ) => {
-    // The volume shares the physical camera's ray but uses a separate artistic
-    // coordinate field; it never changes the Schwarzschild ray table.
-    const phase = Math.max(
-      0,
-      Math.min(
-        9.237_751_65,
-        frame.journeyPhase ?? Math.log(DISTANCE / view.distance)
-      )
-    );
-    // The imagined emitting field carries no scientific frequency measurement.
-    // In the calculated region inspection shows only the physical ray sources.
-    const inspecting =
-      Boolean(frame.spectral) && phase <= 6.437_751_65 + 0.0001;
-    let interiorTexture = interiorBlank;
-    if (phase > 2.956_511_56 && interiorTarget && !inspecting) {
-      const interiorAt = bind(interiorProgram);
-      const samples = { balanced: 20, high: 24, low: 12 }[quality];
-      gl.uniform2f(
-        interiorAt("uCenter"),
-        view.x * interiorTarget.width,
-        (1 - view.y) * interiorTarget.height
-      );
-      gl.uniform1f(
-        interiorAt("uSensor"),
-        2 / Math.min(interiorTarget.width, interiorTarget.height)
-      );
-      gl.uniform3f(
-        interiorAt("uLens"),
-        Math.tan(half),
-        Math.tan(half * 0.5),
-        view.panorama ?? 0
-      );
-      gl.uniformMatrix3fv(interiorAt("uCamera"), false, basis);
-      gl.uniform1f(interiorAt("uPhase"), phase);
-      gl.uniform1f(
-        interiorAt("uAnimationTime"),
-        frame.animationTime ?? frame.time
-      );
-      gl.uniform1i(interiorAt("uSamples"), samples);
-      gl.bindVertexArray(vao);
-      pass(interiorTarget);
-      interiorTexture = interiorTarget.texture;
-    }
-    canvas.dataset.interiorPhase = phase.toFixed(3);
-    canvas.dataset.spectral = String(inspecting);
-    return { inspecting, interiorTexture };
-  };
-
   return {
     dispose() {
       free([
         ...(sceneTarget ? [sceneTarget] : []),
         ...(skyTarget ? [skyTarget] : []),
-        ...(interiorTarget ? [interiorTarget] : []),
         ...glow.flat(),
         ...meterTargets,
         ...exposures,
@@ -868,7 +792,6 @@ export function createHoleRenderer(
       gl.deleteTexture(orbitTexture);
       gl.deleteTexture(plungeTexture);
       gl.deleteTexture(wakeTexture);
-      gl.deleteTexture(interiorBlank);
       sky.dispose();
       particles.dispose();
       gpu.dispose();
@@ -882,7 +805,6 @@ export function createHoleRenderer(
         skyProgram,
         meterProgram,
         adaptProgram,
-        interiorProgram,
       ]) {
         gl.deleteProgram(each.program);
       }
@@ -902,7 +824,9 @@ export function createHoleRenderer(
     },
 
     draw(frame) {
-      const { accretion, time } = frame;
+      const { accretion, time, spectral } = frame;
+      const inspecting = Boolean(spectral);
+      canvas.dataset.spectral = String(inspecting);
       if (!(sceneTarget && skyTarget)) {
         return;
       }
@@ -929,11 +853,6 @@ export function createHoleRenderer(
       const { basis, eye } = cameraOf(view);
       particles.draw(time + DISTANCE, view.spin);
       const half = (view.fov * Math.PI) / 360;
-      const { inspecting, interiorTexture } = renderInterior(
-        frame,
-        basis,
-        half
-      );
       const skyAt = bind(skyProgram);
       texture(0, endsTexture);
       texture(1, spectrumTexture);
@@ -985,7 +904,6 @@ export function createHoleRenderer(
       texture(6, skyTarget.texture);
       texture(7, plungeTexture);
       texture(8, wakeTexture);
-      texture(9, interiorTexture);
       gl.uniform1i(at("uTable"), 0);
       gl.uniform1i(at("uEnds"), 1);
       gl.uniform1i(at("uParticles"), 2);
@@ -993,7 +911,6 @@ export function createHoleRenderer(
       gl.uniform1i(at("uTimes"), 4);
       gl.uniform1i(at("uOrbit"), 5);
       gl.uniform1i(at("uPointSky"), 6);
-      gl.uniform1i(at("uInterior"), 9);
       gl.uniform1i(at("uPlunge"), 7);
       gl.uniform2f(at("uPlungeClock"), plunge.clock, plunge.proper);
       gl.uniform1i(at("uWakeHistory"), 8);
@@ -1098,7 +1015,6 @@ export function createHoleRenderer(
         nextHeight === height &&
         sceneTarget &&
         skyTarget &&
-        interiorTarget &&
         glow.length === HOLE_QUALITY[quality].bloom
       ) {
         return;
@@ -1110,16 +1026,10 @@ export function createHoleRenderer(
       free([
         ...(sceneTarget ? [sceneTarget] : []),
         ...(skyTarget ? [skyTarget] : []),
-        ...(interiorTarget ? [interiorTarget] : []),
         ...glow.flat(),
       ]);
       sceneTarget = target(width, height);
       skyTarget = target(width, height);
-      const interiorScale = { balanced: 0.45, high: 0.5, low: 0.35 }[quality];
-      interiorTarget = target(
-        Math.max(2, Math.round(width * interiorScale)),
-        Math.max(2, Math.round(height * interiorScale))
-      );
       glow = [];
       let levelWidth = width;
       let levelHeight = height;

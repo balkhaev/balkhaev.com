@@ -49,10 +49,10 @@ function travelAction(
   staticMotion: boolean
 ) {
   if (flight.journey.finished) {
-    return "На дне света";
+    return "Граница расчёта";
   }
   if (staticMotion) {
-    return "Следующий момент";
+    return "Ближе";
   }
   if (flight.playback === "playing") {
     return "Пауза";
@@ -94,8 +94,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const fullscreenToggle =
     document.querySelector<HTMLButtonElement>("#fullscreen-toggle");
   const radiusLabel = document.querySelector<HTMLElement>("#journey-radius");
-  const radiusUnit = document.querySelector<HTMLElement>("#journey-unit");
-  const position = document.querySelector<HTMLElement>(".journey-position");
   const horizonTick = document.querySelector<HTMLElement>(".horizon-tick");
   if (horizonTick) {
     horizonTick.style.left = `${(HORIZON_PROGRESS / END_PROGRESS) * 100}%`;
@@ -112,7 +110,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let frame = 0;
   let last = 0;
   let time = 0;
-  let animationTime = 0;
   const physics = createPhysicsPanel(() => redraw());
   let pointer: { x: number; y: number; at: number } | null = null;
   let lastImpulse = 0;
@@ -130,12 +127,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     Object.assign(view, opticsAt(journey.radius));
     Object.assign(
       view,
-      look.advance(
-        journey.radius,
-        0,
-        still.matches || previewStill,
-        journey.artisticProgress
-      )
+      look.advance(journey.radius, 0, still.matches || previewStill)
     );
     view.x = 0.5;
     view.y = 0.5;
@@ -145,19 +137,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.journeyPhase = journey.phase.toFixed(3);
     surface.dataset.playback = flight.playback;
     surface.dataset.sceneTime = time.toFixed(4);
-    surface.dataset.animationTime = animationTime.toFixed(4);
-    surface.dataset.artisticProgress = journey.artisticProgress.toFixed(4);
     surface.dataset.gaze = look.guided ? "guided" : "free";
     updateText(flightStatus, flightLabel(flight));
     updateText(flightNote, flightInstruction(flight));
-    updateText(
-      radiusLabel,
-      journey.artistic ? "Вне времени" : journey.radius.toFixed(2)
-    );
-    if (radiusUnit) {
-      radiusUnit.hidden = journey.artistic;
-    }
-    position?.toggleAttribute("data-artistic", journey.artistic);
+    updateText(radiusLabel, journey.radius.toFixed(2));
     if (journeyProgress) {
       journeyProgress.style.transform = `scaleX(${journey.completion})`;
     }
@@ -172,14 +155,12 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     );
     gazeToggle?.setAttribute("aria-pressed", String(look.guided));
     audio.update({
-      artisticProgress: journey.artisticProgress,
       finished: journey.finished,
       playing,
       radius: journey.radius,
       yaw: view.yaw,
     });
     physics.update({
-      artistic: journey.artistic,
       pitch: view.pitch,
       radius: journey.radius,
       time,
@@ -195,8 +176,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     frameView();
     renderer.draw({
       accretion: 1,
-      animationTime,
-      journeyPhase: flight.journey.phase,
       spectral: physics.spectral,
       time,
     });
@@ -225,16 +204,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     last = now;
     flight.advance(seconds);
     time += sceneTimeStep(seconds);
-    animationTime += seconds;
-    Object.assign(
-      view,
-      look.advance(
-        flight.radius,
-        seconds,
-        false,
-        flight.journey.artisticProgress
-      )
-    );
+    Object.assign(view, look.advance(flight.radius, seconds));
     if (quality.sample(elapsed, renderer?.gpuTime() ?? null)) {
       renderer?.quality(quality.level);
       fit();

@@ -1,9 +1,8 @@
 export const START_RADIUS = 12.5;
 export const END_RADIUS = 0.02;
 export const HORIZON_PROGRESS = Math.log(START_RADIUS);
-export const MODEL_END_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
-export const ARTISTIC_LENGTH = 2.8;
-export const END_PROGRESS = MODEL_END_PROGRESS + ARTISTIC_LENGTH;
+export const END_PROGRESS = Math.log(START_RADIUS / END_RADIUS);
+export const MODEL_END_PROGRESS = END_PROGRESS;
 export const HORIZON_TIME = (2 / 3) * (START_RADIUS ** 1.5 - 1);
 export const END_TIME = (2 / 3) * (START_RADIUS ** 1.5 - END_RADIUS ** 1.5);
 
@@ -49,39 +48,14 @@ const CHAPTERS = [
       "Внешний мир сжимается в тонкую полосу. Оглянитесь — он ещё здесь.",
     id: "deep-interior",
     radius: END_RADIUS,
-    title: "Следы света",
-  },
-] as const;
-
-// The geodesic stops at END_RADIUS; these chapters continue its visual story.
-const ARTISTIC_CHAPTERS = [
-  {
-    description:
-      "Далёкие звёзды оставили световые дуги. Их эхо медленно проходит сквозь тьму.",
-    id: "memory",
-    threshold: 0.35,
-    title: "Память света",
+    title: "Внешнее небо",
   },
   {
     description:
-      "Свет собирается в складки. Пространство раскрывается вокруг, теряя привычные направления.",
-    id: "folds",
-    threshold: 0.75,
-    title: "Складки пространства",
-  },
-  {
-    description:
-      "В глубине остаётся тихое свечение. Волны сходятся к сердцу темноты.",
-    id: "heart",
-    threshold: 1,
-    title: "Тихое ядро",
-  },
-  {
-    description:
-      "Падение завершено. Свет продолжает дышать в глубине. Оглядитесь или вернитесь к звёздам.",
+      "Радиус 0.02 rₛ — граница модели. Свет внешнего мира всё ещё достигает наблюдателя.",
     id: "end",
-    threshold: Number.POSITIVE_INFINITY,
-    title: "На дне света",
+    radius: 0,
+    title: "Граница расчёта",
   },
 ] as const;
 
@@ -94,10 +68,7 @@ const PACE_POINTS = [
   [Math.log(START_RADIUS / 0.55), 0.13],
   [Math.log(START_RADIUS / 0.25), 0.18],
   [Math.log(START_RADIUS / 0.06), 0.19],
-  [MODEL_END_PROGRESS, 0.105],
-  [MODEL_END_PROGRESS + ARTISTIC_LENGTH * 0.35, 0.125],
-  [MODEL_END_PROGRESS + ARTISTIC_LENGTH * 0.75, 0.12],
-  [END_PROGRESS, 0.085],
+  [END_PROGRESS, 0.105],
 ] as const;
 
 function playbackPace(phase: number) {
@@ -123,41 +94,27 @@ export const flightRadius = (properTime: number) =>
     Math.max(0, START_RADIUS ** 1.5 - 1.5 * properTime) ** (2 / 3)
   );
 
-/** Navigation samples the geodesic, then continues beyond its boundary as a visual story. */
+/** Navigation samples a radial rain worldline up to the finite model boundary. */
 export function journeyAt(progress: number) {
   const phase = Number.isNaN(progress)
     ? 0
     : Math.max(0, Math.min(END_PROGRESS, progress));
-  const physicalPhase = Math.min(phase, MODEL_END_PROGRESS);
-  const radius =
-    physicalPhase >= MODEL_END_PROGRESS
-      ? END_RADIUS
-      : START_RADIUS * Math.exp(-physicalPhase);
   const finished = phase >= END_PROGRESS;
-  const artisticProgress = Math.max(
-    0,
-    Math.min(1, (phase - MODEL_END_PROGRESS) / ARTISTIC_LENGTH)
-  );
+  const radius = finished ? END_RADIUS : START_RADIUS * Math.exp(-phase);
   const chapter =
-    (phase >= MODEL_END_PROGRESS
-      ? ARTISTIC_CHAPTERS.find(
-          (candidate) => artisticProgress < candidate.threshold
-        )
+    (finished
+      ? CHAPTERS[6]
       : CHAPTERS.find(
           (candidate) => phase < Math.log(START_RADIUS / candidate.radius)
-        )) ?? ARTISTIC_CHAPTERS[3];
-  const clock =
-    physicalPhase >= MODEL_END_PROGRESS
-      ? END_TIME
-      : (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5);
+        )) ?? CHAPTERS[6];
+  const clock = finished
+    ? END_TIME
+    : (2 / 3) * (START_RADIUS ** 1.5 - radius ** 1.5);
   return {
-    artistic: phase >= MODEL_END_PROGRESS,
-    artisticProgress,
     clock,
     completion: phase / END_PROGRESS,
     description: chapter.description,
     finished,
-    modelCompletion: physicalPhase / MODEL_END_PROGRESS,
     phase,
     radius,
     remainingProperTime: Math.max(0, END_TIME - clock),

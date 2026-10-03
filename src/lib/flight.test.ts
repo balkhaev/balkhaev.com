@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
 import {
-  ARTISTIC_LENGTH,
   createFlight,
   END_PROGRESS,
   END_RADIUS,
@@ -26,7 +25,7 @@ test("radial worldline is timelike and crosses the horizon at finite proper time
   }
 });
 
-test("display time can rewind through the horizon along the same falling worldline", () => {
+test("depth navigation revisits falling frames across the horizon", () => {
   const flight = createFlight();
   flight.travel(1, true);
   flight.travel(-1, true);
@@ -64,11 +63,8 @@ test("forward playback reaches an explicit final frame and holds without a cycle
     "Сфера света",
     "Перед горизонтом",
     "За горизонтом событий",
-    "Следы света",
-    "Память света",
-    "Складки пространства",
-    "Тихое ядро",
-    "На дне света",
+    "Внешнее небо",
+    "Граница расчёта",
   ]);
   expect(radius).toBeCloseTo(END_RADIUS, 12);
   expect(clock).toBeCloseTo(END_TIME, 12);
@@ -195,52 +191,43 @@ test("radius and proper time remain continuous through the horizon and finite mo
   expect(journeyAt(-100)).toEqual(journeyAt(0));
 });
 
-test("the visual continuation advances without pushing the physical model toward a singularity", () => {
+test("navigation finishes exactly at the finite physical model boundary", () => {
   const boundary = journeyAt(MODEL_END_PROGRESS);
-  expect(boundary.finished).toBe(false);
+  expect(MODEL_END_PROGRESS).toBe(END_PROGRESS);
+  expect(boundary.finished).toBe(true);
   expect(boundary.radius).toBe(END_RADIUS);
   expect(boundary.clock).toBe(END_TIME);
-  expect(boundary.artistic).toBe(true);
-  expect(boundary.artisticProgress).toBe(0);
-  expect(boundary.modelCompletion).toBe(1);
-  expect(boundary.completion).toBeLessThan(1);
-  const stages: string[] = [];
-  for (const fraction of [0, 0.2, 0.5, 0.9, 1]) {
-    const journey = journeyAt(MODEL_END_PROGRESS + ARTISTIC_LENGTH * fraction);
-    expect(journey.radius).toBe(END_RADIUS);
-    expect(journey.clock).toBe(END_TIME);
-    expect(journey.remainingProperTime).toBe(0);
-    expect(journey.modelCompletion).toBe(1);
-    expect(journey.artisticProgress).toBeCloseTo(fraction, 12);
-    stages.push(journey.stageId);
+  expect(boundary.completion).toBe(1);
+  expect(boundary.stageId).toBe("end");
+  expect(boundary.stage).toBe("Граница расчёта");
+  for (const extraDepth of [0.001, 1, 2.8, 100]) {
+    expect(journeyAt(END_PROGRESS + extraDepth)).toEqual(boundary);
   }
-  expect(stages).toEqual(["memory", "memory", "folds", "heart", "end"]);
-  expect(journeyAt(END_PROGRESS).finished).toBe(true);
-  expect(journeyAt(END_PROGRESS).completion).toBe(1);
-  const before = journeyAt(MODEL_END_PROGRESS - 0.01);
-  expect(before.artistic).toBe(false);
-  expect(before.artisticProgress).toBe(0);
-  expect(before.modelCompletion).toBeLessThan(1);
+  const before = journeyAt(END_PROGRESS - 0.01);
+  expect(before.finished).toBe(false);
+  expect(before.radius).toBeGreaterThan(END_RADIUS);
+  expect(before.clock).toBeLessThan(END_TIME);
+  expect(before.completion).toBeLessThan(1);
 });
 
-test("manual travel holds and can rewind out of the artistic continuation", () => {
+test("manual travel holds the model boundary and selects earlier physical radii", () => {
   const flight = createFlight();
-  flight.travel(MODEL_END_PROGRESS + 1, true, false);
+  flight.travel(END_PROGRESS + 1, true, false);
   const visible = flight.journey;
-  expect(visible.stageId).toBe("folds");
-  expect(flight.playback).toBe("paused");
+  expect(visible.stageId).toBe("end");
+  expect(flight.playback).toBe("ended");
   expect(flight.advance(1 / 30)).toBe(0);
   expect(flight.journey).toEqual(visible);
   expect(flight.travel(-2, true, false)).toBeLessThan(0);
-  expect(flight.journey.artistic).toBe(false);
+  expect(flight.journey.finished).toBe(false);
   expect(flight.radius).toBeGreaterThan(END_RADIUS);
   expect(flight.journey.clock).toBeLessThan(END_TIME);
   flight.travel(1.5, false, false);
   for (let i = 0; i < 300; i += 1) {
     flight.advance(1 / 30);
   }
-  expect(flight.journey.phase).toBeCloseTo(MODEL_END_PROGRESS + 0.5, 12);
-  expect(flight.journey.artistic).toBe(true);
+  expect(flight.journey.phase).toBeCloseTo(END_PROGRESS - 0.5, 12);
+  expect(flight.journey.finished).toBe(false);
   const settled = flight.journey;
   expect(flight.advance(1 / 30)).toBe(0);
   expect(flight.journey).toEqual(settled);
@@ -280,13 +267,13 @@ test("playback controls start the journey, freeze queued motion and never reset 
   expect(flight.journey).toEqual(ended);
 });
 
-test("cinematic playback visits physical and artistic chapters in order and holds its endpoint", () => {
+test("cinematic playback visits the physical landmarks and holds its model boundary", () => {
   const flight = createFlight();
   flight.resume();
   const chapters: string[] = [];
   let horizonFrames = 0;
   let finishedAt = 0;
-  for (let i = 0; i < 3000; i += 1) {
+  for (let i = 0; i < 1800; i += 1) {
     flight.advance(1 / 30);
     const { journey } = flight;
     if (chapters.at(-1) !== journey.stageId) {
@@ -310,15 +297,12 @@ test("cinematic playback visits physical and artistic chapters in order and hold
     "horizon",
     "interior",
     "deep-interior",
-    "memory",
-    "folds",
-    "heart",
     "end",
   ]);
   // The horizon gets enough display time to perceive its smooth crossing.
   expect(horizonFrames).toBeGreaterThan(60);
-  expect(finishedAt).toBeGreaterThan(75);
-  expect(finishedAt).toBeLessThan(85);
+  expect(finishedAt).toBeGreaterThan(50);
+  expect(finishedAt).toBeLessThan(56);
   expect(flight.playback).toBe("ended");
   expect(flight.journey.completion).toBe(1);
   expect(flight.journey.remainingProperTime).toBe(0);

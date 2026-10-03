@@ -58,7 +58,7 @@ test("inward and outward depth gestures never rewind or jump the source epoch", 
   expect(epoch).toBeCloseTo((7 * CLOCK_RATE) / 60, 12);
 });
 
-test("explicit playback and pauses keep one clock across the horizon and artistic boundary", () => {
+test("explicit playback and pauses keep one clock across the horizon and model endpoint", () => {
   const flight = createFlight();
   flight.resume();
   let epoch = 0;

@@ -118,7 +118,7 @@ test("static lapse is a stationary clock ratio and the tidal gradient scales wit
   expect(relativityAt(START_RADIUS).tidalRatio).toBe(1);
 });
 
-test("gaze samples the physical frame and imagined depth never extends its radius", () => {
+test("gaze samples the physical frame and readouts respect the model endpoint", () => {
   const radius = 0.25;
   const frame = relativityAt(radius, Math.PI * 0.6);
   expect(frame.forwardShift).toBe(skyShiftAt(radius, Math.PI * 0.6));

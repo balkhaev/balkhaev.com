@@ -332,10 +332,6 @@ h1 span {
   font-style: italic;
   color: #71685f;
 }
-.journey-position[data-artistic] {
-  font-family: inherit;
-  letter-spacing: 0.025em;
-}
 .journey-track {
   position: absolute;
   inset: auto var(--gutter) max(14px, env(safe-area-inset-bottom));
@@ -352,7 +348,7 @@ h1 span {
 .horizon-tick {
   position: absolute;
   top: -2px;
-  left: 27.34%;
+  left: 39.23%;
   width: 1px;
   height: 5px;
   background: #b9987055;
@@ -558,13 +554,6 @@ h1 span {
   margin: 12px 0 0;
   font-size: 11px;
   color: #a3a3a5;
-}
-.physics-art-note {
-  padding: 14px;
-  margin: 0 0 22px;
-  color: #c8b494;
-  background: #7f653318;
-  border-left: 1px solid #9d835b;
 }
 .physics-sources {
   margin: 16px 0 0;

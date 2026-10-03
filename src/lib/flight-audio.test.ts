@@ -127,53 +127,48 @@ function oscillatorGain(source: ReturnType<MockContext["createGain"]>) {
   return (destination.gain as ReturnType<typeof mockParameter>).value;
 }
 
-test("the imagined interior gradually opens its harmonics and retains a quiet endpoint", async () => {
+test("the physical endpoint retains a quiet score and depth navigation reuses its audio device", async () => {
   let device: MockContext | undefined;
-  class InteriorContext extends MockContext {
+  class PhysicalContext extends MockContext {
     constructor() {
       super();
       device = this;
     }
   }
-  await withAudioContext(InteriorContext, async () => {
+  await withAudioContext(PhysicalContext, async () => {
     const audio = createFlightAudio();
-    audio.update({ artisticProgress: 0, radius: 0.02 });
+    audio.update({ finished: true, playing: false, radius: 0.02 });
     expect(await audio.setEnabled(true)).toBe(true);
     const context = device;
     if (!context) {
       throw new Error("Audio device was not created");
     }
-    const upperVoice = context.oscillators.find(
-      (source) => source.frequency.value > 250
+    const lowTone = context.oscillators.find(
+      (source) => source.frequency.value > 20
     );
-    if (!upperVoice) {
-      throw new Error("Interior chord has no upper harmonic");
+    if (!lowTone) {
+      throw new Error("Soundscape has no sustained low tone");
     }
-    expect(oscillatorGain(upperVoice)).toBe(0);
-    context.currentTime = 1;
-    audio.update({ artisticProgress: 0.25, radius: 0.02 });
-    const emerging = oscillatorGain(upperVoice);
-    expect(emerging).toBeGreaterThan(0);
-    context.currentTime = 2;
-    audio.update({ artisticProgress: 0.7, radius: 0.02 });
-    const opened = oscillatorGain(upperVoice);
-    expect(opened).toBeGreaterThan(emerging);
-    context.currentTime = 3;
-    audio.update({ artisticProgress: 1, finished: true, radius: 0.02 });
-    expect(oscillatorGain(upperVoice)).toBeGreaterThan(0);
-    expect(oscillatorGain(upperVoice)).toBeLessThan(opened);
+    expect(oscillatorGain(lowTone)).toBeGreaterThan(0);
     expect(context.master?.value).toBeGreaterThan(0);
     expect(context.master?.value).toBeLessThan(0.1);
-    // Seeking back closes the imagined layer without rebuilding the device.
-    context.currentTime = 4;
-    audio.update({ artisticProgress: 0, finished: false, radius: 0.02 });
-    expect(oscillatorGain(upperVoice)).toBe(0);
+    const frequency = lowTone.frequency.value;
+    const volume = context.master?.value;
+    context.currentTime = 1;
+    audio.update({ finished: true, playing: false, radius: 0.02 });
+    expect(lowTone.frequency.value).toBe(frequency);
+    expect(context.master?.value).toBe(volume);
+    // Choosing a larger radius restores the same tone without rebuilding it.
+    context.currentTime = 2;
+    audio.update({ finished: false, playing: false, radius: 12.5 });
+    expect(lowTone.frequency.value).toBeGreaterThan(frequency);
+    expect(oscillatorGain(lowTone)).toBeGreaterThan(0);
     expect(context.resumed).toBe(1);
     audio.dispose();
   });
 });
 
-test("invalid continuation inputs and extreme camera headings stay finite and silent outside the layer", async () => {
+test("invalid radii and extreme camera headings keep sound parameters finite", async () => {
   let device: MockContext | undefined;
   class FiniteContext extends MockContext {
     constructor() {
@@ -188,16 +183,10 @@ test("invalid continuation inputs and extreme camera headings stay finite and si
     if (!context) {
       throw new Error("Audio device was not created");
     }
-    for (const artisticProgress of [
-      Number.NaN,
-      Number.POSITIVE_INFINITY,
-      -10,
-      10,
-    ]) {
+    for (const radius of [Number.NaN, Number.POSITIVE_INFINITY, -10, 10]) {
       context.currentTime += 1;
       audio.update({
-        artisticProgress,
-        radius: Number.NaN,
+        radius,
         yaw: Number.MAX_VALUE,
       });
       for (const source of context.oscillators) {
