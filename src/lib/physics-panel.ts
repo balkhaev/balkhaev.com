@@ -53,8 +53,8 @@ export function createPhysicsPanel(onChange: () => void) {
   const legend = document.querySelector<HTMLElement>("#spectrum-legend");
   const frameNote = document.querySelector<HTMLElement>("#physics-frame-note");
   const clocks = createLocalLightClocks();
-  const clockRows = ["local", "forward", "rear"].map((id) => ({
-    id: id as "local" | "forward" | "rear",
+  const clockRows = ["local", "rim", "forward", "rear"].map((id) => ({
+    id: id as keyof ClockSignals,
     row: document.querySelector<HTMLElement>(`[data-clock="${id}"]`),
   }));
   const labels = new Map<string, HTMLElement>();

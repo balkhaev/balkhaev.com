@@ -212,7 +212,7 @@ float filteredDensity(vec2 p) {
 }
 
 /** The disk where a ray crosses it: its light (rgb) and how opaque it is (a). */
-vec4 disk(float r, float psi, float lambda, float energy, float delay) {
+vec4 disk(float r, float psi, float lambda, float angular, float energy, float delay) {
 	float x = sqrt(2.0 * r);
 	float x0 = sqrt(6.0);
 	float root3 = sqrt(3.0);
@@ -256,7 +256,9 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
 	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
 	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
-	alpha = mix(alpha, 1.0 - exp(-(0.015 + 0.1 * injection.x + 0.45 * injection.y * injection.y + 2.2 * injection.w) * 0.9), feed);
+	// The feed shares the plunge's proper injection column; only its inherited circular g differs by the small launch kick.
+	float incidence = emitterIncidence(r, angular, lambda, g);
+	alpha = mix(alpha, materialOpacity(injectionDepth(injection, 1.0), incidence), feed);
 	vec3 radiance = blackbody(t) * (0.85 + 0.4 * strand + tracer * wake.y * 0.35);
 	radiance += blackbody(T_PEAK * pow(flux, 0.25) * 1.52 * g) * splashes * 0.18;
 	return vec4(frequencyInspection(radiance * uAccretion, g), alpha);
@@ -360,7 +362,7 @@ void main() {
 				if (r > DISK_OUT) continue;
 				float psi = atan(hit.z, hit.x);
 				float lambda = -angular * normal.y;
-				if (r >= DISK_IN) emission = disk(r, psi, lambda, energy, delay);
+				if (r >= DISK_IN) emission = disk(r, psi, lambda, angular, energy, delay);
 				else emission = plungingDisk(r, psi, lambda, angular, energy, pathSlope(row, phi, phiEnd, angular, energy), delay);
 			}
 			light += through * emission.rgb * emission.a;

@@ -34,28 +34,28 @@ const CHAPTERS = [
   },
   {
     description:
-      "Горизонт не гасит свет. Сигналы внешнего мира продолжают приходить.",
+      "Свет теснится вокруг тени. Падение продолжается, и внешние сигналы всё ещё приходят.",
     id: "horizon",
     radius: 1,
     title: "Перед горизонтом",
   },
   {
     description:
-      "Ритмы внешнего света расходятся: в одних направлениях чаще, в других — медленнее.",
+      "Внешний свет собирается по краям. Разные пути приносят разные мгновения.",
     id: "interior",
     radius: 0.25,
     title: "За горизонтом событий",
   },
   {
     description:
-      "Свет несёт разные мгновения внешнего мира. Поверните взгляд и сравните его ритмы.",
+      "По краям темноты ещё живёт внешний свет — с разными цветами, задержками и ритмами.",
     id: "deep-interior",
     radius: END_RADIUS,
     title: "Внешнее небо",
   },
   {
     description:
-      "0.02 rₛ — граница расчёта. Внешний свет продолжает приходить; его часы можно сравнить.",
+      "0.02 rₛ — граница расчёта. Глубина удерживается, внешний свет продолжает приходить.",
     id: "end",
     radius: 0,
     title: "Граница расчёта",
@@ -165,7 +165,13 @@ export function createFlight() {
           );
         }
         let step = (target - progress) * (1 - Math.exp(-elapsed * 7));
-        const forwardRate = progress < HORIZON_PROGRESS ? 0.6 : 0.3;
+        // Navigation eases continuously from r=2 to r=0.5; the horizon adds no barrier.
+        const approach = Math.max(
+          0,
+          Math.min(1, (progress - HORIZON_PROGRESS + Math.LN2) / (2 * Math.LN2))
+        );
+        const forwardRate =
+          0.6 - 0.3 * approach * approach * (3 - 2 * approach);
         const limit = elapsed * (step < 0 ? 1.2 : forwardRate);
         step = Math.sign(step) * Math.min(Math.abs(step), limit);
         progress += step;

@@ -1,26 +1,10 @@
-import { END_RADIUS, HORIZON_PROGRESS, START_RADIUS } from "./flight";
-
 const radians = Math.PI / 180;
 
-/** Guide towards the increasingly blueshifted sky band; it never changes a ray's physics. */
-export function guidedLookAt(radius: number) {
-  const r = Math.max(END_RADIUS, Math.min(START_RADIUS, radius));
-  const phase = Math.log(START_RADIUS / r);
-  const fraction = Math.max(
-    0,
-    Math.min(1, (phase - 1.65) / (HORIZON_PROGRESS - 1.65))
-  );
-  const ease = fraction ** 3 * (10 + fraction * (6 * fraction - 15));
-  // For the rain frame g = 1 / (1 - cos(theta) / sqrt(r)). Choose g=2/sqrt(r)
-  // inside: this growing, finite shift stays outside the shadow on the route.
-  // It approaches the transverse sky band as r shrinks, without a post-end turn.
-  const shift = 2 / Math.sqrt(r);
-  const skyAngle = Math.acos(
-    Math.max(-1, Math.min(1, Math.sqrt(r) * (1 - 1 / shift)))
-  );
+/** The direction of radial inward fall stays fixed through the whole route. */
+export function guidedLookAt() {
   return {
     pitch: 0,
-    yaw: (ease * skyAngle) / radians,
+    yaw: 0,
   };
 }
 
@@ -35,9 +19,9 @@ export function createObserverLook() {
   let targetYaw = 0;
   let targetPitch = 0;
   return {
-    advance(radius: number, seconds: number, immediate = false) {
+    advance(seconds: number, immediate = false) {
       if (guided) {
-        const target = guidedLookAt(radius);
+        const target = guidedLookAt();
         targetYaw = yaw + shortestTurn(target.yaw - yaw);
         targetPitch = target.pitch;
       }

@@ -120,6 +120,23 @@ test("manual forward travel settles at the selected depth without autonomous inf
   expect(flight.advance(1 / 30)).toBeGreaterThan(0);
 });
 
+test("manual distance navigation has no velocity discontinuity at the horizon", () => {
+  const increments = [-0.001, 0.001].map((offset) => {
+    const flight = createFlight();
+    flight.travel(HORIZON_PROGRESS + offset, true, false);
+    const before = flight.journey.phase;
+    flight.travel(0.5, false, false);
+    flight.advance(1 / 120);
+    expect(flight.playback).toBe("paused");
+    return flight.journey.phase - before;
+  });
+  expect(increments[0]).toBeGreaterThan(0);
+  expect(increments[1]).toBeGreaterThan(0);
+  expect(
+    Math.abs((increments[0] ?? 0) / (increments[1] ?? 1) - 1)
+  ).toBeLessThan(0.002);
+});
+
 test("manual direction changes cancel autonomous infall and respect pause", () => {
   const flight = createFlight();
   flight.travel(3, true);

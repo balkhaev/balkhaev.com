@@ -1,3 +1,5 @@
+import { MATERIAL_OPACITY_SHADER } from "./material-opacity";
+
 /** Test-body plunge from the ISCO, in r_s = c = 1 and ingoing PG time.
  * A small inward kick makes the boundary travel time finite; E and L then stay constant. */
 export const PLUNGE_IN = 0.02;
@@ -118,6 +120,8 @@ const float PLUNGE_E = ${PLUNGE_E.toPrecision(15)};
 const float PLUNGE_L = ${PLUNGE_L.toPrecision(15)};
 const float PLUNGE_MIN = ${PLUNGE_IN.toFixed(2)};
 
+${MATERIAL_OPACITY_SHADER}
+
 vec4 plungeState(float r) {
   float at = clamp(log(3.0 / r) / ${LOG_RANGE.toPrecision(15)}, 0.0, 1.0) * ${PLUNGE_SAMPLES - 1}.0;
   int low = int(floor(at));
@@ -163,8 +167,8 @@ vec4 plungingDisk(float r, float psi, float lambda, float angular, float energy,
   vec4 structure = inflowMaterial(phase, birthTime);
   // Constant stationary mass flux: r Sigma |U^r| is conserved.
   float column = 3.0 * ${PLUNGE_KICK.toFixed(3)} / (r * speed);
-  float density = (0.015 + 0.1 * structure.x + 0.45 * structure.y * structure.y + 2.2 * structure.w) * column;
-  float alpha = 1.0 - exp(-density * 0.9);
+  float incidence = emitterIncidence(r, angular, lambda, shift);
+  float alpha = materialOpacity(injectionDepth(structure, column), incidence);
   // Prescribed thermal emission with a restrained compression contribution; no luminous horizon.
   float temperature = 2050.0 * pow(max(column, 0.0001), 0.12) * pow(3.0 / r, 0.08);
   temperature *= 0.6 + 0.55 * structure.x + 0.1 * structure.z + structure.w * 0.2;

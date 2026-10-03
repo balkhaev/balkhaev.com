@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { END_RADIUS, START_RADIUS } from "./flight";
+import { shadowAngle } from "./infall-geodesics";
 import {
   cameraOf,
   cameraRay,
@@ -17,6 +19,24 @@ const view: SceneView = {
   y: 0.5,
   yaw: 0,
 };
+
+// Invert the actual picking ray rather than a second copy of the lens formula.
+function projectedShadowRadius(radius: number) {
+  const frame = { ...view, ...opticsAt(radius), distance: radius };
+  const shadow = shadowAngle(radius);
+  let low = 0;
+  let high = 2;
+  for (let step = 0; step < 40; step += 1) {
+    const rho = (low + high) / 2;
+    const ray = cameraRay(frame, 1000, 1000, 0.5 + rho / 2, 0.5);
+    if (Math.acos(ray[2] ?? 0) < shadow) {
+      low = rho;
+    } else {
+      high = rho;
+    }
+  }
+  return (low + high) / 2;
+}
 
 describe("first-person scene", () => {
   test("looking through 360 degrees preserves an orthonormal camera and never moves the eye", () => {
@@ -72,5 +92,50 @@ describe("first-person scene", () => {
     const before = opticsAt(1.001),
       after = opticsAt(0.999);
     expect(Math.abs(after.fov - before.fov)).toBeLessThan(0.2);
+  });
+
+  test("the physical shadow grows throughout the route without a lens zoom-out", () => {
+    let previousShadow = 0;
+    let previousFov = 64;
+    let previousPanorama = 0;
+    const routeLength = Math.log(START_RADIUS / END_RADIUS);
+    for (let step = 0; step <= 512; step += 1) {
+      const radius = START_RADIUS * Math.exp((-routeLength * step) / 512);
+      const lens = opticsAt(radius);
+      const rho = projectedShadowRadius(radius);
+      expect(rho).toBeGreaterThan(previousShadow);
+      expect(rho).toBeLessThan(0.95);
+      expect(lens.fov).toBeGreaterThanOrEqual(previousFov - 1e-7);
+      expect(lens.fov).toBeLessThanOrEqual(180);
+      expect(lens.panorama).toBeGreaterThanOrEqual(previousPanorama);
+      expect(lens.panorama).toBeLessThanOrEqual(1);
+      previousShadow = rho;
+      previousFov = lens.fov;
+      previousPanorama = lens.panorama;
+    }
+    expect(projectedShadowRadius(3)).toBeCloseTo(0.719_334, 6);
+    expect(projectedShadowRadius(1)).toBeGreaterThan(0.92);
+    expect(projectedShadowRadius(END_RADIUS)).toBeCloseTo(0.95, 4);
+    expect(opticsAt(END_RADIUS).fov).toBeLessThan(171);
+    expect(opticsAt(END_RADIUS / 2)).toEqual(opticsAt(END_RADIUS));
+  });
+
+  test("lens opening matches the outer shadow velocity and remains smooth at the horizon", () => {
+    const h = 1e-4;
+    for (const radius of [3, 1]) {
+      const before = radius * Math.exp(h);
+      const after = radius * Math.exp(-h);
+      const rhoBefore = projectedShadowRadius(before);
+      const rhoAt = projectedShadowRadius(radius);
+      const rhoAfter = projectedShadowRadius(after);
+      expect((rhoAt - rhoBefore) / h).toBeCloseTo((rhoAfter - rhoAt) / h, 3);
+      const fovBefore = opticsAt(before).fov;
+      const fovAt = opticsAt(radius).fov;
+      const fovAfter = opticsAt(after).fov;
+      expect(Math.abs(fovAfter - 2 * fovAt + fovBefore) / h).toBeLessThan(0.03);
+    }
+    for (const radius of [START_RADIUS, 10, 5, 3]) {
+      expect(opticsAt(radius)).toEqual({ fov: 64, panorama: 0 });
+    }
   });
 });

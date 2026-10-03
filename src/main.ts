@@ -128,10 +128,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     const { journey } = flight;
     view.distance = journey.radius;
     Object.assign(view, opticsAt(journey.radius));
-    Object.assign(
-      view,
-      look.advance(journey.radius, 0, still.matches || previewStill)
-    );
+    Object.assign(view, look.advance(0, still.matches || previewStill));
     view.x = 0.5;
     view.y = 0.5;
     surface.dataset.observerRadius = view.distance.toFixed(4);
@@ -141,6 +138,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.playback = flight.playback;
     surface.dataset.sceneTime = time.toFixed(4);
     surface.dataset.gaze = look.guided ? "guided" : "free";
+    surface.dataset.gazeYaw = view.yaw.toFixed(4);
+    surface.dataset.gazePitch = view.pitch.toFixed(4);
     updateText(flightStatus, flightLabel(flight));
     updateText(flightNote, flightInstruction(flight));
     updateText(radiusLabel, journey.radius.toFixed(2));
@@ -225,7 +224,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     last = now;
     flight.advance(seconds);
     time += sceneTimeStep(seconds);
-    Object.assign(view, look.advance(flight.radius, seconds));
+    Object.assign(view, look.advance(seconds));
     if (quality.sample(elapsed, renderer?.gpuTime() ?? null)) {
       renderer?.quality(quality.level);
       fit();
