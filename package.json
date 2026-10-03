@@ -6,7 +6,7 @@
     "build": "bun scripts/build.ts",
     "check": "tsc --noEmit && ultracite check",
     "deploy": "bun scripts/deploy.ts",
-    "dev": "bun run build && bun scripts/serve.ts",
+    "dev": "node .devhub/launch.cjs dev",
     "fix": "ultracite fix",
     "test": "bun test src",
     "worktree": "node .devhub/worktree.cjs"
