@@ -7,24 +7,28 @@ import { skyShiftAt } from "./relativity";
 test("directed gaze keeps the approach radial and reveals the peripheral interior sky", () => {
   expect(guidedLookAt(12.5)).toEqual({ pitch: 0, yaw: 0 });
   expect(guidedLookAt(3)).toEqual({ pitch: 0, yaw: 0 });
-  expect(guidedLookAt(END_RADIUS).yaw).toBeGreaterThan(85);
+  expect(guidedLookAt(END_RADIUS).yaw).toBeGreaterThan(82);
   expect(guidedLookAt(END_RADIUS).yaw).toBeLessThan(90);
   expect(
     Math.abs(guidedLookAt(1.000_01).yaw - guidedLookAt(0.999_99).yaw)
   ).toBeLessThan(0.001);
 });
 
-test("the guided interior sightline follows an escaping external source with finite g=2", () => {
+test("the guided interior sightline follows a growing but finite blueshift on an escaping ray", () => {
   let previousYaw = 0;
+  let previousShift = 0;
   for (const radius of [1, 0.75, 0.5, 0.25, 0.1, 0.06, END_RADIUS]) {
     const gaze = guidedLookAt(radius);
     const angle = (gaze.yaw * Math.PI) / 180;
     expect(angle).toBeGreaterThan(shadowAngle(radius));
-    expect(skyShiftAt(radius, angle)).toBeCloseTo(2, 12);
+    const shift = skyShiftAt(radius, angle);
+    expect(shift).toBeCloseTo(2 / Math.sqrt(radius), 10);
+    expect(shift).toBeGreaterThan(previousShift);
     expect(gaze.pitch).toBe(0);
     expect(gaze.yaw).toBeGreaterThan(previousYaw);
     expect(gaze.yaw).toBeLessThan(90);
     previousYaw = gaze.yaw;
+    previousShift = shift ?? 0;
   }
   expect(guidedLookAt(1).yaw).toBeCloseTo(60, 12);
   expect(guidedLookAt(END_RADIUS / 2)).toEqual(guidedLookAt(END_RADIUS));

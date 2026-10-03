@@ -1,4 +1,13 @@
-import { type InfallTable, rowAngle } from "./infall-geodesics";
+import {
+  createExternalLightCatalogue,
+  EXTERNAL_LIGHT_CURVE_SHADER,
+  EXTERNAL_LIGHT_STRIDE,
+} from "./external-light";
+import {
+  type FiniteSkyMap,
+  type InfallTable,
+  rowAngle,
+} from "./infall-geodesics";
 import { SPECTRUM_SHADER } from "./spectrum";
 
 const SKY_SIZE = 128;
@@ -213,6 +222,158 @@ void main() {
   float response = 0.25 * (erfApprox(b.x) - erfApprox(a.x)) * (erfApprox(b.y) - erfApprox(a.y));
   outColor = vec4(vFlux * response, 0.0);
 }`;
+
+/** Finite variable sources reuse the same lens, ray-image Jacobian and point PSF. */
+export const EXTERNAL_LIGHT_VERTEX = `#version 300 es
+precision highp float;
+precision highp sampler2D;
+layout(location = 0) in vec4 aSource; // fixed world direction, integrated flux
+layout(location = 1) in vec4 aPattern; // temperature, proper period, phase, modulation
+layout(location = 2) in vec4 aClock; // source lapse, thermal modulation, reserved
+uniform sampler2D uFiniteSky;
+uniform vec4 uGrid;
+uniform int uSkyFirst;
+uniform float uDistance;
+uniform vec3 uRadial;
+uniform mat3 uCamera;
+uniform vec3 uLens;
+uniform vec2 uViewport;
+uniform vec2 uCenter;
+uniform float uSensor;
+uniform float uStars;
+uniform float uTime; // one monotonic observer PG epoch, never multiplied by g
+flat out vec2 vCentre;
+flat out vec3 vFlux;
+const float PI = 3.14159265359;
+const float TAU = 6.28318530718;
+const vec2 CORNERS[6] = vec2[6](vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1));
+${SPECTRUM_SHADER}
+${EXTERNAL_LIGHT_CURVE_SHADER}
+vec2 finiteAt(int row) { return texelFetch(uFiniteSky, ivec2(row, 0), 0).rg; }
+float cameraAngle(float rho) { return mix(atan(rho * uLens.x), 2.0 * atan(rho * uLens.y), uLens.z); }
+void main() {
+  gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+  vFlux = vec3(0.0);
+  vCentre = vec2(0.0);
+  int image = gl_InstanceID % 6;
+  bool reverse = image % 2 == 1;
+  vec3 source = normalize(aSource.xyz);
+  float beta = atan(length(cross(source, uRadial)), dot(source, uRadial));
+  float phi = (reverse ? TAU - beta : beta) + float(image / 2) * TAU;
+  int low = uSkyFirst;
+  int high = int(uGrid.x) - 1;
+  if (low < 0 || low >= high || phi > finiteAt(low).x || phi < finiteAt(high).x) return;
+  for (int k = 0; k < 10; k++) {
+    if (high - low <= 1) break;
+    int middle = (low + high) / 2;
+    if (finiteAt(middle).x > phi) low = middle; else high = middle;
+  }
+  vec2 a = finiteAt(low);
+  vec2 b = finiteAt(high);
+  float blend = clamp((a.x - phi) / max(a.x - b.x, 1e-8), 0.0, 1.0);
+  float row = float(low) + blend;
+  float fraction = (row - uGrid.y) / (uGrid.x - 1.0 - uGrid.y);
+  float theta = uGrid.z + (PI - uGrid.z) * fraction * fraction;
+  float rowDerivative = 2.0 * (PI - uGrid.z) * fraction / (uGrid.x - 1.0 - uGrid.y);
+  float phiDerivative = (b.x - a.x) / max(rowDerivative, 1e-12);
+  vec3 across = normalize(source - cos(beta) * uRadial);
+  vec3 ray = -cos(theta) * uRadial + (reverse ? -1.0 : 1.0) * sin(theta) * across;
+  vec3 local = transpose(uCamera) * ray;
+  float sensorAngle = atan(length(local.xy), local.z);
+  float upper = length(max(uCenter, uViewport - uCenter) + 3.0) * uSensor;
+  if (sensorAngle > cameraAngle(upper)) return;
+  float lower = 0.0;
+  for (int k = 0; k < 18; k++) {
+    float middle = (lower + upper) * 0.5;
+    if (cameraAngle(middle) < sensorAngle) lower = middle; else upper = middle;
+  }
+  float rho = (lower + upper) * 0.5;
+  vec2 offset = length(local.xy) > 1e-8 ? normalize(local.xy) * rho : vec2(0.0);
+  vCentre = uCenter + offset / uSensor;
+  float angularRate = mix(uLens.x / (1.0 + rho * rho * uLens.x * uLens.x), 2.0 * uLens.y / (1.0 + rho * rho * uLens.y * uLens.y), uLens.z);
+  float cameraArea = uSensor * uSensor * (rho > 1e-5 ? sin(sensorAngle) * angularRate / rho : angularRate * angularRate);
+  float gain = min(12.0, sin(theta) / max(abs(sin(beta) * phiDerivative), 1e-12));
+  float energy = 1.0 - cos(theta) / sqrt(uDistance);
+  float shift = aClock.x / max(energy, 0.0001);
+  float delay = mix(a.y, b.y, blend);
+  // All images share one emitting history. Only the solved path delay differs.
+  float properTime = aClock.x * (uTime - delay);
+  float variation = externalLightVariation(properTime, aPattern.y, aPattern.z);
+  float luminosity = mix(1.0, variation, aPattern.w);
+  float temperature = aPattern.x * (1.0 + aClock.y * (variation - 0.95) / 1.1);
+  vFlux = shiftedSpectrum(temperature, shift) * aSource.w * luminosity
+    * gain / max(cameraArea, 1e-14) * uStars;
+  vec2 pixel = vCentre + CORNERS[gl_VertexID] * 3.0;
+  gl_Position = vec4(pixel / uViewport * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+function externalSourceSeparation(
+  data: Float32Array,
+  at: number,
+  radial: number[]
+) {
+  const cosine =
+    (data[at] ?? 0) * (radial[0] ?? 0) +
+    (data[at + 1] ?? 0) * (radial[1] ?? 0) +
+    (data[at + 2] ?? 0) * (radial[2] ?? 0);
+  return Math.acos(Math.max(-1, Math.min(1, cosine)));
+}
+
+/** Ten source histories, with six bounded candidate optical images per source. */
+export function createExternalLightSky(gl: WebGL2RenderingContext) {
+  const data = createExternalLightCatalogue();
+  const buffer = gl.createBuffer();
+  const vao = gl.createVertexArray();
+  const stride = EXTERNAL_LIGHT_STRIDE * 4;
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  for (let attribute = 0; attribute < 3; attribute += 1) {
+    gl.enableVertexAttribArray(attribute);
+    gl.vertexAttribPointer(
+      attribute,
+      4,
+      gl.FLOAT,
+      false,
+      stride,
+      attribute * 16
+    );
+    gl.vertexAttribDivisor(attribute, 6);
+  }
+  return {
+    dispose() {
+      gl.deleteBuffer(buffer);
+      gl.deleteVertexArray(vao);
+    },
+    draw() {
+      gl.bindVertexArray(vao);
+      gl.drawArraysInstanced(
+        gl.TRIANGLES,
+        0,
+        6,
+        (data.length / EXTERNAL_LIGHT_STRIDE) * 6
+      );
+    },
+    /** Valid geometrical branches, including those outside the current camera. */
+    imageCount(map: FiniteSkyMap, radial: number[]) {
+      let count = 0;
+      const upper = map.data[map.firstValidRow * 4] ?? -1;
+      const lower = map.data.at(-4) ?? 0;
+      for (let at = 0; at < data.length; at += EXTERNAL_LIGHT_STRIDE) {
+        const beta = externalSourceSeparation(data, at, radial);
+        for (let image = 0; image < 6; image += 1) {
+          const phi =
+            (image % 2 === 1 ? Math.PI * 2 - beta : beta) +
+            Math.floor(image / 2) * Math.PI * 2;
+          if (phi >= lower && phi <= upper) {
+            count += 1;
+          }
+        }
+      }
+      return count;
+    },
+  };
+}
 
 export function createPointSky(gl: WebGL2RenderingContext) {
   const data = createDistantSky();

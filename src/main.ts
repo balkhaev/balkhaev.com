@@ -8,12 +8,14 @@ import { createFlight, END_PROGRESS, HORIZON_PROGRESS } from "./lib/flight";
 import { createFlightAudio } from "./lib/flight-audio";
 import { createObserverLook } from "./lib/observer-look";
 import { createPhysicsPanel } from "./lib/physics-panel";
+import { skyShiftAt } from "./lib/relativity";
 import { OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
 import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
 const hint = document.querySelector<HTMLElement>("#hint");
+const rateFormat = new Intl.NumberFormat("ru", { maximumSignificantDigits: 3 });
 
 function flightLabel(flight: ReturnType<typeof createFlight>) {
   if (!flight.active) {
@@ -94,6 +96,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const fullscreenToggle =
     document.querySelector<HTMLButtonElement>("#fullscreen-toggle");
   const radiusLabel = document.querySelector<HTMLElement>("#journey-radius");
+  const signalLabel = document.querySelector<HTMLElement>("#journey-signal");
   const horizonTick = document.querySelector<HTMLElement>(".horizon-tick");
   if (horizonTick) {
     horizonTick.style.left = `${(HORIZON_PROGRESS / END_PROGRESS) * 100}%`;
@@ -141,6 +144,24 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     updateText(flightStatus, flightLabel(flight));
     updateText(flightNote, flightInstruction(flight));
     updateText(radiusLabel, journey.radius.toFixed(2));
+    const skyAngle = Math.acos(
+      Math.max(
+        -1,
+        Math.min(
+          1,
+          Math.cos((view.yaw * Math.PI) / 180) *
+            Math.cos((view.pitch * Math.PI) / 180)
+        )
+      )
+    );
+    const skyRate = skyShiftAt(journey.radius, skyAngle);
+    surface.dataset.skyRate = skyRate === null ? "none" : skyRate.toFixed(4);
+    if (signalLabel) {
+      signalLabel.hidden = !flight.active || skyRate === null;
+      if (skyRate !== null) {
+        updateText(signalLabel, `Свет извне · ${rateFormat.format(skyRate)}×`);
+      }
+    }
     if (journeyProgress) {
       journeyProgress.style.transform = `scaleX(${journey.completion})`;
     }

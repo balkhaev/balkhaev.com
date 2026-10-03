@@ -17,12 +17,19 @@ import {
   WAKE_TEXELS,
 } from "./disk-wake";
 import {
+  createExternalLightSky,
   createPointSky,
+  EXTERNAL_LIGHT_VERTEX,
   firstSkyRow,
   SKY_FRAGMENT,
   SKY_VERTEX,
 } from "./distant-sky";
-import { infallTable, radialClock } from "./infall-geodesics";
+import { EXTERNAL_LIGHT_RADIUS } from "./external-light";
+import {
+  createFiniteSkyMap,
+  infallTable,
+  radialClock,
+} from "./infall-geodesics";
 import {
   createPlungingFlow,
   PLUNGE_SAMPLES,
@@ -235,9 +242,9 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	float breathing = 0.5 + 0.5 * sin((uTime - delay) * 0.24 + clouds * TAU);
 	// A coherent hot eddy orbits and shears; delayed higher-order images follow it.
 	float eddyAngle = atan(sin(phase + 2.35), cos(phase + 2.35));
-	float eddy = exp(-pow((r - 4.9) / 0.38, 2.0) - pow(eddyAngle / 0.12, 2.0));
+	float eddy = exp(-pow((r - 4.9) / 0.38, 2.0) - pow(eddyAngle / 0.145, 2.0));
 	// Local heat injection followed by proper-time cooling. Every image samples this same event.
-	float eventAge = mod(uTime - delay + EPOCH - 8.0, 72.0) * sqrt(1.0 - 1.5 / 4.9);
+	float eventAge = mod(uTime - delay + EPOCH - 8.0, 32.0) * sqrt(1.0 - 1.5 / 4.9);
 	float flare = (1.0 - exp(-eventAge / 0.65)) * exp(-eventAge / 3.5);
 	float tracer = smoothstep(0.04, 0.22, matter.g);
 	// A finite emitting inner boundary feeds the plunge, instead of a black gap at the ISCO.
@@ -245,7 +252,7 @@ vec4 disk(float r, float psi, float lambda, float energy, float delay) {
 	vec4 injection = inflowMaterial(phase, uTime - delay + EPOCH);
 	float innerTemperature = 2050.0 * (0.6 + 0.55 * injection.x + 0.1 * injection.z + injection.w * 0.2);
 	float temperature = mix(T_PEAK * pow(flux, 0.25), innerTemperature, feed);
-	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.45 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
+	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.58 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
 	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
 	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
 	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
@@ -562,6 +569,7 @@ export function createHoleRenderer(
   let compose: Program;
   let particleProgram: Program;
   let skyProgram: Program;
+  let externalProgram: Program;
   let meterProgram: Program;
   let adaptProgram: Program;
   try {
@@ -627,6 +635,27 @@ export function createHoleRenderer(
       ],
       SKY_VERTEX
     );
+    externalProgram = compile(
+      gl,
+      SKY_FRAGMENT,
+      [
+        "uFiniteSky",
+        "uSpectrum",
+        "uGrid",
+        "uSkyFirst",
+        "uDistance",
+        "uRadial",
+        "uCamera",
+        "uLens",
+        "uViewport",
+        "uCenter",
+        "uSensor",
+        "uStars",
+        "uSpectral",
+        "uTime",
+      ],
+      EXTERNAL_LIGHT_VERTEX
+    );
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.error(error);
@@ -638,6 +667,14 @@ export function createHoleRenderer(
   const tableTexture = dataTexture(gl, table.phiCount, table.rows, table.u);
   const endsTexture = dataTexture(gl, table.rows, 1, table.ends);
   const timesTexture = dataTexture(gl, table.phiCount, table.rows, table.times);
+  let externalMap = createFiniteSkyMap(table, EXTERNAL_LIGHT_RADIUS);
+  const externalTexture = dataTexture(
+    gl,
+    table.rows,
+    1,
+    externalMap.data,
+    true
+  );
   const spectrumTexture = dataTexture(
     gl,
     SPECTRUM_SAMPLES,
@@ -648,6 +685,7 @@ export function createHoleRenderer(
   const orbit = createStellarOrbit();
   const orbitTexture = dataTexture(gl, STAR_SAMPLES, 1, orbit.data, true);
   const sky = createPointSky(gl);
+  const externalSky = createExternalLightSky(gl);
   const particles = createDiskParticles(gl, particleProgram.program);
   const wake = createDiskWake();
   const wakeTexture = dataTexture(
@@ -736,6 +774,47 @@ export function createHoleRenderer(
     gl.bindTexture(gl.TEXTURE_2D, source);
   };
 
+  const configureSky = (
+    program: Program,
+    basis: Float32Array,
+    eye: number[],
+    half: number,
+    spectral: boolean,
+    first: number
+  ) => {
+    const at = bind(program);
+    texture(1, spectrumTexture);
+    gl.uniform1i(at("uSpectrum"), 1);
+    gl.uniform4f(
+      at("uGrid"),
+      table.rows,
+      table.below,
+      table.critical,
+      table.phiCount
+    );
+    gl.uniform1i(at("uSkyFirst"), first);
+    gl.uniform1f(at("uDistance"), table.distance);
+    gl.uniform3f(
+      at("uRadial"),
+      (eye[0] ?? 0) / table.distance,
+      (eye[1] ?? 0) / table.distance,
+      (eye[2] ?? 0) / table.distance
+    );
+    gl.uniformMatrix3fv(at("uCamera"), false, basis);
+    gl.uniform3f(
+      at("uLens"),
+      Math.tan(half),
+      Math.tan(half * 0.5),
+      view.panorama ?? 0
+    );
+    gl.uniform2f(at("uViewport"), width, height);
+    gl.uniform2f(at("uCenter"), view.x * width, (1 - view.y) * height);
+    gl.uniform1f(at("uSensor"), 2 / Math.min(width, height));
+    gl.uniform1f(at("uStars"), view.stars);
+    gl.uniform1i(at("uSpectral"), spectral ? 1 : 0);
+    return at;
+  };
+
   // Global adaptation follows actual scene light and applies one exposure to the entire frame.
   const adaptExposure = (source: Target) => {
     const meterAt = bind(meterProgram);
@@ -788,11 +867,13 @@ export function createHoleRenderer(
       gl.deleteTexture(tableTexture);
       gl.deleteTexture(endsTexture);
       gl.deleteTexture(timesTexture);
+      gl.deleteTexture(externalTexture);
       gl.deleteTexture(spectrumTexture);
       gl.deleteTexture(orbitTexture);
       gl.deleteTexture(plungeTexture);
       gl.deleteTexture(wakeTexture);
       sky.dispose();
+      externalSky.dispose();
       particles.dispose();
       gpu.dispose();
       gl.deleteVertexArray(vao);
@@ -803,6 +884,7 @@ export function createHoleRenderer(
         compose,
         particleProgram,
         skyProgram,
+        externalProgram,
         meterProgram,
         adaptProgram,
       ]) {
@@ -853,38 +935,16 @@ export function createHoleRenderer(
       const { basis, eye } = cameraOf(view);
       particles.draw(time + DISTANCE, view.spin);
       const half = (view.fov * Math.PI) / 360;
-      const skyAt = bind(skyProgram);
+      const skyAt = configureSky(
+        skyProgram,
+        basis,
+        eye,
+        half,
+        inspecting,
+        firstSkyRow(table)
+      );
       texture(0, endsTexture);
-      texture(1, spectrumTexture);
       gl.uniform1i(skyAt("uEnds"), 0);
-      gl.uniform1i(skyAt("uSpectrum"), 1);
-      gl.uniform4f(
-        skyAt("uGrid"),
-        table.rows,
-        table.below,
-        table.critical,
-        table.phiCount
-      );
-      gl.uniform1i(skyAt("uSkyFirst"), firstSkyRow(table));
-      gl.uniform1f(skyAt("uDistance"), table.distance);
-      gl.uniform3f(
-        skyAt("uRadial"),
-        eye[0] / table.distance,
-        eye[1] / table.distance,
-        eye[2] / table.distance
-      );
-      gl.uniformMatrix3fv(skyAt("uCamera"), false, basis);
-      gl.uniform3f(
-        skyAt("uLens"),
-        Math.tan(half),
-        Math.tan(half * 0.5),
-        view.panorama ?? 0
-      );
-      gl.uniform2f(skyAt("uViewport"), width, height);
-      gl.uniform2f(skyAt("uCenter"), view.x * width, (1 - view.y) * height);
-      gl.uniform1f(skyAt("uSensor"), 2 / Math.min(width, height));
-      gl.uniform1f(skyAt("uStars"), view.stars);
-      gl.uniform1i(skyAt("uSpectral"), inspecting ? 1 : 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, skyTarget.framebuffer);
       gl.viewport(0, 0, width, height);
       gl.clearColor(0, 0, 0, 0);
@@ -892,6 +952,27 @@ export function createHoleRenderer(
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE);
       sky.draw();
+      const externalAt = configureSky(
+        externalProgram,
+        basis,
+        eye,
+        half,
+        inspecting,
+        externalMap.firstValidRow
+      );
+      texture(0, externalTexture);
+      gl.uniform1i(externalAt("uFiniteSky"), 0);
+      gl.uniform1f(externalAt("uTime"), time + DISTANCE);
+      externalSky.draw();
+      canvas.dataset.externalLightImages = String(
+        externalSky.imageCount(
+          externalMap,
+          eye.map((component) => component / table.distance)
+        )
+      );
+      canvas.dataset.externalLightSources = "10";
+      canvas.dataset.externalLightRadius = String(EXTERNAL_LIGHT_RADIUS);
+      canvas.dataset.externalLightEpoch = (time + DISTANCE).toFixed(4);
       gl.disable(gl.BLEND);
       gl.bindVertexArray(vao);
       const at = bind(scene);
@@ -1047,6 +1128,19 @@ export function createHoleRenderer(
       view = next;
       if (Math.abs(table.distance - next.distance) > 1e-7) {
         infallTable(next.distance, table);
+        externalMap = createFiniteSkyMap(table, EXTERNAL_LIGHT_RADIUS);
+        gl.bindTexture(gl.TEXTURE_2D, externalTexture);
+        gl.texSubImage2D(
+          gl.TEXTURE_2D,
+          0,
+          0,
+          0,
+          table.rows,
+          1,
+          gl.RGBA,
+          gl.FLOAT,
+          externalMap.data
+        );
         for (const [source, data, tw, th] of [
           [tableTexture, table.u, table.phiCount, table.rows],
           [timesTexture, table.times, table.phiCount, table.rows],

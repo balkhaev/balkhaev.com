@@ -137,8 +137,11 @@
           </fieldset>
         </div>
         <div aria-hidden="true" class="journey-position">
-          <span id="journey-radius">12.50</span
-          ><span class="radius-unit" id="journey-unit">rₛ</span>
+          <div>
+            <span id="journey-radius">12.50</span
+            ><span class="radius-unit" id="journey-unit">rₛ</span>
+          </div>
+          <span class="journey-signal" hidden id="journey-signal"></span>
         </div>
         <div aria-hidden="true" class="journey-track">
           <span id="journey-progress"></span
@@ -224,10 +227,10 @@
             </div>
           </div>
           <div class="physics-sky">
-            <h3>Частота удалённого неба</h3>
+            <h3>Свет и видимый ход часов</h3>
             <p class="physics-fine">
-              Сдвиг зависит от направления. С той же кратностью идут видимые
-              часы удалённого источника.
+              Более частые сигналы синеют, более редкие — краснеют. Темп зависит
+              от направления: всё небо не ускоряется одновременно.
             </p>
             <dl class="sky-shifts">
               <div>
@@ -243,6 +246,26 @@
                 <dd id="physics-rear">—</dd>
               </div>
             </dl>
+            <div class="light-clocks" id="light-clocks">
+              <p class="clock-heading">Локальное сравнение сигналов</p>
+              <div class="light-clock" data-clock="local">
+                <span>Ваш эталон</span><output>1×</output>
+                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
+              </div>
+              <div class="light-clock" data-clock="forward">
+                <span>По центру обзора</span><output>—</output>
+                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
+              </div>
+              <div class="light-clock" data-clock="rear">
+                <span>Сзади · 180°</span><output>—</output>
+                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
+              </div>
+              <p class="physics-fine">
+                Движущиеся точки сравнивают мгновенный приём одинаковых сигналов
+                в выбранном падающем кадре. Это локальная иллюстрация отношения
+                частот, а не отдельные часы сцены.
+              </p>
+            </div>
           </div>
         </div>
         <div class="physics-explanation">
@@ -264,6 +287,12 @@
               вспышки или поверхности. Внешний свет продолжает приходить. Глубже
               его изображение всё сильнее концентрируется в поперечной полосе.
             </p>
+            <p>
+              Несколько переменных источников снаружи посылают узнаваемые
+              световые импульсы. Каждый повторный образ приносит тот же источник
+              из другого момента прошлого. Вспышка в диске тоже возвращается в
+              задержанных изображениях.
+            </p>
           </details>
           <details>
             <summary>Часы, задержки и расстояние</summary>
@@ -284,6 +313,11 @@
               Скролл исследует локальные кадры на разных радиусах. Он не
               моделирует физическое зависание или выход из горизонта: внутри все
               будущие пути ведут к меньшему радиусу.
+            </p>
+            <p>
+              При удержании глубины картинка показывает последовательность
+              выбранных локальных кадров. Частота получаемых сигналов для
+              реального падающего наблюдателя сравнивается отдельно выше.
             </p>
           </details>
           <details>

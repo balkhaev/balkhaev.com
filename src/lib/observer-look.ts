@@ -2,7 +2,7 @@ import { END_RADIUS, HORIZON_PROGRESS, START_RADIUS } from "./flight";
 
 const radians = Math.PI / 180;
 
-/** Guide towards an escaping sky ray with g=2; camera orientation never changes a ray's physics. */
+/** Guide towards the increasingly blueshifted sky band; it never changes a ray's physics. */
 export function guidedLookAt(radius: number) {
   const r = Math.max(END_RADIUS, Math.min(START_RADIUS, radius));
   const phase = Math.log(START_RADIUS / r);
@@ -11,10 +11,13 @@ export function guidedLookAt(radius: number) {
     Math.min(1, (phase - 1.65) / (HORIZON_PROGRESS - 1.65))
   );
   const ease = fraction ** 3 * (10 + fraction * (6 * fraction - 15));
-  // For the rain frame g = 1 / (1 - cos(theta) / sqrt(r)). The g=2
-  // direction lies outside the shadow throughout the guided interior descent.
+  // For the rain frame g = 1 / (1 - cos(theta) / sqrt(r)). Choose g=2/sqrt(r)
+  // inside: this growing, finite shift stays outside the shadow on the route.
   // It approaches the transverse sky band as r shrinks, without a post-end turn.
-  const skyAngle = Math.acos(Math.min(1, Math.sqrt(r) * 0.5));
+  const shift = 2 / Math.sqrt(r);
+  const skyAngle = Math.acos(
+    Math.max(-1, Math.min(1, Math.sqrt(r) * (1 - 1 / shift)))
+  );
   return {
     pitch: 0,
     yaw: (ease * skyAngle) / radians,

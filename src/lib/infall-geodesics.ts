@@ -253,3 +253,112 @@ export function infallDelay(table: InfallTable, row: number, phi: number) {
     radialClock(table.distance)
   );
 }
+
+export interface FiniteSkyMap {
+  /** Per row: angle at source sphere (-1 if captured), PG delay, dPhi/dTheta, reserved. */
+  data: Float32Array;
+  firstValidRow: number;
+  sourceRadius: number;
+}
+
+function finiteSphereCrossing(
+  table: InfallTable,
+  row: number,
+  inverse: number,
+  radialDelay: number
+) {
+  const end = table.ends[row] ?? 0;
+  if (!(end > 0)) {
+    return null;
+  }
+  // Keep the exact radial limit closed at phi=0, beyond the integrator's
+  // tiny angular regularization of theta=pi.
+  if (row === table.rows - 1) {
+    return { delay: radialDelay, phi: 0 };
+  }
+  const offset = row * table.phiCount;
+  let low = 0;
+  let high = table.phiCount - 1;
+  if ((table.u[offset + high] ?? 0) > inverse) {
+    return null;
+  }
+  // R exceeds the observer radius. A turning escaping ray also has exactly
+  // one crossing of this outer sphere, on its outer segment.
+  while (high - low > 1) {
+    const middle = Math.floor((low + high) / 2);
+    if ((table.u[offset + middle] ?? 0) > inverse) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  const a = table.u[offset + low] ?? 0;
+  const b = table.u[offset + high] ?? 0;
+  const blend = (inverse - a) / (b - a);
+  const residualA = table.times[offset + low] ?? 0;
+  const residualB = table.times[offset + high] ?? 0;
+  const phi = columnPhi(low + blend, end, table.phiCount);
+  const delay = residualA + (residualB - residualA) * blend + radialDelay;
+  return Number.isFinite(phi) && Number.isFinite(delay) && delay >= 0
+    ? { delay, phi }
+    : null;
+}
+
+function finiteMapDerivatives(
+  data: Float32Array,
+  angles: Float64Array,
+  firstValidRow: number,
+  rows: number
+) {
+  for (let row = firstValidRow; row < rows; row += 1) {
+    if ((data[row * 4] ?? -1) < 0) {
+      continue;
+    }
+    const previous = Math.max(firstValidRow, row - 1);
+    const next = Math.min(rows - 1, row + 1);
+    const angleSpan = (angles[next] ?? 0) - (angles[previous] ?? 0);
+    data[row * 4 + 2] =
+      angleSpan > 0
+        ? ((data[next * 4] ?? 0) - (data[previous * 4] ?? 0)) / angleSpan
+        : 0;
+  }
+}
+
+/**
+ * Past-lightcone map to a stationary emitting sphere outside this observer.
+ * The first crossing of R on the outer segment shares the existing ray and PG
+ * residual-clock tables; each winding therefore samples its actual source event.
+ * Source angles are measured about the black-hole centre, not the camera.
+ */
+export function createFiniteSkyMap(
+  table: InfallTable,
+  sourceRadius: number
+): FiniteSkyMap {
+  if (
+    !Number.isFinite(sourceRadius) ||
+    sourceRadius <= Math.max(1, table.distance)
+  ) {
+    throw new RangeError(
+      "The emitting sphere must be outside the observer and horizon."
+    );
+  }
+  const data = new Float32Array(table.rows * 4);
+  const angles = new Float64Array(table.rows);
+  const inverse = 1 / sourceRadius;
+  const radialDelay = radialClock(sourceRadius) - radialClock(table.distance);
+  let firstValidRow = table.rows;
+  for (let row = 0; row < table.rows; row += 1) {
+    const at = row * 4;
+    data[at] = -1;
+    angles[row] = rowAngle(row, table);
+    const crossing = finiteSphereCrossing(table, row, inverse, radialDelay);
+    if (!crossing) {
+      continue;
+    }
+    data[at] = crossing.phi;
+    data[at + 1] = crossing.delay;
+    firstValidRow = Math.min(firstValidRow, row);
+  }
+  finiteMapDerivatives(data, angles, firstValidRow, table.rows);
+  return { data, firstValidRow, sourceRadius };
+}

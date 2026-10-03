@@ -2,13 +2,76 @@ import { expect, test } from "bun:test";
 import {
   angleRow,
   columnPhi,
+  createFiniteSkyMap,
   infallDelay,
   infallTable,
   pgClock,
+  radialClock,
   rainRay,
   rowAngle,
   shadowAngle,
 } from "./infall-geodesics";
+
+function directLightQuadrature(
+  radius: number,
+  angle: number,
+  sourceRadius: number
+) {
+  const ray = rainRay(radius, angle);
+  const integrands = (logRadius: number) => {
+    const r = Math.exp(logRadius);
+    const radial = Math.sqrt(
+      ray.energy ** 2 - ((1 - 1 / r) * ray.angular ** 2) / r ** 2
+    );
+    return {
+      angle: ray.angular / (r * radial),
+      time:
+        (r * (ray.energy ** 2 + ray.angular ** 2 / r ** 3)) /
+        (radial * (ray.energy + radial / Math.sqrt(r))),
+    };
+  };
+  const steps = 4096;
+  const start = Math.log(radius);
+  const end = Math.log(sourceRadius);
+  const h = (end - start) / steps;
+  const first = integrands(start);
+  const last = integrands(end);
+  let phi = first.angle + last.angle;
+  let delay = first.time + last.time;
+  for (let step = 1; step < steps; step += 1) {
+    const sample = integrands(start + step * h);
+    const weight = step % 2 ? 4 : 2;
+    phi += sample.angle * weight;
+    delay += sample.time * weight;
+  }
+  return { delay: (delay * h) / 3, phi: (phi * h) / 3 };
+}
+
+function finiteImage(table: ReturnType<typeof infallTable>, sourcePhi: number) {
+  const map = createFiniteSkyMap(table, 60);
+  let low = map.firstValidRow;
+  let high = table.rows - 1;
+  if ((map.data[low * 4] ?? 0) < sourcePhi) {
+    throw new Error("Requested image exceeds the retained winding count.");
+  }
+  while (high - low > 1) {
+    const middle = Math.floor((low + high) / 2);
+    if ((map.data[middle * 4] ?? 0) > sourcePhi) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  const a = map.data[low * 4] ?? 0;
+  const b = map.data[high * 4] ?? 0;
+  const fraction = (sourcePhi - a) / (b - a);
+  const delayA = map.data[low * 4 + 1] ?? 0;
+  const delayB = map.data[high * 4 + 1] ?? 0;
+  return {
+    angle: rowAngle(low + fraction, table),
+    delay: delayA + (delayB - delayA) * fraction,
+  };
+}
 
 test("sky frequency shift agrees with independent static-frame gravity and Lorentz factors", () => {
   for (const radius of [12.5, 5, 2, 1.001]) {
@@ -214,5 +277,101 @@ test("all future photon directions move to smaller radius inside the horizon", (
       const ray = rainRay(radius, angle);
       expect(ray.angular * ray.slope).toBeLessThan(0);
     }
+  }
+});
+
+test("finite source maps share the null path and PG delay verified by independent quadrature", () => {
+  for (const radius of [12.5, 1, 0.02]) {
+    const table = infallTable(radius);
+    const row = Math.floor(angleRow(2.4, table));
+    const angle = rowAngle(row, table);
+    for (const sourceRadius of [40, 60, 80]) {
+      const map = createFiniteSkyMap(table, sourceRadius);
+      const expected = directLightQuadrature(radius, angle, sourceRadius);
+      expect(Math.abs((map.data[row * 4] ?? 0) - expected.phi)).toBeLessThan(
+        0.0001
+      );
+      expect(
+        Math.abs((map.data[row * 4 + 1] ?? 0) - expected.delay)
+      ).toBeLessThan(0.001);
+      expect(map.sourceRadius).toBe(sourceRadius);
+      expect(map.firstValidRow).toBeGreaterThanOrEqual(table.below);
+      for (let captured = 0; captured < map.firstValidRow; captured += 1) {
+        expect(map.data[captured * 4]).toBe(-1);
+      }
+      const final = (table.rows - 1) * 4;
+      expect(map.data[final]).toBe(0);
+      expect(map.data[final + 1]).toBeCloseTo(
+        radialClock(sourceRadius) - radialClock(radius),
+        4
+      );
+    }
+  }
+});
+
+test("finite sphere angular derivatives follow the independently integrated source map", () => {
+  const table = infallTable(0.25);
+  const map = createFiniteSkyMap(table, 60);
+  const row = Math.floor(angleRow(2.4, table));
+  const angle = rowAngle(row, table);
+  const h = 1e-5;
+  const a = directLightQuadrature(table.distance, angle - h, 60).phi;
+  const b = directLightQuadrature(table.distance, angle + h, 60).phi;
+  const expectedDerivative = (b - a) / (2 * h);
+  const actualDerivative = map.data[row * 4 + 2] ?? 0;
+  expect(actualDerivative).toBeLessThan(0);
+  expect(Math.abs(actualDerivative / expectedDerivative - 1)).toBeLessThan(
+    0.005
+  );
+  for (let at = map.firstValidRow + 1; at < table.rows; at += 1) {
+    expect(map.data[at * 4]).toBeLessThan(map.data[(at - 1) * 4] ?? 0);
+    expect(map.data[at * 4 + 1]).toBeGreaterThan(0);
+    expect(map.data[at * 4 + 2]).toBeLessThan(0);
+  }
+});
+
+test("one finite variable source has delayed opposite-parity and winding images", () => {
+  const table = infallTable(1);
+  const direct = finiteImage(table, 0.6);
+  const opposite = finiteImage(table, 2 * Math.PI - 0.6);
+  const winding = finiteImage(table, 2 * Math.PI + 0.6);
+  expect(direct.angle).toBeGreaterThan(opposite.angle);
+  expect(opposite.angle).toBeGreaterThan(winding.angle);
+  expect(opposite.delay).toBeGreaterThan(direct.delay);
+  expect(winding.delay).toBeGreaterThan(opposite.delay);
+  // Every image reads one source phase at its own T-delay, with no per-image time warp.
+  const observerEpoch = 100;
+  expect(observerEpoch - opposite.delay).toBeLessThan(
+    observerEpoch - direct.delay
+  );
+  expect(observerEpoch - winding.delay).toBeLessThan(
+    observerEpoch - opposite.delay
+  );
+});
+
+test("a finite static source's retarded clock derivative agrees with g along an actual rain worldline", () => {
+  const radius = 1;
+  const table = infallTable(radius);
+  const row = Math.floor(angleRow(2.4, table));
+  const map = createFiniteSkyMap(table, 60);
+  const sourcePhi = map.data[row * 4] ?? 0;
+  const image = finiteImage(table, sourcePhi);
+  const h = 0.002;
+  const rAt = (tau: number) => (radius ** 1.5 - 1.5 * tau) ** (2 / 3);
+  const before = finiteImage(infallTable(rAt(-h)), sourcePhi);
+  const after = finiteImage(infallTable(rAt(h)), sourcePhi);
+  const sourceLapse = Math.sqrt(1 - 1 / 60);
+  const emittedBefore = sourceLapse * (-h - before.delay);
+  const emittedAfter = sourceLapse * (h - after.delay);
+  const measured = (emittedAfter - emittedBefore) / (2 * h);
+  const expected =
+    sourceLapse / (1 - Math.cos(image.angle) / Math.sqrt(radius));
+  expect(Math.abs(measured - expected)).toBeLessThan(0.005);
+});
+
+test("finite maps reject an emitting sphere inside the observer or at a static horizon", () => {
+  const table = infallTable(3);
+  for (const radius of [0.5, 1, 3, Number.NaN, Number.POSITIVE_INFINITY]) {
+    expect(() => createFiniteSkyMap(table, radius)).toThrow(RangeError);
   }
 });

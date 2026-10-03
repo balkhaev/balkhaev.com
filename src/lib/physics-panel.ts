@@ -1,4 +1,6 @@
+import { createLocalLightClocks } from "./local-light-clocks";
 import { relativityAt, skyShiftAt } from "./relativity";
+import { CLOCK_RATE } from "./scene-geometry";
 
 interface PhysicsFrame {
   pitch: number;
@@ -12,6 +14,35 @@ const factor = (value: number) => `${formatter.format(value)}×`;
 const shift = (value: number | null) =>
   value === null ? "Нет внешнего луча" : factor(value);
 
+type ClockSignals = ReturnType<
+  ReturnType<typeof createLocalLightClocks>["advance"]
+>;
+
+function signalColour(rate: number | null) {
+  if (rate !== null && rate > 1.001) {
+    return "#91b9d6";
+  }
+  if (rate !== null && rate < 0.999) {
+    return "#bc967e";
+  }
+  return "#cabca6";
+}
+
+function showSignal(
+  row: HTMLElement,
+  { phase, rate }: ClockSignals["forward"]
+) {
+  const output = row.querySelector("output");
+  if (output) {
+    output.textContent = rate === null ? "Нет внешнего луча" : factor(rate);
+  }
+  row.dataset.empty = String(rate === null);
+  row.dataset.rate = rate === null ? "none" : rate.toFixed(4);
+  row.style.setProperty("--signal-phase", phase.toFixed(4));
+  row.style.setProperty("--signal-second", ((phase + 0.5) % 1).toFixed(4));
+  row.style.setProperty("--signal-colour", signalColour(rate));
+}
+
 /** Optional observations of the same ray model; no separate physical time or camera. */
 export function createPhysicsPanel(onChange: () => void) {
   const panel = document.querySelector<HTMLElement>("#physics-panel");
@@ -21,6 +52,11 @@ export function createPhysicsPanel(onChange: () => void) {
     document.querySelector<HTMLButtonElement>("#spectral-toggle");
   const legend = document.querySelector<HTMLElement>("#spectrum-legend");
   const frameNote = document.querySelector<HTMLElement>("#physics-frame-note");
+  const clocks = createLocalLightClocks();
+  const clockRows = ["local", "forward", "rear"].map((id) => ({
+    id: id as "local" | "forward" | "rear",
+    row: document.querySelector<HTMLElement>(`[data-clock="${id}"]`),
+  }));
   const labels = new Map<string, HTMLElement>();
   for (const id of [
     "radius",
@@ -40,11 +76,20 @@ export function createPhysicsPanel(onChange: () => void) {
   }
   let spectral = false;
   let lastTime = -1;
+  let lastClockTime = 0;
   let lastFrame: PhysicsFrame | null = null;
   const text = (id: string, value: string) => {
     const element = labels.get(id);
     if (element && element.textContent !== value) {
       element.textContent = value;
+    }
+  };
+  const updateClocks = (seconds: number, radius: number, angle: number) => {
+    const signals = clocks.advance(seconds, radius, angle);
+    for (const { id, row } of clockRows) {
+      if (row) {
+        showSignal(row, signals[id]);
+      }
     }
   };
   const update = (frame: PhysicsFrame, force = false) => {
@@ -53,14 +98,14 @@ export function createPhysicsPanel(onChange: () => void) {
       frame.yaw !== lastFrame.yaw ||
       frame.pitch !== lastFrame.pitch;
     lastFrame = frame;
-    if (
-      !panel ||
-      panel.hidden ||
-      (!(force || changed) && frame.time - lastTime < 0.15)
-    ) {
+    const seconds = Math.max(
+      0,
+      Math.min(0.1, (frame.time - lastClockTime) / CLOCK_RATE)
+    );
+    lastClockTime = frame.time;
+    if (!panel || panel.hidden) {
       return;
     }
-    lastTime = frame.time;
     const angle = Math.acos(
       Math.max(
         -1,
@@ -71,6 +116,11 @@ export function createPhysicsPanel(onChange: () => void) {
         )
       )
     );
+    updateClocks(seconds, frame.radius, angle);
+    if (!(force || changed) && frame.time - lastTime < 0.15) {
+      return;
+    }
+    lastTime = frame.time;
     const physical = relativityAt(frame.radius, angle);
     text("radius", `${physical.radius.toFixed(3)} rₛ`);
     text("time", `${frame.time.toFixed(1)} rₛ/c`);
