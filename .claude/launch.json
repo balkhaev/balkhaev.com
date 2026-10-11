@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "name": "site",
+      "port": 4175,
+      "runtimeArgs": [
+        "F:/code/devhub/src/cli.ts",
+        "attach",
+        "balkhaev-com/site"
+      ],
+      "runtimeExecutable": "bun"
+    }
+  ],
+  "version": "0.0.1"
+}

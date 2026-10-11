@@ -1,0 +1,24 @@
+{
+  "id": "balkhaev-com",
+  "launch": {
+    "dev": [
+      "site"
+    ]
+  },
+  "name": "balkhaev.com",
+  "services": [
+    {
+      "command": "bun run build && bun scripts/serve.ts",
+      "env": {},
+      "id": "site",
+      "name": "site",
+      "port": 4175,
+      "ui": [
+        {
+          "label": "Сайт",
+          "url": "/"
+        }
+      ]
+    }
+  ]
+}
