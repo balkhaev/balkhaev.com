@@ -7,7 +7,7 @@
   "releaseBranch": "main",
   "stageBranch": "stage",
   "version": 1,
-  "worktreeRoot": "D:/worktrees/balkhaev.com",
+  "worktreeRoot": "F:/worktrees/balkhaev.com",
   "mode": "mvp",
   "deploy": "bun scripts/deploy.ts"
 }
