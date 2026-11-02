@@ -7,6 +7,8 @@ export interface Job {
   place?: string;
   points: string[];
   role: string;
+  /** Product domains shown as links instead of a place. */
+  sites?: string[];
 }
 
 export interface Project {
@@ -18,21 +20,24 @@ export interface Project {
 export interface Resume {
   description: string;
   details: string;
+  /** Short entries closing the web development section. */
   earlier: Job[];
   education: string;
   headline: string;
+  /** Machine learning work, newest first. */
   jobs: Job[];
   labels: {
     details: string;
-    earlier: string;
     education: string;
     experience: string;
+    format: string;
     languages: string;
     projects: string;
     skills: string;
     switcher: string;
+    web: string;
   };
-  languages: string[];
+  languages: string;
   location: string;
   name: string;
   pdf: string;
@@ -40,16 +45,19 @@ export interface Resume {
   skills: { group: string; items: string }[];
   summary: string;
   title: string;
+  /** Web development before the move to machine learning. */
+  web: Job[];
 }
 
 const HEADLINE = "ML Engineer / Generative AI Engineer / Product Developer";
+const AIGF_SITES = ["luv.club", "adorely.co", "sinly.io"];
 
 export const RESUMES: Record<Lang, Resume> = {
   en: {
     description:
-      "Mikhail Balkhaev, ML engineer and generative AI engineer. 14 years in software development at VK, Yandex and Funcorp.",
+      "Mikhail Balkhaev, ML engineer working on generative AI: image and video diffusion, speech, LLM agents and GPU infrastructure.",
     details:
-      "Full-time, part-time or project work. Remote, hybrid or on-site. Open to business travel and relocation within Russia.",
+      "Full-time, part-time or project work; remote, hybrid or on-site; open to business travel and relocation within Russia.",
     earlier: [
       {
         company: "Oversun",
@@ -64,7 +72,7 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "2013",
         place: "Sochi",
         points: [
-          "WordPress and ModX: modules for a city news portal, SQL optimization.",
+          "WordPress and ModX: modules for a city news portal, SQL optimisation.",
         ],
         role: "Web Developer",
       },
@@ -72,9 +80,7 @@ export const RESUMES: Record<Lang, Resume> = {
         company: "RedBox",
         period: "2011 – 2012",
         place: "Buryatia",
-        points: [
-          "Joomla and WordPress templates, first responsive layouts, jQuery.",
-        ],
+        points: ["Joomla and WordPress templates, jQuery."],
         role: "HTML Developer",
       },
     ],
@@ -84,37 +90,115 @@ export const RESUMES: Record<Lang, Resume> = {
       {
         company: "AIGF",
         period: "Mar 2026 – present",
-        place: "luv.club",
         points: [
-          "Building luv.club, an 18+ AI companion platform with image and video generation. I work on the whole product: WebSocket API, queue workers, website and admin panel.",
-          "Image and video generation on RunPod with Qwen Image 2.1 and H3: characters, outfits, scenes and face swap.",
-          "3D-to-video: the reference 3D render guides only the first 5 of 20 sampling steps. The camera and composition stay in place, and the model is free to make the motion natural.",
-          "An API and MCP server that let external agents create characters, scenes and shoots.",
+          "AI companion platforms (18+) with image, video and 3D generation, chat and voice: a multi-tenant Hono backend, Redis/BullMQ workers and RunPod GPU jobs with idempotent submission.",
+          "Identity-consistent photos with Qwen Image 2.1: an edit-consistency LoRA, up to four reference images and an automatic redraw when the face drifts.",
+          "Video: text- and image-to-video with two-pass sampling and RIFE interpolation to 48 fps; face and full-character swap with MiniMax H3 and swap LoRAs.",
+          "3D stage to video: the reference render conditions only the first 5 of 20 sampling steps, which keeps the camera and composition while the model produces natural motion.",
+          "Companion memory: LLM fact extraction with corrections, hybrid retrieval over OpenAI embeddings in pgvector, lexical reranking and LLM relevance scoring.",
+          "Age-safety checks for generated media: face detection, a ViT age classifier and a logistic probe on CLIP ViT-B/16 embeddings trained on 9,574 labelled person crops. On held-out data, correct refusals rose from 283 to 350 of 400 and false refusals fell from 26 to 3 of 302.",
+          "Tool-using Grok agents: a studio director that sets up shoots and reviews results, and a 3D scene editor with validated, revision-checked edits; REST and MCP API with OAuth 2.1.",
+          "Voice: self-hosted Kokoro-82M TTS on CPU (ONNX, 54 voices) and Whisper recognition.",
         ],
         role: "Generative AI Engineer",
+        sites: AIGF_SITES,
       },
       {
         company: "Funcorp",
         period: "Nov 2024 – Mar 2026",
         place: "Cyprus",
         points: [
-          "Started on the main product, then moved to building new AI products from scratch.",
-          "Image and video generation with Wan 2.2, LTX, SD and SDXL in ComfyUI and DiffSynth-Studio; dataset preparation and LoRA training.",
+          "Started on the main product, then built new AI products from scratch.",
+          "Diffusion pipelines for images and video (Wan 2.2, LTX, SD, SDXL) in ComfyUI and DiffSynth-Studio; dataset collection and LoRA training.",
           "Text-to-speech: voice design and fine-tuning the model for natural-sounding speech.",
-          "LLM features and RAG with Qwen3.5-9B, ChatGPT, Grok and Qdrant.",
-          "Next.js, Hono, Kafka, ClickHouse, PostgreSQL, Redis, FFmpeg.",
+          "LLM features with Qwen3.5-9B, ChatGPT and Grok; RAG on Qdrant.",
+          "Data and backend: Kafka, ClickHouse, PostgreSQL, Redis, Next.js, Hono, FFmpeg.",
         ],
         role: "Senior Product Developer",
       },
+    ],
+    labels: {
+      details: "Details",
+      education: "Education",
+      experience: "Experience",
+      format: "Work",
+      languages: "Languages",
+      projects: "ML projects",
+      skills: "Skills",
+      switcher: "Language",
+      web: "Web development",
+    },
+    languages: "Russian (native), English (upper intermediate, B2)",
+    location: "Moscow, Russia",
+    name: "Mikhail Balkhaev",
+    pdf: "balkhaev-cv-en.pdf",
+    projects: [
+      {
+        name: "Studio",
+        text: "AI film production: a Claude producer agent turns an idea into a script and staged shots, renders reference passes in Blender over MCP and generates the shots with H3. A take is accepted only after frame decoding, a vision-model review and a speech-transcription check.",
+        url: "https://film.balkhaev.com/",
+      },
+      {
+        name: "MediaPipes",
+        text: "Image, video and speech generation on ComfyUI and vLLM: Qwen Image 2.1 INT8 with up to ten references, tiled upscaling to 8 MP, Higgs TTS 3 (4B). INT8 attention for H3 cut sampling from 13.0 to 6.8 s/step (a swap job from 129 to 80 s) and shipped after identity, lip-sync and LPIPS metrics and a blind review.",
+        url: "https://mediapipes.balkhaev.com/",
+      },
+      {
+        name: "Inference",
+        text: "GPU scheduler for a home RTX 5080 shared by ComfyUI, local LLMs and Blender: admission by measured RAM and VRAM peaks, GPU sharing only after three comparable solo runs, warm-model residency and budgets that grow after out-of-memory errors.",
+      },
+      {
+        name: "Local LLM",
+        text: "Qwen3.8-Flash-Next (125B GGUF) on one RTX 5080 through Strata, with experts spread across VRAM, RAM and SSD, a 262k context and about 100 tokens/s; an OpenAI- and Anthropic-compatible gateway with multi-account routing.",
+      },
+      {
+        name: "Montage",
+        text: "Video understanding: Qwen3-VL-4B frame descriptions, word-aligned WhisperX transcripts and PySceneDetect cuts in one timeline, with models loaded in turn to fit one GPU; video-to-video recasting with H3.",
+      },
+      {
+        name: "Modeler",
+        text: "Characters and previz in Blender: image-to-3D with TRELLIS.2 and Pixal3D to textured GLB, text-to-motion on a 63-bone rig with foot-contact quality gates, Qwen-guided facial reconstruction.",
+        url: "https://modeler.balkhaev.com/",
+      },
+    ],
+    skills: [
+      {
+        group: "Generative models",
+        items:
+          "Qwen Image, H3, Wan 2.2, LTX, SD, SDXL, TRELLIS.2, Kokoro, Higgs TTS, Whisper, Qwen3-VL",
+      },
+      {
+        group: "ML engineering",
+        items:
+          "LoRA training, datasets, evaluation (identity similarity, LPIPS, lip-sync, held-out sets), CLIP probes, embeddings and RAG, INT8 and GGUF inference",
+      },
+      {
+        group: "Serving",
+        items:
+          "ComfyUI, vLLM, ONNX Runtime, RunPod, GPU scheduling, Redis/BullMQ",
+      },
+      {
+        group: "LLM and agents",
+        items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
+      },
+      {
+        group: "Software",
+        items:
+          "Python, TypeScript, Node.js, Bun, Hono, Next.js, React, PostgreSQL, ClickHouse, Kafka, Docker",
+      },
+    ],
+    summary:
+      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents and the GPU infrastructure that runs them. I build these systems from the model pipeline and its evaluation to the product backend. Before 2024 I spent 13 years in web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
+    title: "Mikhail Balkhaev — CV",
+    web: [
       {
         company: "Yandex",
         period: "Oct 2022 – Aug 2024",
         place: "Moscow",
         points: [
-          "Moved from VK with the Delivery Club team into the Yandex Eats advertising unit. Most of the work was analytics and testing ad hypotheses.",
-          "Maintained the main Yandex Eats and Yandex Vendor webviews and improved the micro-frontend architecture.",
-          "Built an ad runner game with a courier. The first partner was Haval, which was entering the Russian market at the time: the courier became a car, with billboards along the road.",
-          "Implemented most of the banner ads, debugged analytics and proposed new metrics.",
+          "Moved from VK with the Delivery Club team to the Yandex Eats advertising unit: analytics and fast testing of ad hypotheses.",
+          "Main Yandex Eats and Yandex Vendor webviews; micro-frontend architecture.",
+          "An ad runner game whose first partner was Haval at its Russian launch; most of the banner ads, analytics debugging and new metrics.",
         ],
         role: "Frontend Developer",
       },
@@ -123,9 +207,7 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Jun 2020 – Oct 2022",
         place: "Delivery Club",
         points: [
-          "Maintained delivery-club.ru, effectively as a full-stack developer.",
-          "Built admin panels for partners and the legal team, and new ad formats.",
-          "Wrote internal libraries: UI components and API helpers.",
+          "Maintained delivery-club.ru, effectively full-stack: admin panels for partners and lawyers, ad formats, internal UI and API libraries.",
           "After an incident, built a document tool for the legal team with versioning and audit logs.",
         ],
         role: "Lead Developer",
@@ -135,8 +217,7 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Jun 2019 – Mar 2020",
         place: "Moscow",
         points: [
-          "Turned high-level ideas into working features and made the technical decisions myself. The main project, a sports streaming service, was put on hold because of COVID.",
-          "Node.js, Express, React, Docker, Redis, PostgreSQL, Nginx.",
+          "A sports streaming service built from high-level ideas with full technical ownership (Node.js, React, PostgreSQL, Redis, Docker); COVID put it on hold.",
         ],
         role: "Full-stack Developer",
       },
@@ -145,83 +226,23 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Nov 2015 – Dec 2018",
         place: "Moscow",
         points: [
-          "Frontend for about ten high-traffic, server-rendered sites in the Alexa top 50: rewrote legacy code, optimized business logic, set up builds.",
-          "Responsible for advertising: banners, web push and popunders.",
-          "Trained new developers, reviewed code and maintained technical documentation.",
+          "Frontend for about ten high-traffic sites in the Alexa top 50: legacy rewrites, optimisation and builds; ad integrations; trained developers and reviewed code.",
         ],
         role: "Senior Frontend Developer",
       },
     ],
-    labels: {
-      details: "Availability",
-      earlier: "Earlier",
-      education: "Education",
-      experience: "Experience",
-      languages: "Languages",
-      projects: "Projects",
-      skills: "Skills",
-      switcher: "Language",
-    },
-    languages: ["Russian: native", "English: basic (A1)"],
-    location: "Moscow, Russia",
-    name: "Mikhail Balkhaev",
-    pdf: "balkhaev-cv-en.pdf",
-    projects: [
-      {
-        name: "Inference",
-        text: "A job queue for my home RTX 5080 and a laptop RTX 4080 that serve image generation. Each job reserves resources based on the average load of its type, a model stays loaded when the next job needs it, and jobs run in parallel when there is room.",
-      },
-      {
-        name: "Local LLM",
-        text: "Qwen3.8-Flash-Next (125B) through Strata at about 100 tokens/s on an RTX 5080 with 64 GB of RAM, driven by DeepSeek Harness with the dsh-purge plugin.",
-      },
-      {
-        name: "balkhaev.com",
-        text: "Falling into a Schwarzschild black hole in the browser: WebGL ray tracing in Painlevé–Gullstrand coordinates.",
-        url: "https://balkhaev.com/",
-      },
-      {
-        name: "ggpick.club",
-        text: "An SEO site about games with 200+ unique visitors a day.",
-        url: "https://ggpick.club/",
-      },
-    ],
-    skills: [
-      {
-        group: "Generative AI",
-        items:
-          "Wan 2.2, LTX, SD, SDXL, Qwen Image, H3, ComfyUI, DiffSynth-Studio, LoRA training, TTS, FFmpeg",
-      },
-      {
-        group: "LLM",
-        items: "RAG, Qdrant, embeddings, local inference, agents, MCP",
-      },
-      {
-        group: "Backend",
-        items:
-          "Node.js, Bun, Hono, Python, Django, Kafka, ClickHouse, PostgreSQL, Redis, Elasticsearch, MongoDB, GraphQL, REST, Docker",
-      },
-      {
-        group: "Frontend",
-        items:
-          "TypeScript, React, Next.js, Vue, WebGL, micro-frontends, Webpack, SEO",
-      },
-    ],
-    summary:
-      "Software developer with 14 years of experience. I worked on Delivery Club at VK and on Yandex Eats at Yandex, and since 2024 I have been building generative AI products: image and video diffusion pipelines, LoRA training, text-to-speech, RAG and local LLM inference.",
-    title: "Mikhail Balkhaev — CV",
   },
   ru: {
     description:
-      "Михаил Бальхаев, ML-инженер и инженер по генеративному AI. 14 лет в разработке: VK, Яндекс, Funcorp.",
+      "Михаил Бальхаев, ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура.",
     details:
-      "Полная или частичная занятость, проектная работа. Удалённо, гибрид или офис. Готов к командировкам и переезду по России.",
+      "Полная или частичная занятость, проекты; удалённо, гибрид или офис; готов к переезду по России.",
     earlier: [
       {
         company: "Oversun",
         period: "2014 – 2015",
         points: [
-          "Сайты на WordPress с нуля и собственные модули; корпоративный сайт компании с младшим верстальщиком под моим руководством.",
+          "Сайты на WordPress с нуля, свои модули, руководство младшим верстальщиком.",
         ],
         role: "Веб-разработчик",
       },
@@ -238,9 +259,7 @@ export const RESUMES: Record<Lang, Resume> = {
         company: "RedBox",
         period: "2011 – 2012",
         place: "Бурятия",
-        points: [
-          "Шаблоны для Joomla и WordPress, первые адаптивные вёрстки, jQuery.",
-        ],
+        points: ["Шаблоны для Joomla и WordPress, jQuery."],
         role: "HTML-верстальщик",
       },
     ],
@@ -250,37 +269,115 @@ export const RESUMES: Record<Lang, Resume> = {
       {
         company: "AIGF",
         period: "Март 2026 – сейчас",
-        place: "luv.club",
         points: [
-          "Делаю luv.club, платформу AI-компаньонов (18+) с генерацией фото и видео. Отвечаю за весь продукт: API на WebSocket, воркеры очередей, сайт и админку.",
-          "Генерация фото и видео на RunPod с Qwen Image 2.1 и H3: персонажи, образы, сцены, FaceSwap.",
-          "3D в видео: референсный 3D-рендер управляет только первыми 5 из 20 шагов сэмплирования. Камера и композиция сохраняются, а движение модель делает естественным.",
-          "API и MCP-сервер, через которые внешние агенты создают персонажей, сцены и съёмки.",
+          "Платформы AI-компаньонов (18+) с генерацией фото, видео и 3D, чатом и голосом: мультитенантный бэкенд на Hono, воркеры Redis/BullMQ, GPU-задачи на RunPod.",
+          "Фото с сохранением внешности на Qwen Image 2.1: LoRA для согласованных правок, до четырёх референсов и автоматическая перерисовка, если лицо «уплыло».",
+          "Видео: text-to-video и image-to-video с двухпроходным сэмплированием и интерполяцией RIFE до 48 fps; замена лица и всего персонажа на MiniMax H3 со swap-LoRA.",
+          "3D-сцена в видео: референсный рендер задаёт только первые 5 из 20 шагов сэмплирования, так что камера и композиция сохраняются, а движение остаётся естественным.",
+          "Память компаньонов: извлечение фактов LLM с исправлениями, гибридный поиск по эмбеддингам OpenAI в pgvector, лексическое переранжирование и оценка релевантности LLM.",
+          "Проверка возраста на сгенерированных медиа: детекция лиц, ViT-классификатор возраста и логистический пробник на эмбеддингах CLIP, обученный на 9 574 примерах. На отложенных данных верные отказы выросли с 283 до 350 из 400, ложные упали с 26 до 3 из 302.",
+          "Агенты на Grok с инструментами: режиссёр студии настраивает съёмки и проверяет результат, 3D-редактор правит сцены с валидацией и контролем ревизий; REST и MCP API с OAuth 2.1.",
+          "Голос: свой TTS на CPU (Kokoro-82M в ONNX, 54 голоса) и распознавание на Whisper.",
         ],
         role: "Generative AI Engineer",
+        sites: AIGF_SITES,
       },
       {
         company: "Funcorp",
         period: "Ноябрь 2024 – март 2026",
         place: "Кипр",
         points: [
-          "Начинал с поддержки основного продукта, потом перешёл на новые AI-продукты с нуля.",
-          "Генерация изображений и видео: Wan 2.2, LTX, SD и SDXL в ComfyUI и DiffSynth-Studio; подготовка датасетов и обучение LoRA.",
-          "Синтез речи: дизайн голосов и дообучение модели, чтобы речь звучала естественно.",
-          "LLM и RAG: Qwen3.5-9B, ChatGPT, Grok, Qdrant.",
-          "Next.js, Hono, Kafka, ClickHouse, PostgreSQL, Redis, FFmpeg.",
+          "Начинал с поддержки основного продукта, потом делал новые AI-продукты с нуля.",
+          "Диффузионные пайплайны для фото и видео (Wan 2.2, LTX, SD, SDXL) в ComfyUI и DiffSynth-Studio; сбор датасетов и обучение LoRA.",
+          "Синтез речи: дизайн голосов и дообучение модели для естественного звучания.",
+          "LLM-функции на Qwen3.5-9B, ChatGPT и Grok; RAG на Qdrant.",
+          "Данные и бэкенд: Kafka, ClickHouse, PostgreSQL, Redis, Next.js, Hono, FFmpeg.",
         ],
         role: "Senior Product Developer",
       },
+    ],
+    labels: {
+      details: "Детали",
+      education: "Образование",
+      experience: "Опыт",
+      format: "Формат",
+      languages: "Языки",
+      projects: "ML-проекты",
+      skills: "Навыки",
+      switcher: "Язык",
+      web: "Веб-разработка",
+    },
+    languages: "Русский (родной), английский (выше среднего, B2)",
+    location: "Москва",
+    name: "Михаил Бальхаев",
+    pdf: "balkhaev-cv-ru.pdf",
+    projects: [
+      {
+        name: "Studio",
+        text: "Производство AI-фильмов: агент-продюсер на Claude превращает идею в сценарий и поставленные кадры, рендерит референсные проходы в Blender через MCP и генерирует кадры на H3. Дубль принимается, только если прошёл декодирование кадров, проверку визуальной моделью и транскрибацию речи.",
+        url: "https://film.balkhaev.com/",
+      },
+      {
+        name: "MediaPipes",
+        text: "Генерация фото, видео и речи на ComfyUI и vLLM: Qwen Image 2.1 INT8 с десятью референсами, тайловый апскейл до 8 Мп, Higgs TTS 3 (4B). INT8-attention для H3 ускорил сэмплирование с 13,0 до 6,8 с/шаг (задача замены: со 129 до 80 с) и попал в прод после замеров сходства лиц, липсинка, LPIPS и слепого сравнения.",
+        url: "https://mediapipes.balkhaev.com/",
+      },
+      {
+        name: "Inference",
+        text: "Планировщик GPU для домашней RTX 5080 (ComfyUI, локальные LLM, Blender): допуск по измеренным пикам RAM и VRAM, совместный запуск только после трёх сопоставимых одиночных, прогретые модели и бюджеты, растущие после нехватки памяти.",
+      },
+      {
+        name: "Локальная LLM",
+        text: "Qwen3.8-Flash-Next (125B, GGUF) на одной RTX 5080 через Strata: эксперты распределены между VRAM, RAM и SSD, контекст 262k, около 100 токенов/с; шлюз с API OpenAI и Anthropic и маршрутизацией по аккаунтам.",
+      },
+      {
+        name: "Montage",
+        text: "Разбор видео: описания кадров от Qwen3-VL-4B, транскрипт WhisperX с выравниванием слов и склейки PySceneDetect в одном таймлайне, модели загружаются по очереди, чтобы уместиться в одну GPU; перекаст видео на H3.",
+      },
+      {
+        name: "Modeler",
+        text: "Персонажи и превиз в Blender: image-to-3D (TRELLIS.2, Pixal3D) в GLB с текстурами, text-to-motion на риге из 63 костей с проверкой контакта стоп, реконструкция лица по снимкам Qwen.",
+        url: "https://modeler.balkhaev.com/",
+      },
+    ],
+    skills: [
+      {
+        group: "Модели",
+        items:
+          "Qwen Image, H3, Wan 2.2, LTX, SD, SDXL, TRELLIS.2, Kokoro, Higgs TTS, Whisper, Qwen3-VL",
+      },
+      {
+        group: "ML-инженерия",
+        items:
+          "Обучение LoRA, датасеты, оценка (сходство лиц, LPIPS, липсинк), CLIP-пробники, эмбеддинги и RAG, INT8 и GGUF",
+      },
+      {
+        group: "Сервинг",
+        items:
+          "ComfyUI, vLLM, ONNX Runtime, RunPod, планирование GPU, Redis/BullMQ",
+      },
+      {
+        group: "LLM и агенты",
+        items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
+      },
+      {
+        group: "Разработка",
+        items:
+          "Python, TypeScript, Node.js, Bun, Hono, Next.js, React, PostgreSQL, ClickHouse, Kafka, Docker",
+      },
+    ],
+    summary:
+      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Делаю системы целиком, от пайплайна моделей и оценки качества до бэкенда продукта. До 2024 года 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
+    title: "Михаил Бальхаев — резюме",
+    web: [
       {
         company: "Яндекс",
         period: "Октябрь 2022 – август 2024",
         place: "Москва",
         points: [
-          "Перешёл из VK вместе с командой Delivery Club в рекламное направление Яндекс Еды. Основная работа: аналитика и проверка рекламных гипотез.",
-          "Поддерживал основной webview Яндекс Еды и Яндекс Вендора, улучшал микрофронтендную архитектуру.",
-          "Сделал рекламный раннер с курьером. Первым партнёром стал Haval, который тогда выходил на российский рынок: курьера заменили машиной, вдоль дороги поставили рекламные щиты.",
-          "Реализовал почти всю баннерную рекламу, отлаживал аналитику, предлагал новые метрики.",
+          "Перешёл из VK вместе с командой Delivery Club в рекламное направление Яндекс Еды: аналитика и быстрая проверка рекламных гипотез.",
+          "Основной webview Яндекс Еды и Яндекс Вендора, микрофронтендная архитектура.",
+          "Рекламный раннер, первым партнёром которого стал Haval на старте в России; почти вся баннерная реклама, отладка аналитики и новые метрики.",
         ],
         role: "Разработчик интерфейсов",
       },
@@ -289,10 +386,8 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Июнь 2020 – октябрь 2022",
         place: "Delivery Club",
         points: [
-          "Поддерживал delivery-club.ru, фактически как full-stack.",
-          "Делал админки для партнёров и юристов, новые рекламные форматы.",
-          "Писал внутренние библиотеки: UI-компоненты и API-хелперы.",
-          "После одного из инцидентов сделал админку для юристов с версионированием документов и аудит-логами.",
+          "Поддерживал delivery-club.ru, фактически как full-stack: админки для партнёров и юристов, рекламные форматы, внутренние UI- и API-библиотеки.",
+          "После инцидента сделал для юристов систему документов с версиями и аудит-логами.",
         ],
         role: "Ведущий разработчик",
       },
@@ -301,8 +396,7 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Июнь 2019 – март 2020",
         place: "Москва",
         points: [
-          "Реализовывал идеи по высокоуровневому описанию, технические решения принимал сам. Основной проект, сервис спортивных трансляций, остановился из-за ковида.",
-          "Node.js, Express, React, Docker, Redis, PostgreSQL, Nginx.",
+          "Сервис спортивных трансляций по высокоуровневым идеям, все технические решения на мне (Node.js, React, PostgreSQL, Redis, Docker); проект остановил ковид.",
         ],
         role: "Fullstack-разработчик",
       },
@@ -311,70 +405,10 @@ export const RESUMES: Record<Lang, Resume> = {
         period: "Ноябрь 2015 – декабрь 2018",
         place: "Москва",
         points: [
-          "Фронтенд десятка высоконагруженных сайтов из топ-50 Alexa (не SPA, много legacy): переписывание старого кода, оптимизация бизнес-логики, настройка сборки.",
-          "Отвечал за рекламу: баннеры, web push, popunder.",
-          "Обучал новых верстальщиков, проводил код-ревью, вёл техническую документацию.",
+          "Фронтенд десятка высоконагруженных сайтов из топ-50 Alexa: переписывание legacy, оптимизация и сборка; рекламные интеграции; обучение верстальщиков и код-ревью.",
         ],
         role: "Senior Frontend Developer",
       },
     ],
-    labels: {
-      details: "Формат работы",
-      earlier: "Ранее",
-      education: "Образование",
-      experience: "Опыт",
-      languages: "Языки",
-      projects: "Проекты",
-      skills: "Навыки",
-      switcher: "Язык",
-    },
-    languages: ["Русский: родной", "Английский: начальный (A1)"],
-    location: "Москва",
-    name: "Михаил Бальхаев",
-    pdf: "balkhaev-cv-ru.pdf",
-    projects: [
-      {
-        name: "Inference",
-        text: "Очередь задач для домашней RTX 5080 и ноутбука с RTX 4080, которые работают как серверы генерации. Каждое задание резервирует ресурсы по средней нагрузке своего типа, модель не выгружается, если она нужна следующей задаче, а при свободных ресурсах задачи идут параллельно.",
-      },
-      {
-        name: "Локальная LLM",
-        text: "Qwen3.8-Flash-Next (125B) через Strata, около 100 токенов/с на RTX 5080 с 64 ГБ RAM. Харнесс DeepSeek Harness с плагином dsh-purge.",
-      },
-      {
-        name: "balkhaev.com",
-        text: "Падение в чёрную дыру Шварцшильда в браузере: трассировка лучей на WebGL в координатах Пенлеве–Гульстранда.",
-        url: "https://balkhaev.com/",
-      },
-      {
-        name: "ggpick.club",
-        text: "SEO-сайт об играх, 200+ уникальных посетителей в день.",
-        url: "https://ggpick.club/",
-      },
-    ],
-    skills: [
-      {
-        group: "Генеративный AI",
-        items:
-          "Wan 2.2, LTX, SD, SDXL, Qwen Image, H3, ComfyUI, DiffSynth-Studio, обучение LoRA, TTS, FFmpeg",
-      },
-      {
-        group: "LLM",
-        items: "RAG, Qdrant, эмбеддинги, локальный инференс, агенты, MCP",
-      },
-      {
-        group: "Бэкенд",
-        items:
-          "Node.js, Bun, Hono, Python, Django, Kafka, ClickHouse, PostgreSQL, Redis, Elasticsearch, MongoDB, GraphQL, REST, Docker",
-      },
-      {
-        group: "Фронтенд",
-        items:
-          "TypeScript, React, Next.js, Vue, WebGL, микрофронтенды, Webpack, SEO",
-      },
-    ],
-    summary:
-      "Разработчик, 14 лет опыта. Работал над Delivery Club в VK и Яндекс Едой в Яндексе, с 2024 года делаю продукты на генеративном AI: пайплайны генерации изображений и видео, обучение LoRA, синтез речи, RAG и локальный инференс LLM.",
-    title: "Михаил Бальхаев — резюме",
   },
 };
