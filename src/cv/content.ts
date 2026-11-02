@@ -32,7 +32,6 @@ export interface Resume {
     experience: string;
     format: string;
     languages: string;
-    projects: string;
     skills: string;
     switcher: string;
     web: string;
@@ -41,7 +40,7 @@ export interface Resume {
   location: string;
   name: string;
   pdf: string;
-  projects: Project[];
+  projectGroups: { label: string; projects: Project[] }[];
   skills: { group: string; items: string }[];
   summary: string;
   title: string;
@@ -123,7 +122,6 @@ export const RESUMES: Record<Lang, Resume> = {
       experience: "Experience",
       format: "Work",
       languages: "Languages",
-      projects: "ML projects",
       skills: "Skills",
       switcher: "Language",
       web: "Web development",
@@ -132,33 +130,104 @@ export const RESUMES: Record<Lang, Resume> = {
     location: "Moscow, Russia",
     name: "Mikhail Balkhaev",
     pdf: "balkhaev-cv-en.pdf",
-    projects: [
+    projectGroups: [
       {
-        name: "Studio",
-        text: "AI film production: a Claude producer agent turns an idea into a script and staged shots, renders reference passes in Blender over MCP and generates the shots with H3. A take is accepted only after frame decoding, a vision-model review and a speech-transcription check.",
-        url: "https://film.balkhaev.com/",
+        label: "AI and media",
+        projects: [
+          {
+            name: "Studio",
+            text: "AI film production: a Claude producer agent turns an idea into a script and staged shots, renders reference passes in Blender over MCP and generates the shots with H3. A take is accepted only after frame decoding, a vision-model review and a speech-transcription check.",
+            url: "https://film.balkhaev.com/",
+          },
+          {
+            name: "MediaPipes",
+            text: "Image, video and speech generation on ComfyUI and vLLM: Qwen Image 2.1 INT8 with up to ten references, tiled upscaling to 8 MP, Higgs TTS 3 (4B). INT8 attention for H3 cut sampling from 13.0 to 6.8 s/step (a swap job from 129 to 80 s) and shipped after identity, lip-sync and LPIPS metrics and a blind review.",
+            url: "https://mediapipes.balkhaev.com/",
+          },
+          {
+            name: "Persons",
+            text: "Character identity service: seven reference views and a character sheet per character, CPU face checks with YuNet and 512-d AuraFace embeddings, storyboard stills with up to four characters, and a PostgreSQL job queue with SKIP LOCKED and per-person fairness.",
+          },
+          {
+            name: "Modeler",
+            text: "Characters and previz in Blender: image-to-3D with TRELLIS.2 and Pixal3D to textured GLB, text-to-motion on a 63-bone rig with foot-contact quality gates, Qwen-guided facial reconstruction.",
+            url: "https://modeler.balkhaev.com/",
+          },
+          {
+            name: "Montage",
+            text: "Video understanding: Qwen3-VL-4B frame descriptions, word-aligned WhisperX transcripts and PySceneDetect cuts in one timeline, with models loaded in turn to fit one GPU; video-to-video recasting with H3.",
+          },
+          {
+            name: "Inference",
+            text: "GPU scheduler for a home RTX 5080 shared by ComfyUI, local LLMs and Blender: admission by measured RAM and VRAM peaks, GPU sharing only after three comparable solo runs, warm-model residency and budgets that grow after out-of-memory errors.",
+          },
+          {
+            name: "Local LLM",
+            text: "Qwen3.8-Flash-Next (125B GGUF) on one RTX 5080 through Strata, with experts spread across VRAM, RAM and SSD, a 262k context and about 100 tokens/s; an OpenAI- and Anthropic-compatible gateway with multi-account routing.",
+          },
+        ],
       },
       {
-        name: "MediaPipes",
-        text: "Image, video and speech generation on ComfyUI and vLLM: Qwen Image 2.1 INT8 with up to ten references, tiled upscaling to 8 MP, Higgs TTS 3 (4B). INT8 attention for H3 cut sampling from 13.0 to 6.8 s/step (a swap job from 129 to 80 s) and shipped after identity, lip-sync and LPIPS metrics and a blind review.",
-        url: "https://mediapipes.balkhaev.com/",
+        label: "Data products",
+        projects: [
+          {
+            name: "ggpick.club",
+            text: "Game discovery in Russian, English and Chinese: Steam and community data in PostgreSQL, hybrid search on multilingual-e5 embeddings in Qdrant with cross-encoder reranking and a fallback when models are down, transliteration and keyboard-layout correction. 200+ unique visitors a day.",
+            url: "https://ggpick.club/",
+          },
+          {
+            name: "Polywin",
+            text: "Polymarket research: typed market-data clients with WebSocket order-book reconciliation, an opportunity scanner that accounts for depth and fees, LLM news-to-market reasoning with validated quotes, and forecasts scored by Brier score and calibration. A signal needs 30+ resolved markets and a statistically positive edge.",
+          },
+          {
+            name: "AI News",
+            text: "Radar of new models and AI tools from 44 sources (GitHub, Hugging Face, arXiv, Reddit, X): grounded Russian summaries with quote checks, hybrid semantic search with a CPU cross-encoder, growth signals from stars and commits. Moving blocking work off the event loop cut p99 pauses from 585 to 62 ms.",
+          },
+          {
+            name: "FastNews",
+            text: "RSS and X news desk: safe article extraction, URL and text deduplication, LLM enrichment (entities, topics, claims, forecasts) with schema and quote validation, and a versioned API that feeds Polywin.",
+          },
+          {
+            name: "Soclogin",
+            text: "Service for my own Instagram, X and Avito accounts: an AES-256-GCM credential vault, idempotent browser operations on Playwright, tenant-scoped feeds for the news products and MCP diagnostics.",
+          },
+        ],
       },
       {
-        name: "Inference",
-        text: "GPU scheduler for a home RTX 5080 shared by ComfyUI, local LLMs and Blender: admission by measured RAM and VRAM peaks, GPU sharing only after three comparable solo runs, warm-model residency and budgets that grow after out-of-memory errors.",
+        label: "Sites and client work",
+        projects: [
+          {
+            name: "ZemStroy CRM",
+            text: "Sales CRM for a land development company: amoCRM, Avito and CIAN integrations on Redis/BullMQ, call transcription with Whisper and LLM call scoring, a first-response bot with versioned prompts, Telegram alerts for new leads and SLA breaches.",
+          },
+          {
+            name: "Altai Land",
+            text: "Land-development site with an interactive 3D valley on Three.js: streamed scene packages for mobile (first load from 7.2 to 3.7 MB), a chunked forest of 79,125 trees (5.9M to 1.2M triangles), a 568-plot masterplan shared by 2D and 3D, 31 indexable pages.",
+            url: "https://алтайземля.рф/",
+          },
+          {
+            name: "balkhaev.com",
+            text: "Falling into a Schwarzschild black hole in the browser: WebGL ray tracing in Painlevé–Gullstrand coordinates, a lensed star catalogue with Doppler and gravitational shifts, and tests against independent numerical quadrature.",
+            url: "https://balkhaev.com/",
+          },
+        ],
       },
       {
-        name: "Local LLM",
-        text: "Qwen3.8-Flash-Next (125B GGUF) on one RTX 5080 through Strata, with experts spread across VRAM, RAM and SSD, a 262k context and about 100 tokens/s; an OpenAI- and Anthropic-compatible gateway with multi-account routing.",
-      },
-      {
-        name: "Montage",
-        text: "Video understanding: Qwen3-VL-4B frame descriptions, word-aligned WhisperX transcripts and PySceneDetect cuts in one timeline, with models loaded in turn to fit one GPU; video-to-video recasting with H3.",
-      },
-      {
-        name: "Modeler",
-        text: "Characters and previz in Blender: image-to-3D with TRELLIS.2 and Pixal3D to textured GLB, text-to-motion on a 63-bone rig with foot-contact quality gates, Qwen-guided facial reconstruction.",
-        url: "https://modeler.balkhaev.com/",
+        label: "Tools and games",
+        projects: [
+          {
+            name: "DevHub",
+            text: "Development platform for me and my AI agents: dependency-aware process supervision, a worktree and release workflow gated by checks, Canvas and Kanban project knowledge served over MCP, and Coolify deployment monitoring.",
+          },
+          {
+            name: "Gamza",
+            text: "Isometric extraction autobattler on Unreal Engine 5.8 and C++: a deterministic headless simulation with hash-verified replays, tactical squad AI (hearing, flanking, suppression), a persistent living world, maps built from geodata and an automatic cinematic camera.",
+          },
+          {
+            name: "Habar",
+            text: "Pixel-art idle strategy game in TypeScript: a DOM-independent simulation, seeded shot-by-shot combat, factions, convoys and an economy, and procedural terrain painted in Web Workers.",
+          },
+        ],
       },
     ],
     skills: [
@@ -182,13 +251,18 @@ export const RESUMES: Record<Lang, Resume> = {
         items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
       },
       {
-        group: "Software",
+        group: "Backend and data",
         items:
-          "Python, TypeScript, Node.js, Bun, Hono, Next.js, React, PostgreSQL, ClickHouse, Kafka, Docker",
+          "Python, TypeScript, Node.js, Bun, Hono, FastAPI, PostgreSQL, ClickHouse, Kafka, Redis, Qdrant, SQLite, Docker",
+      },
+      {
+        group: "Frontend and 3D",
+        items:
+          "React, Next.js, Three.js, WebGL, Unreal Engine 5 (C++), Blender, Playwright",
       },
     ],
     summary:
-      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents and the GPU infrastructure that runs them. I build these systems from the model pipeline and its evaluation to the product backend. Before 2024 I spent 13 years in web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
+      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents and the GPU infrastructure that runs them. I build products end to end, from the model pipeline and its evaluation to the backend and interface: in 2026 that meant media generation services, data platforms, a CRM and an Unreal Engine game. Before 2024 I spent 13 years in web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
     title: "Mikhail Balkhaev — CV",
     web: [
       {
@@ -302,7 +376,6 @@ export const RESUMES: Record<Lang, Resume> = {
       experience: "Опыт",
       format: "Формат",
       languages: "Языки",
-      projects: "ML-проекты",
       skills: "Навыки",
       switcher: "Язык",
       web: "Веб-разработка",
@@ -311,33 +384,104 @@ export const RESUMES: Record<Lang, Resume> = {
     location: "Москва",
     name: "Михаил Бальхаев",
     pdf: "balkhaev-cv-ru.pdf",
-    projects: [
+    projectGroups: [
       {
-        name: "Studio",
-        text: "Производство AI-фильмов: агент-продюсер на Claude превращает идею в сценарий и поставленные кадры, рендерит референсные проходы в Blender через MCP и генерирует кадры на H3. Дубль принимается, только если прошёл декодирование кадров, проверку визуальной моделью и транскрибацию речи.",
-        url: "https://film.balkhaev.com/",
+        label: "AI и медиа",
+        projects: [
+          {
+            name: "Studio",
+            text: "Производство AI-фильмов: агент-продюсер на Claude превращает идею в сценарий и поставленные кадры, рендерит референсные проходы в Blender через MCP и генерирует кадры на H3. Дубль принимается, только если прошёл декодирование кадров, проверку визуальной моделью и транскрибацию речи.",
+            url: "https://film.balkhaev.com/",
+          },
+          {
+            name: "MediaPipes",
+            text: "Генерация фото, видео и речи на ComfyUI и vLLM: Qwen Image 2.1 INT8 с десятью референсами, тайловый апскейл до 8 Мп, Higgs TTS 3 (4B). INT8-attention для H3 ускорил сэмплирование с 13,0 до 6,8 с/шаг (задача замены: со 129 до 80 с) и попал в прод после замеров сходства лиц, липсинка, LPIPS и слепого сравнения.",
+            url: "https://mediapipes.balkhaev.com/",
+          },
+          {
+            name: "Persons",
+            text: "Сервис персонажей: семь референсных ракурсов и лист персонажа, проверка лиц на CPU (YuNet, 512-мерные эмбеддинги AuraFace), раскадровки до четырёх персонажей в кадре, очередь задач на PostgreSQL со SKIP LOCKED и справедливым распределением.",
+          },
+          {
+            name: "Modeler",
+            text: "Персонажи и превиз в Blender: image-to-3D (TRELLIS.2, Pixal3D) в GLB с текстурами, text-to-motion на риге из 63 костей с проверкой контакта стоп, реконструкция лица по снимкам Qwen.",
+            url: "https://modeler.balkhaev.com/",
+          },
+          {
+            name: "Montage",
+            text: "Разбор видео: описания кадров от Qwen3-VL-4B, транскрипт WhisperX с выравниванием слов и склейки PySceneDetect в одном таймлайне, модели загружаются по очереди, чтобы уместиться в одну GPU; перекаст видео на H3.",
+          },
+          {
+            name: "Inference",
+            text: "Планировщик GPU для домашней RTX 5080 (ComfyUI, локальные LLM, Blender): допуск по измеренным пикам RAM и VRAM, совместный запуск только после трёх сопоставимых одиночных, прогретые модели и бюджеты, растущие после нехватки памяти.",
+          },
+          {
+            name: "Локальная LLM",
+            text: "Qwen3.8-Flash-Next (125B, GGUF) на одной RTX 5080 через Strata: эксперты распределены между VRAM, RAM и SSD, контекст 262k, около 100 токенов/с; шлюз с API OpenAI и Anthropic и маршрутизацией по аккаунтам.",
+          },
+        ],
       },
       {
-        name: "MediaPipes",
-        text: "Генерация фото, видео и речи на ComfyUI и vLLM: Qwen Image 2.1 INT8 с десятью референсами, тайловый апскейл до 8 Мп, Higgs TTS 3 (4B). INT8-attention для H3 ускорил сэмплирование с 13,0 до 6,8 с/шаг (задача замены: со 129 до 80 с) и попал в прод после замеров сходства лиц, липсинка, LPIPS и слепого сравнения.",
-        url: "https://mediapipes.balkhaev.com/",
+        label: "Продукты на данных",
+        projects: [
+          {
+            name: "ggpick.club",
+            text: "Поиск игр на русском, английском и китайском: данные Steam и сообществ в PostgreSQL, гибридный поиск на эмбеддингах multilingual-e5 в Qdrant с переранжированием cross-encoder и запасным путём при отказе моделей, транслитерация и исправление раскладки. 200+ уникальных посетителей в день.",
+            url: "https://ggpick.club/",
+          },
+          {
+            name: "Polywin",
+            text: "Исследование Polymarket: типизированные клиенты рыночных данных со сверкой стакана по WebSocket, сканер возможностей с учётом глубины и комиссий, разбор новостей LLM с проверкой цитат и прогнозы с оценкой по Brier score и калибровке. Сигнал требует 30+ закрытых рынков и статистически значимого преимущества.",
+          },
+          {
+            name: "AI News",
+            text: "Радар новых моделей и AI-инструментов из 44 источников (GitHub, Hugging Face, arXiv, Reddit, X): пересказы на русском с проверкой цитат, гибридный семантический поиск с cross-encoder на CPU, сигналы роста по звёздам и коммитам. Вынос блокирующей работы из event loop снизил p99-паузы с 585 до 62 мс.",
+          },
+          {
+            name: "FastNews",
+            text: "Новостная лента из RSS и X: безопасное извлечение статей, дедупликация по URL и тексту, обогащение LLM (сущности, темы, утверждения, прогнозы) с проверкой схемы и цитат, версионированный API для Polywin.",
+          },
+          {
+            name: "Soclogin",
+            text: "Сервис для собственных аккаунтов Instagram, X и Avito: хранилище учётных данных с AES-256-GCM, идемпотентные браузерные операции на Playwright, ленты для новостных продуктов и диагностика по MCP.",
+          },
+        ],
       },
       {
-        name: "Inference",
-        text: "Планировщик GPU для домашней RTX 5080 (ComfyUI, локальные LLM, Blender): допуск по измеренным пикам RAM и VRAM, совместный запуск только после трёх сопоставимых одиночных, прогретые модели и бюджеты, растущие после нехватки памяти.",
+        label: "Сайты и заказы",
+        projects: [
+          {
+            name: "CRM Земстрой",
+            text: "CRM продаж для компании по продаже земли: интеграции с amoCRM, Avito и ЦИАН на Redis/BullMQ, транскрибация звонков Whisper и их оценка LLM, бот первого ответа с версиями промптов, уведомления в Telegram о новых лидах и нарушениях SLA.",
+          },
+          {
+            name: "Алтай — живая земля",
+            text: "Сайт посёлка с интерактивной 3D-долиной на Three.js: потоковая загрузка сцен на мобильных (первая загрузка с 7,2 до 3,7 МБ), лес из 79 125 деревьев по чанкам (с 5,9 до 1,2 млн треугольников), генплан на 568 участков общий для 2D и 3D, 31 индексируемая страница.",
+            url: "https://алтайземля.рф/",
+          },
+          {
+            name: "balkhaev.com",
+            text: "Падение в чёрную дыру Шварцшильда в браузере: трассировка лучей на WebGL в координатах Пенлеве–Гульстранда, линзированный каталог звёзд с доплеровским и гравитационным сдвигом, тесты против независимого численного интегрирования.",
+            url: "https://balkhaev.com/",
+          },
+        ],
       },
       {
-        name: "Локальная LLM",
-        text: "Qwen3.8-Flash-Next (125B, GGUF) на одной RTX 5080 через Strata: эксперты распределены между VRAM, RAM и SSD, контекст 262k, около 100 токенов/с; шлюз с API OpenAI и Anthropic и маршрутизацией по аккаунтам.",
-      },
-      {
-        name: "Montage",
-        text: "Разбор видео: описания кадров от Qwen3-VL-4B, транскрипт WhisperX с выравниванием слов и склейки PySceneDetect в одном таймлайне, модели загружаются по очереди, чтобы уместиться в одну GPU; перекаст видео на H3.",
-      },
-      {
-        name: "Modeler",
-        text: "Персонажи и превиз в Blender: image-to-3D (TRELLIS.2, Pixal3D) в GLB с текстурами, text-to-motion на риге из 63 костей с проверкой контакта стоп, реконструкция лица по снимкам Qwen.",
-        url: "https://modeler.balkhaev.com/",
+        label: "Инструменты и игры",
+        projects: [
+          {
+            name: "DevHub",
+            text: "Платформа разработки для меня и моих AI-агентов: управление процессами с учётом зависимостей, процесс worktree и релизов с проверками, знания о проектах (Canvas и Kanban) через MCP, мониторинг деплоев Coolify.",
+          },
+          {
+            name: "Gamza",
+            text: "Изометрический экстракшен-автобаттлер на Unreal Engine 5.8 и C++: детерминированная headless-симуляция с проверяемыми реплеями, тактический ИИ отряда (слух, фланги, подавление), живой мир между рейдами, карты по геоданным и автоматическая кинематографичная камера.",
+          },
+          {
+            name: "Habar",
+            text: "Пиксельная idle-стратегия на TypeScript: симуляция без DOM, бой выстрел за выстрелом с фиксированным сидом, фракции, конвои и экономика, процедурный ландшафт, который рисуется в Web Workers.",
+          },
+        ],
       },
     ],
     skills: [
@@ -361,13 +505,18 @@ export const RESUMES: Record<Lang, Resume> = {
         items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
       },
       {
-        group: "Разработка",
+        group: "Бэкенд и данные",
         items:
-          "Python, TypeScript, Node.js, Bun, Hono, Next.js, React, PostgreSQL, ClickHouse, Kafka, Docker",
+          "Python, TypeScript, Node.js, Bun, Hono, FastAPI, PostgreSQL, ClickHouse, Kafka, Redis, Qdrant, SQLite, Docker",
+      },
+      {
+        group: "Фронтенд и 3D",
+        items:
+          "React, Next.js, Three.js, WebGL, Unreal Engine 5 (C++), Blender, Playwright",
       },
     ],
     summary:
-      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Делаю системы целиком, от пайплайна моделей и оценки качества до бэкенда продукта. До 2024 года 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
+      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Делаю продукты целиком, от пайплайна моделей и оценки качества до бэкенда и интерфейса: в 2026 году это сервисы генерации медиа, продукты на данных, CRM и игра на Unreal Engine. До 2024 года 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
     title: "Михаил Бальхаев — резюме",
     web: [
       {
