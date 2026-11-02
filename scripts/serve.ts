@@ -8,13 +8,17 @@ const files = new Map([
   ["/robots.txt", "robots.txt"],
   ["/sitemap.xml", "sitemap.xml"],
   ["/cv/", "cv/index.html"],
+  ["/cv/ru/", "cv/ru/index.html"],
 ]);
 const CV_ASSET = /^\/cv\/(?:fonts\/)?[\w-]+\.(?:css|jpg|pdf|woff2)$/;
 serve({
   fetch(request) {
     const { pathname } = new URL(request.url);
-    if (pathname === "/cv") {
-      return new Response(null, { headers: { Location: "/cv/" }, status: 301 });
+    if (pathname === "/cv" || pathname === "/cv/ru") {
+      return new Response(null, {
+        headers: { Location: `${pathname}/` },
+        status: 301,
+      });
     }
     const file =
       files.get(pathname) ??

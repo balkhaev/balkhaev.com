@@ -69,7 +69,9 @@ The display loop is capped at 60 fps, including the idle scene, and pauses in hi
 
 ## Resume
 
-`/cv/` is a static resume page in `public/cv` (Onest and JetBrains Mono are self-hosted). Its screen layout follows the visitor's colour scheme; print styles lay the same markup out as two light A4 pages. The downloadable `public/cv/balkhaev-cv.pdf` is committed: after editing the page, run `bun scripts/cv-pdf.ts`, which prints it with a local Chrome or Edge (`CHROME_PATH` overrides the browser). Nginx redirects `/cv` to `/cv/` so relative asset paths resolve.
+`/cv/` (English, the default) and `/cv/ru/` (Russian) are generated at build time from `src/cv/content.ts` by `src/cv/render.ts`; both languages keep the same structure, which `src/cv/cv.test.ts` checks. Static assets live in `public/cv`: the stylesheet, the self-hosted IBM Plex Sans subsets, the photo and the two PDFs. Print styles lay each page out on A4.
+
+The PDFs (`balkhaev-cv-en.pdf`, `balkhaev-cv-ru.pdf`) are committed: after editing the content or styles, run `bun scripts/cv-pdf.ts`, which prints both with a local Chrome or Edge (`CHROME_PATH` overrides the browser). Nginx redirects `/cv` and `/cv/ru` to their trailing-slash URLs.
 
 ## Production
 

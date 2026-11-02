@@ -1,11 +1,13 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "bun";
+import { LANGS, RESUMES } from "../src/cv/content";
+import { renderCv } from "../src/cv/render";
 
-// Prints public/cv/index.html to the committed PDF with a local Chrome or Edge.
+// Prints each language of the resume to its committed PDF with a local Chrome or Edge.
 const browser = [
   process.env.CHROME_PATH,
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
@@ -18,31 +20,34 @@ if (!browser) {
   throw new Error("Set CHROME_PATH to a Chrome or Edge executable");
 }
 
-const page = new URL("../public/cv/index.html", import.meta.url);
-const output = fileURLToPath(
-  new URL("../public/cv/balkhaev-cv.pdf", import.meta.url)
-);
+const assets = new URL("../public/cv/", import.meta.url);
 // A private profile keeps headless Chrome away from a running browser.
-const profile = await mkdtemp(join(tmpdir(), "balkhaev-cv-"));
+const work = await mkdtemp(join(tmpdir(), "balkhaev-cv-"));
 try {
-  const child = spawn(
-    [
-      browser,
-      "--headless=new",
-      "--disable-gpu",
-      "--no-first-run",
-      "--no-pdf-header-footer",
-      "--virtual-time-budget=10000",
-      `--user-data-dir=${profile}`,
-      `--print-to-pdf=${output}`,
-      page.href,
-    ],
-    { stderr: "ignore", stdout: "ignore" }
-  );
-  if ((await child.exited) !== 0 || !existsSync(output)) {
-    throw new Error("Chrome could not print the CV");
+  for (const lang of LANGS) {
+    const page = join(work, `${lang}.html`);
+    const output = fileURLToPath(new URL(RESUMES[lang].pdf, assets));
+    // biome-ignore lint/performance/noAwaitInLoops: one headless Chrome at a time
+    await writeFile(page, renderCv(lang, assets.href));
+    const child = spawn(
+      [
+        browser,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-pdf-header-footer",
+        "--virtual-time-budget=10000",
+        `--user-data-dir=${join(work, "profile")}`,
+        `--print-to-pdf=${output}`,
+        pathToFileURL(page).href,
+      ],
+      { stderr: "ignore", stdout: "ignore" }
+    );
+    if ((await child.exited) !== 0 || !existsSync(output)) {
+      throw new Error(`Chrome could not print the ${lang} CV`);
+    }
+    process.stdout.write(`Printed ${output}\n`);
   }
 } finally {
-  await rm(profile, { force: true, recursive: true });
+  await rm(work, { force: true, recursive: true });
 }
-process.stdout.write(`Printed ${output}\n`);
