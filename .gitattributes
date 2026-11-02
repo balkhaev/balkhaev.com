@@ -1,0 +1,2 @@
+# Biome formats with LF; keep checkouts and merges LF even where Git's global core.autocrlf is true.
+* text=auto eol=lf
