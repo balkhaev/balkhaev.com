@@ -60,11 +60,20 @@ const earlier = (entry: Job) => `
             <p>${entry.points.map(html).join(" ")}</p>
           </article>`;
 
-const project = ({ name, text, url }: Project) => `
+const project = ({ name, text, url }: Project) => {
+  const domain = url?.replace(/^https:\/\/|\/$/g, "");
+  const link =
+    url && domain !== name
+      ? `<span>, <a href="${url}">${html(domain ?? "")}</a></span>`
+      : "";
+  const title =
+    url && domain === name ? `<a href="${url}">${html(name)}</a>` : html(name);
+  return `
           <article class="project">
-            <h3>${html(name)}${url ? `<span>, <a href="${url}">${html(url.replace(/^https:\/\/|\/$/g, ""))}</a></span>` : ""}</h3>
+            <h3>${title}${link}</h3>
             <p>${html(text)}</p>
           </article>`;
+};
 
 const details = (cv: Resume) =>
   [
@@ -137,7 +146,7 @@ export function renderCv(lang: Lang, assets = "/cv/") {
       </header>
       <p class="summary">${html(cv.summary)}</p>
 ${section(cv.labels.experience, cv.jobs.map(job).join(""))}
-${section(cv.labels.projects, cv.projects.map(project).join(""))}
+${cv.projectGroups.map((group) => section(group.label, group.projects.map(project).join(""))).join("\n")}
 ${section(cv.labels.web, cv.web.map(job).join("") + cv.earlier.map(earlier).join(""))}
 ${section(cv.labels.skills, `<dl class="skills">${skills}</dl>`)}
 ${section(cv.labels.details, `<dl class="skills">${details(cv)}</dl>`)}
