@@ -67,6 +67,10 @@ Sky-specific tests additionally check fixed unit source directions, total spheri
 
 The display loop is capped at 60 fps, including the idle scene, and pauses in hidden tabs. Stale returning frames cannot skip forward through flight chapters. The renderer adapts its pixel budget (2.07 / 4.15 / 8.29 megapixels), bloom levels (2 / 3 / 4) and tracer count (4,500 / 12,000 / 28,000) to GPU performance. It renders at device-pixel resolution up to 3× before applying the budget, retaining native Full HD even in the lowest tier. Larger displays can still downscale when the active GPU budget is exceeded. Reduced-motion mode holds simulation time between explicit travel inputs and allows explicit camera navigation. Native contact anchors remain visible and keyboard/screen-reader accessible during flight and when WebGL is unavailable or lost. Status announcements occur only when the chapter or playback state changes; the radius and progress indicators are decorative.
 
+## Resume
+
+`/cv/` is a static resume page in `public/cv` (Onest and JetBrains Mono are self-hosted). Its screen layout follows the visitor's colour scheme; print styles lay the same markup out as two light A4 pages. The downloadable `public/cv/balkhaev-cv.pdf` is committed: after editing the page, run `bun scripts/cv-pdf.ts`, which prints it with a local Chrome or Edge (`CHROME_PATH` overrides the browser). Nginx redirects `/cv` to `/cv/` so relative asset paths resolve.
+
 ## Production
 
 Coolify serves an Nginx image on `https://balkhaev.com`. DNS points to `49.13.216.63`. The Docker image listens on port 8080; TLS is handled by Coolify.
