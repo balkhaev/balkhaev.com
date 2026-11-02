@@ -1,4 +1,11 @@
-import { type Job, LANGS, type Lang, RESUMES } from "./content";
+import {
+  type Job,
+  LANGS,
+  type Lang,
+  type Project,
+  RESUMES,
+  type Resume,
+} from "./content";
 
 export const CV_PATHS: Record<Lang, string> = { en: "/cv/", ru: "/cv/ru/" };
 const ORIGIN = "https://balkhaev.com";
@@ -24,24 +31,52 @@ const section = (label: string, body: string) => `
         <div>${body}</div>
       </section>`;
 
-const job = ({ company, period, place, points, role }: Job) => `
+const where = ({ place, sites }: Job) => {
+  if (sites) {
+    const links = sites.map(
+      (site) => `<a href="https://${site}/">${html(site)}</a>`
+    );
+    return `<span>, ${links.join(", ")}</span>`;
+  }
+  return place ? `<span>, ${html(place)}</span>` : "";
+};
+
+const job = (entry: Job) => `
           <article class="job">
             <header>
-              <h3>${html(company)}${place ? `<span>, ${html(place)}</span>` : ""}</h3>
-              <p class="period">${html(period)}</p>
+              <h3>${html(entry.company)}${where(entry)}</h3>
+              <p class="period">${html(entry.period)}</p>
             </header>
-            <p class="role">${html(role)}</p>
-            <ul>${points.map((point) => `<li>${html(point)}</li>`).join("")}</ul>
+            <p class="role">${html(entry.role)}</p>
+            <ul>${entry.points.map((point) => `<li>${html(point)}</li>`).join("")}</ul>
           </article>`;
 
-const earlier = ({ company, period, place, points, role }: Job) => `
+const earlier = (entry: Job) => `
           <article class="job brief">
             <header>
-              <h3>${html(company)}${place ? `<span>, ${html(place)}</span>` : ""}<span class="role-inline">, ${html(role)}</span></h3>
-              <p class="period">${html(period)}</p>
+              <h3>${html(entry.company)}${where(entry)}<span>, ${html(entry.role)}</span></h3>
+              <p class="period">${html(entry.period)}</p>
             </header>
-            <p>${points.map(html).join(" ")}</p>
+            <p>${entry.points.map(html).join(" ")}</p>
           </article>`;
+
+const project = ({ name, text, url }: Project) => `
+          <article class="project">
+            <h3>${html(name)}${url ? `<span>, <a href="${url}">${html(url.replace(/^https:\/\/|\/$/g, ""))}</a></span>` : ""}</h3>
+            <p>${html(text)}</p>
+          </article>`;
+
+const details = (cv: Resume) =>
+  [
+    [cv.labels.languages, cv.languages],
+    [cv.labels.education, cv.education],
+    [cv.labels.format, cv.details],
+  ]
+    .map(
+      ([label, text]) =>
+        `<div><dt>${html(label ?? "")}</dt><dd>${html(text ?? "")}</dd></div>`
+    )
+    .join("");
 
 /**
  * Renders one language of the resume. `assets` points at the folder with
@@ -58,12 +93,6 @@ export function renderCv(lang: Lang, assets = "/cv/") {
       ? `<a aria-current="page" href="${CV_PATHS[code]}">${code.toUpperCase()}</a>`
       : `<a href="${CV_PATHS[code]}" hreflang="${code}" lang="${code}">${code.toUpperCase()}</a>`
   ).join("");
-  const projects = cv.projects
-    .map(
-      ({ name, text, url }) =>
-        `<p class="project"><b>${url ? `<a href="${url}">${html(name)}</a>` : html(name)}.</b> ${html(text)}</p>`
-    )
-    .join("");
   const skills = cv.skills
     .map(
       ({ group, items }) =>
@@ -108,12 +137,10 @@ export function renderCv(lang: Lang, assets = "/cv/") {
       </header>
       <p class="summary">${html(cv.summary)}</p>
 ${section(cv.labels.experience, cv.jobs.map(job).join(""))}
-${section(cv.labels.earlier, cv.earlier.map(earlier).join(""))}
-${section(cv.labels.projects, projects)}
+${section(cv.labels.projects, cv.projects.map(project).join(""))}
+${section(cv.labels.web, cv.web.map(job).join("") + cv.earlier.map(earlier).join(""))}
 ${section(cv.labels.skills, `<dl class="skills">${skills}</dl>`)}
-${section(cv.labels.languages, `<p>${cv.languages.map(html).join("<br>")}</p>`)}
-${section(cv.labels.education, `<p>${html(cv.education)}</p>`)}
-${section(cv.labels.details, `<p>${html(cv.details)}</p>`)}
+${section(cv.labels.details, `<dl class="skills">${details(cv)}</dl>`)}
     </main>
   </body>
 </html>

@@ -7,10 +7,10 @@ const shape = (lang: (typeof LANGS)[number]) => {
   const cv = RESUMES[lang];
   return {
     earlier: cv.earlier.map((job) => [job.company, job.points.length]),
-    jobs: cv.jobs.map((job) => job.points.length),
-    languages: cv.languages.length,
+    jobs: cv.jobs.map((job) => [job.sites, job.points.length]),
     projects: cv.projects.map((project) => project.url),
     skills: cv.skills.length,
+    web: cv.web.map((job) => job.points.length),
   };
 };
 

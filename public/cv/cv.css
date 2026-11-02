@@ -111,6 +111,12 @@ h1 {
   font-size: 17px;
   color: var(--muted);
 }
+.contacts a {
+  text-decoration: none;
+}
+.contacts a:hover {
+  text-decoration: underline;
+}
 .contacts {
   display: flex;
   flex-wrap: wrap;
@@ -155,11 +161,13 @@ h2 {
   align-items: baseline;
   justify-content: space-between;
 }
-.job h3 {
+.job h3,
+.project h3 {
   font-size: 15px;
   font-weight: 600;
 }
-.job h3 span {
+.job h3 span,
+.project h3 span {
   font-weight: 400;
   color: var(--muted);
 }
@@ -175,22 +183,25 @@ h2 {
 .job li + li {
   margin-top: 3px;
 }
+.job + .brief {
+  margin-top: 18px;
+}
 .brief + .brief {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .brief p {
   color: var(--muted);
 }
 
 .project + .project {
-  margin-top: 10px;
+  margin-top: 14px;
 }
-.project b {
-  font-weight: 600;
+.project p {
+  margin-top: 2px;
 }
 .skills div {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-columns: 150px minmax(0, 1fr);
   gap: 16px;
 }
 .skills div + div {
@@ -230,12 +241,12 @@ h2 {
 
 @page {
   size: A4;
-  margin: 14mm 16mm 13mm;
+  margin: 12mm 15mm 11mm;
 }
 @media print {
   body {
-    font-size: 8.9pt;
-    line-height: 1.42;
+    font-size: 8.7pt;
+    line-height: 1.4;
   }
   .bar {
     display: none;
@@ -278,7 +289,8 @@ h2 {
     border-top-width: 0.25mm;
   }
   h2,
-  .job h3 {
+  .job h3,
+  .project h3 {
     font-size: 9.4pt;
   }
   .job {
@@ -294,17 +306,23 @@ h2 {
   .job li + li {
     margin-top: 0.5mm;
   }
+  .job + .brief {
+    margin-top: 3.2mm;
+  }
   .brief + .brief {
-    margin-top: 2mm;
+    margin-top: 1.6mm;
   }
   .project {
     break-inside: avoid;
   }
   .project + .project {
-    margin-top: 1.6mm;
+    margin-top: 2.6mm;
+  }
+  .project p {
+    margin-top: 0.4mm;
   }
   .skills div {
-    grid-template-columns: 26mm minmax(0, 1fr);
+    grid-template-columns: 31mm minmax(0, 1fr);
     gap: 3mm;
   }
   .skills div + div {
