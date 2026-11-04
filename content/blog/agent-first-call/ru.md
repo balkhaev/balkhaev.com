@@ -95,49 +95,24 @@ const messages: Anthropic.MessageParam[] = [
 
 Ответ модели может генерироваться десятки секунд. Чтобы не смотреть в пустой экран, используем стриминг: текст печатается по мере генерации, а в конце `finalMessage()` отдаёт полный ответ.
 
+Весь `chat.ts` занимает около 40 строк: цикл читает строку из терминала, кладёт её в `messages` и делает запрос. Главное в нём вот это:
+
 ```ts
-// chat.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
+const stream = client.messages.stream({
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  output_config: { effort: "low" },
+  system,
+  messages,
+});
+stream.on("text", (delta) => process.stdout.write(delta));
+const reply = await stream.finalMessage();
 
-const client = new Anthropic(); // ключ берётся из ANTHROPIC_API_KEY
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-const system = "Ты лаконичный помощник программиста. Отвечай по делу.";
-const messages: Anthropic.MessageParam[] = [];
-
-while (true) {
-  const input = (await rl.question("\n> ")).trim();
-  if (!input || input === "/exit") break;
-
-  messages.push({ role: "user", content: input });
-
-  const stream = client.messages.stream({
-    model: "claude-opus-5-5",
-    max_tokens: 16000,
-    output_config: { effort: "low" },
-    system,
-    messages,
-  });
-
-  stream.on("text", (delta) => process.stdout.write(delta));
-  const reply = await stream.finalMessage();
-
-  if (reply.stop_reason === "refusal") {
-    console.log("\n[модель отказалась отвечать]");
-    messages.pop(); // не тащим этот вопрос дальше в историю
-    continue;
-  }
-
-  // В историю кладём весь content целиком, а не только текст
-  messages.push({ role: "assistant", content: reply.content });
-
-  const { input_tokens, output_tokens } = reply.usage;
-  console.log(`\n[${input_tokens} in / ${output_tokens} out]`);
-}
-
-rl.close();
+// в историю кладём весь content, а не только текст
+messages.push({ role: "assistant", content: reply.content });
 ```
+
+Остальное обвязка: выйти по `/exit`, при `stop_reason: "refusal"` убрать последний вопрос из истории и после ответа напечатать `reply.usage`.
 
 ```bash
 bun chat.ts

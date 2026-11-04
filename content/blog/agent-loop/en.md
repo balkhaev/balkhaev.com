@@ -67,16 +67,28 @@ We check the model's arguments with [zod](https://zod.dev). The model almost alw
 bun add zod
 ```
 
+Each tool in `tools.ts` is four things: a description for the model, a zod schema for the arguments, a "dangerous" flag and a `run` function. Here is `read_file` in full; the other three follow the same shape:
+
 ```ts
-// tools.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { z } from "zod";
+read_file: {
+  definition: {
+    name: "read_file",
+    description: "Read a whole text file.",
+    input_schema: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+  schema: z.object({ path: z.string() }),
+  dangerous: false,
+  run: async ({ path }) => (await readFile(safePath(path), "utf8")).slice(0, 50_000),
+},
+```
 
-// The agent only works inside this folder
-export const ROOT = path.resolve(process.argv[2] ?? process.cwd());
+`list_files` reads a directory with `readdir`, `write_file` writes a file and is marked dangerous, and `run_command` runs `bash -c` through `Bun.spawn` in the working folder and returns the exit code, stdout and stderr. The one function worth showing separately is `safePath`:
 
+```ts
 function safePath(p: string): string {
   const full = path.resolve(ROOT, p);
   if (full !== ROOT && !full.startsWith(ROOT + path.sep)) {
@@ -84,104 +96,6 @@ function safePath(p: string): string {
   }
   return full;
 }
-
-type Tool = {
-  definition: Anthropic.Tool;
-  schema: z.ZodType;
-  dangerous: boolean; // ask for confirmation first
-  run: (input: any) => Promise<string>;
-};
-
-export const tools: Record<string, Tool> = {
-  list_files: {
-    definition: {
-      name: "list_files",
-      description: "List files and folders at a relative path.",
-      input_schema: {
-        type: "object",
-        properties: { path: { type: "string", description: "For example, src" } },
-        required: ["path"],
-      },
-    },
-    schema: z.object({ path: z.string() }),
-    dangerous: false,
-    async run({ path: p }) {
-      const entries = await readdir(safePath(p), { withFileTypes: true });
-      return entries
-        .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
-        .join("\n");
-    },
-  },
-
-  read_file: {
-    definition: {
-      name: "read_file",
-      description: "Read a whole text file.",
-      input_schema: {
-        type: "object",
-        properties: { path: { type: "string" } },
-        required: ["path"],
-      },
-    },
-    schema: z.object({ path: z.string() }),
-    dangerous: false,
-    async run({ path: p }) {
-      const text = await readFile(safePath(p), "utf8");
-      return text.length > 50_000 ? text.slice(0, 50_000) + "\n…(truncated)" : text;
-    },
-  },
-
-  write_file: {
-    definition: {
-      name: "write_file",
-      description: "Create or overwrite a file. Replaces the whole file.",
-      input_schema: {
-        type: "object",
-        properties: {
-          path: { type: "string" },
-          content: { type: "string" },
-        },
-        required: ["path", "content"],
-      },
-    },
-    schema: z.object({ path: z.string(), content: z.string() }),
-    dangerous: true,
-    async run({ path: p, content }) {
-      await writeFile(safePath(p), content);
-      return `wrote ${content.length} characters to ${p}`;
-    },
-  },
-
-  run_command: {
-    definition: {
-      name: "run_command",
-      description:
-        "Run a shell command in the working folder. Returns stdout, stderr and the exit code.",
-      input_schema: {
-        type: "object",
-        properties: { command: { type: "string" } },
-        required: ["command"],
-      },
-    },
-    schema: z.object({ command: z.string() }),
-    dangerous: true,
-    async run({ command }) {
-      const proc = Bun.spawn(["bash", "-c", command], {
-        cwd: ROOT,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const timer = setTimeout(() => proc.kill(), 60_000);
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const code = await proc.exited;
-      clearTimeout(timer);
-      return `exit ${code}\n--- stdout\n${stdout.slice(-20_000)}\n--- stderr\n${stderr.slice(-5_000)}`;
-    },
-  },
-};
 ```
 
 A few choices here matter.
@@ -193,98 +107,25 @@ A few choices here matter.
 
 ## Step 2. The loop
 
+The loop in `agent.ts` is short. Send the history together with the tool list, append the reply to the history, and while the model asks for tools, run them and go again:
+
 ```ts
-// agent.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
-import { ROOT, tools } from "./tools";
+for (let step = 0; step < MAX_STEPS; step++) {
+  const reply = await client.messages
+    .stream({ model: "claude-opus-5-5", max_tokens: 32000, system, tools: definitions, messages })
+    .finalMessage();
+  messages.push({ role: "assistant", content: reply.content });
 
-const client = new Anthropic();
-const rl = createInterface({ input: process.stdin, output: process.stdout });
+  if (reply.stop_reason !== "tool_use") return; // the agent's turn is over
 
-const system = `You are a coding agent. Working folder: ${ROOT}.
-Look at the files before acting. Check your work by running commands.
-When the task is done, briefly describe what you did.`;
-
-const messages: Anthropic.MessageParam[] = [];
-const MAX_STEPS = 30;
-
-async function runTool(block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
-  const tool = tools[block.name];
-  const fail = (text: string): Anthropic.ToolResultBlockParam => ({
-    type: "tool_result",
-    tool_use_id: block.id,
-    content: text,
-    is_error: true,
-  });
-
-  if (!tool) return fail(`no tool named ${block.name}`);
-
-  const parsed = tool.schema.safeParse(block.input);
-  if (!parsed.success) return fail(`invalid arguments: ${parsed.error.message}`);
-
-  console.log(`\n🔧 ${block.name} ${JSON.stringify(parsed.data).slice(0, 200)}`);
-
-  if (tool.dangerous) {
-    const answer = await rl.question("   run it? [y/N] ");
-    if (answer.trim().toLowerCase() !== "y") {
-      return fail("the user declined this call");
-    }
-  }
-
-  try {
-    const output = await tool.run(parsed.data);
-    return { type: "tool_result", tool_use_id: block.id, content: output };
-  } catch (err) {
-    return fail(String(err));
-  }
+  const calls = reply.content.filter((b) => b.type === "tool_use");
+  const results = [];
+  for (const call of calls) results.push(await runTool(call));
+  messages.push({ role: "user", content: results }); // all results in one message
 }
-
-async function agentTurn() {
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const stream = client.messages.stream({
-      model: "claude-opus-5-5",
-      max_tokens: 32000,
-      output_config: { effort: "medium" },
-      system,
-      tools: Object.values(tools).map((t) => t.definition),
-      messages,
-    });
-    stream.on("text", (delta) => process.stdout.write(delta));
-    const reply = await stream.finalMessage();
-
-    messages.push({ role: "assistant", content: reply.content });
-
-    if (reply.stop_reason === "tool_use") {
-      const calls = reply.content.filter(
-        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-      );
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const call of calls) results.push(await runTool(call));
-      // All results go in one message
-      messages.push({ role: "user", content: results });
-      continue;
-    }
-
-    if (reply.stop_reason === "max_tokens") {
-      console.log("\n[the reply hit max_tokens]");
-    } else if (reply.stop_reason === "refusal") {
-      console.log("\n[the model declined to continue]");
-    }
-    return;
-  }
-  console.log(`\n[stopped after ${MAX_STEPS} steps]`);
-}
-
-while (true) {
-  const input = (await rl.question("\n> ")).trim();
-  if (!input || input === "/exit") break;
-  messages.push({ role: "user", content: input });
-  await agentTurn();
-}
-
-rl.close();
 ```
+
+`runTool` makes four checks in order: the tool exists, the arguments pass the zod schema, the user answered "y" for a dangerous tool, and the function didn't throw. If any of them fails, the model gets a `tool_result` with `is_error: true` and the error text. Outside the loop is the plain chat from the previous part: read a line, append it to `messages`, run the agent's turn.
 
 ```bash
 bun agent.ts ~/code/some-project

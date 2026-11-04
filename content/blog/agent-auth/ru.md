@@ -48,85 +48,26 @@ flowchart TD
 
 ## Учебный SSO
 
-В компании уже есть провайдер входа: Keycloak, Microsoft Entra ID, Okta, Google Workspace. Все они говорят на OAuth 2.0 и OpenID Connect и выдают токены в формате JWT. Чтобы пример запускался без них, напишем маленький провайдер на 70 строк с библиотекой [jose](https://github.com/panva/jose). Он умеет три вещи: публиковать ключ для проверки подписи, выдавать токен по имени пользователя и обменивать токены.
+В компании уже есть провайдер входа: Keycloak, Microsoft Entra ID, Okta, Google Workspace. Все они говорят на OAuth 2.0 и OpenID Connect и выдают токены в формате JWT. Чтобы пример запускался без них, напишем маленький провайдер на 70 строк с библиотекой [jose](https://github.com/panva/jose).
 
 ```bash
 bun add jose @modelcontextprotocol/server @modelcontextprotocol/client zod @anthropic-ai/sdk
 ```
 
+`idp.ts` держит пару ключей RS256 и трёх тестовых сотрудников: Игорь из продаж, Мария из разработки и Ольга из HR и руководства. Адресов у него три:
+
+- `/jwks` отдаёт публичный ключ, по нему серверы проверяют подписи;
+- `/dev-login?user=igor` выдаёт токен агента на 8 часов, это замена настоящему входу через браузер;
+- `/token` принимает токен агента и выдаёт вместо него токен для `wiki` или `db` на 5 минут.
+
+Сам токен подписывается одной цепочкой вызовов jose:
+
 ```ts
-// idp.ts — учебный провайдер входа. В компании на его месте Keycloak, Entra ID или Okta
-import { SignJWT, exportJWK, generateKeyPair, jwtVerify } from "jose";
-
-const ISSUER = "http://localhost:4000";
-const { publicKey, privateKey } = await generateKeyPair("RS256");
-const jwk = { ...(await exportJWK(publicKey)), kid: "demo", alg: "RS256" };
-
-// Группы обычно приходят из каталога сотрудников (AD, LDAP, Google Groups)
-const USERS: Record<string, { name: string; groups: string[] }> = {
-  igor: { name: "Игорь Смирнов", groups: ["sales"] },
-  maria: { name: "Мария Орлова", groups: ["engineering"] },
-  olga: { name: "Ольга Белова", groups: ["hr", "management"] },
-};
-// Какие сервисы могут получать токены
-const AUDIENCES = ["wiki", "db"];
-
-function issue(sub: string, audience: string, ttl: string) {
-  const user = USERS[sub];
-  return new SignJWT({ name: user.name, groups: user.groups })
-    .setProtectedHeader({ alg: "RS256", kid: "demo" })
-    .setIssuer(ISSUER)
-    .setSubject(sub)
-    .setAudience(audience)
-    .setIssuedAt()
-    .setExpirationTime(ttl)
-    .sign(privateKey);
-}
-
-Bun.serve({
-  port: 4000,
-  async fetch(req) {
-    const url = new URL(req.url);
-
-    if (url.pathname === "/jwks") return Response.json({ keys: [jwk] });
-
-    // Вместо настоящего входа через браузер: выдаём токен агента по имени
-    if (url.pathname === "/dev-login") {
-      const user = url.searchParams.get("user") ?? "";
-      if (!USERS[user]) return new Response("unknown user", { status: 404 });
-      return new Response(await issue(user, "company-agent", "8h"));
-    }
-
-    // Token exchange (RFC 8693): токен агента меняется на токен для конкретного сервиса
-    if (url.pathname === "/token" && req.method === "POST") {
-      const form = await req.formData();
-      if (form.get("grant_type") !== "urn:ietf:params:oauth:grant-type:token-exchange") {
-        return Response.json({ error: "unsupported_grant_type" }, { status: 400 });
-      }
-      const audience = String(form.get("audience"));
-      if (!AUDIENCES.includes(audience)) {
-        return Response.json({ error: "invalid_target" }, { status: 400 });
-      }
-      try {
-        const { payload } = await jwtVerify(String(form.get("subject_token")), publicKey, {
-          issuer: ISSUER,
-          audience: "company-agent",
-        });
-        return Response.json({
-          access_token: await issue(payload.sub as string, audience, "5m"),
-          issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
-          token_type: "Bearer",
-          expires_in: 300,
-        });
-      } catch {
-        return Response.json({ error: "invalid_grant" }, { status: 400 });
-      }
-    }
-
-    return new Response("not found", { status: 404 });
-  },
-});
-console.log(`IdP на ${ISSUER}`);
+new SignJWT({ name: user.name, groups: user.groups })
+  .setProtectedHeader({ alg: "RS256", kid: "demo" })
+  .setIssuer(ISSUER).setSubject(sub).setAudience(audience)
+  .setIssuedAt().setExpirationTime(ttl)
+  .sign(privateKey);
 ```
 
 В токене три поля, на которых держится всё остальное:
@@ -158,66 +99,29 @@ console.log(`IdP на ${ISSUER}`);
 }
 ```
 
-В `mcp.ts` добавляются две функции. Первая меняет токен и кеширует результат, пока он не начнёт истекать:
+В `mcp.ts` добавляются две функции. Первая, `tokenFor`, меняет токен у провайдера и кеширует результат, пока он не начнёт истекать. Сам обмен это один POST-запрос:
 
 ```ts
-const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
-
-// Меняет токен сотрудника на короткий токен для одного сервиса и кеширует его
-function tokenFor(userToken: string, audience: string) {
-  let cached: { token: string; expires: number } | undefined;
-  return async () => {
-    if (cached && cached.expires > Date.now() + 30_000) return cached.token;
-    const res = await fetch(`${ISSUER}/token`, {
-      method: "POST",
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        subject_token: userToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
-        audience,
-      }),
-    });
-    if (!res.ok) throw new Error(`token exchange для ${audience}: ${res.status}`);
-    const body = (await res.json()) as { access_token: string; expires_in: number };
-    cached = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
-    return cached.token;
-  };
-}
+const res = await fetch(`${ISSUER}/token`, {
+  method: "POST",
+  body: new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+    subject_token: userToken,
+    subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+    audience, // "wiki" или "db"
+  }),
+});
+const { access_token, expires_in } = await res.json();
 ```
 
 Вторая выбирает транспорт. Для HTTP-серверов передаём `authProvider`: транспорт вызывает его перед каждым запросом и кладёт токен в заголовок `Authorization`:
 
 ```ts
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-
-type StdioConfig = { command: string; args?: string[]; env?: Record<string, string> };
-type HttpConfig = { url: string; audience: string };
-type ServerConfig = StdioConfig | HttpConfig;
-
-function transportFor(params: ServerConfig, userToken: string) {
-  if ("command" in params) return new StdioClientTransport({ ...params, stderr: "inherit" });
-  const getToken = tokenFor(userToken, params.audience);
-  // Транспорт спрашивает токен перед каждым запросом: он свежий, даже если сессия агента длится часами
-  return new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: getToken } });
-}
+new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: tokenFor(userToken, params.audience) } });
 ```
 
-`connectMcp` из части 4 почти не меняется: принимает токен сотрудника вторым аргументом и создаёт транспорт через `transportFor`:
+`connectMcp` из части 4 почти не меняется: принимает токен сотрудника вторым аргументом и создаёт транспорт через `transportFor`.
 
-```ts
-export async function connectMcp(config: Record<string, ServerConfig>, userToken: string) {
-  // ...
-  for (const [serverName, params] of Object.entries(config)) {
-    // auto: говорим по ревизии 2026-07-28, а со старыми серверами по протоколу 2025 года
-    const client = new Client(
-      { name: "company-agent", version: "1.0.0" },
-      { versionNegotiation: { mode: "auto" } },
-    );
-    await client.connect(transportFor(params, userToken));
-    // ... дальше как раньше: listTools и обёртки для модели
-  }
-}
-```
 
 Stdio-серверы остаются для локальных инструментов без данных компании. Всё, что отдаёт данные с правами, ходит по HTTP с токеном.
 
@@ -226,57 +130,22 @@ Stdio-серверы остаются для локальных инструме
 Обоим серверам нужно одно и то же: достать токен из заголовка, проверить подпись по публичному ключу провайдера, издателя, срок и адресата. Выносим это в `auth.ts`:
 
 ```ts
-// auth.ts
-import { type AuthInfo, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
-import { createRemoteJWKSet, jwtVerify } from "jose";
-
-const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
-const jwks = createRemoteJWKSet(new URL(`${ISSUER}/jwks`));
-
-export type User = { id: string; groups: string[] };
-
-// Защита MCP-сервера как ресурса OAuth: проверка токена и метаданные ресурса (RFC 9728)
-export function protectedResource(origin: string, audience: string) {
-  const resource = `${origin}/mcp`;
-  const metadataPath = "/.well-known/oauth-protected-resource/mcp";
-
-  // Проверяет подпись, издателя, срок и, главное, audience: токен выдан именно этому сервису
-  const gate = requireBearerAuth({
-    resourceMetadataUrl: `${origin}${metadataPath}`,
-    verifier: {
-      async verifyAccessToken(token): Promise<AuthInfo> {
-        try {
-          const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
-          return {
-            token,
-            clientId: payload.sub as string,
-            scopes: [],
-            expiresAt: payload.exp,
-            extra: { groups: (payload.groups as string[]) ?? [] },
-          };
-        } catch {
-          throw new OAuthError(OAuthErrorCode.InvalidToken, "токен не подходит этому сервису");
-        }
-      },
+const gate = requireBearerAuth({
+  resourceMetadataUrl: `${origin}/.well-known/oauth-protected-resource/mcp`,
+  verifier: {
+    async verifyAccessToken(token) {
+      try {
+        const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
+        return { token, clientId: payload.sub, scopes: [], expiresAt: payload.exp, extra: { groups: payload.groups } };
+      } catch {
+        throw new OAuthError(OAuthErrorCode.InvalidToken, "токен не подходит этому сервису");
+      }
     },
-  });
-
-  return {
-    gate,
-    metadataPath,
-    metadata: () => Response.json({ resource, authorization_servers: [ISSUER] }),
-  };
-}
-
-export function userOf(auth: AuthInfo | undefined): User {
-  if (!auth) throw new Error("запрос без проверенного токена");
-  return { id: auth.clientId, groups: (auth.extra?.groups as string[]) ?? [] };
-}
-
-export function auditLog(user: User, tool: string, args: unknown) {
-  console.error(`[audit] ${new Date().toISOString()} ${user.id} ${tool} ${JSON.stringify(args)}`);
-}
+  },
+});
 ```
+
+Кроме `gate` в `auth.ts` ещё две маленькие функции: `userOf` достаёт из проверенного токена логин и группы, а `auditLog` пишет в stderr, кто какой инструмент вызвал.
 
 `createRemoteJWKSet` сам скачивает и кеширует ключи провайдера, поэтому смена ключей в SSO не требует перезапуска серверов.
 
@@ -288,80 +157,23 @@ export function auditLog(user: User, tool: string, args: unknown) {
 
 Сервер вики из [части 5](/blog/ru/agent-search/) уже хранит у каждого документа поле `access` со списком групп. Теперь используем его. Главное изменение: MCP-сервер собирается заново на каждый запрос, и пользователь живёт в замыкании.
 
+Запрос `search` из части 5 получает одно дополнительное условие: документ виден, если хотя бы одна его группа доступа есть у пользователя.
+
+```sql
+WHERE chunks MATCH ?
+  AND EXISTS (SELECT 1 FROM json_each(docs.access)
+              WHERE json_each.value IN (SELECT value FROM json_each(?)))  -- группы пользователя и "all"
+```
+
+То же условие добавляется в `read`. А HTTP-обработчик собирает сервер под пользователя из проверенного токена:
+
 ```ts
-// wiki-server.ts
-import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
-import { type User, auditLog, protectedResource, userOf } from "./auth";
-
-const PORT = 3001;
-const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-const resource = protectedResource(`http://localhost:${PORT}`, "wiki");
-
-// Документ виден, если хотя бы одна его группа доступа есть у пользователя
-const VISIBLE = `EXISTS (SELECT 1 FROM json_each(docs.access)
-  WHERE json_each.value IN (SELECT value FROM json_each(?)))`;
-
-// Сервер собирается на каждый запрос, и пользователь живёт в замыкании:
-// инструменты физически не могут выдать чужие документы
-function buildServer(user: User) {
-  const groups = JSON.stringify(["all", ...user.groups]);
-  const server = new McpServer({ name: "wiki", version: "2.0.0" });
-
-  server.registerTool(
-    "search",
-    { /* описание и схема как в части 5 */ },
-    async ({ query, limit }) => {
-      auditLog(user, "search", { query });
-      // ... тот же запрос к FTS5, только с условием видимости
-      const rows = db
-        .query(
-          `SELECT chunks.path, chunks.title, chunks.heading,
-                  snippet(chunks, 3, '«', '»', '…', 32) AS snippet
-           FROM chunks JOIN docs ON docs.path = chunks.path
-           WHERE chunks MATCH ? AND ${VISIBLE}
-           ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
-        )
-        .all(toFtsQuery(query), groups, limit);
-      // ... форматирование как раньше
-    },
-  );
-
-  server.registerTool(
-    "read",
-    { /* как в части 5 */ },
-    async ({ path }) => {
-      auditLog(user, "read", { path });
-      const doc = db
-        .query(`SELECT title, body FROM docs WHERE path = ? AND ${VISIBLE}`)
-        .get(path, groups) as { title: string; body: string } | null;
-      // Одинаковый ответ для «нет такого» и «нет доступа»: не выдаём сам факт существования
-      if (!doc) return { isError: true, content: [{ type: "text", text: `Нет документа ${path}` }] };
-      return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
-    },
-  );
-
-  return server;
-}
-
-// Сервер собирается на каждый запрос из того, кто пришёл с токеном
 const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
 
-Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === resource.metadataPath) return resource.metadata();
-    if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-
-    // Без подходящего токена: 401 со ссылкой на метаданные, откуда клиент узнает, где взять токен
-    const auth = await resource.gate(req);
-    if (auth instanceof Response) return auth;
-    return handler.fetch(req, { authInfo: auth });
-  },
-});
-console.error(`wiki MCP на http://localhost:${PORT}/mcp`);
+// в Bun.serve, на адресе /mcp
+const auth = await resource.gate(req);
+if (auth instanceof Response) return auth; // 401 без подходящего токена
+return handler.fetch(req, { authInfo: auth });
 ```
 
 Три детали здесь важнее, чем кажется.
@@ -380,21 +192,11 @@ console.error(`wiki MCP на http://localhost:${PORT}/mcp`);
 
 Правила в демо такие: менеджер видит свои сделки, руководство и HR видят все. Колонку `salary` видит только HR.
 
-```sql
--- rls.sql
--- Таблицы как в демо-базе, но у сотрудников и сделок есть логин из SSO
-CREATE TABLE employees (
-  id serial PRIMARY KEY, login text UNIQUE, name text,
-  department text, position text, salary integer
-);
-CREATE TABLE deals (
-  id serial PRIMARY KEY, client text, owner_login text REFERENCES employees(login),
-  amount integer, stage text, closed_at date
-);
+Таблицы те же, что в демо-базе, только у сотрудников и сделок есть логин из SSO. Главное в `rls.sql` это роли и политика:
 
--- Роли для чтения. Агент подключается под agent или agent_hr и на время запроса
--- переключается в reader или hr_reader. INHERIT FALSE: без SET ROLE прав нет.
--- Каждый логин может стать только «своей» ролью, и никакой другой
+```sql
+-- Роли для чтения. Агент переключается в них на время запроса.
+-- INHERIT FALSE: без SET ROLE прав нет
 CREATE ROLE reader NOLOGIN;
 CREATE ROLE hr_reader NOLOGIN IN ROLE reader;
 GRANT reader TO agent WITH INHERIT FALSE;
@@ -405,27 +207,14 @@ GRANT SELECT (id, login, name, department, position) ON employees TO reader;
 GRANT SELECT ON employees TO hr_reader;
 GRANT SELECT ON deals TO reader;
 
--- Кто спрашивает. Писать сюда могут только логины агента, читать никто
-CREATE TABLE request_context (
-  tx xid8 PRIMARY KEY, login text NOT NULL, groups text[] NOT NULL
-);
-REVOKE ALL ON request_context FROM PUBLIC;
-GRANT INSERT ON request_context TO agent, agent_hr;
-
--- Политики читают контекст текущей транзакции через функции с правами владельца
-CREATE FUNCTION app_user() RETURNS text
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-  AS $$ SELECT login FROM request_context WHERE tx = pg_current_xact_id() $$;
-CREATE FUNCTION app_groups() RETURNS text[]
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-  AS $$ SELECT groups FROM request_context WHERE tx = pg_current_xact_id() $$;
-
--- Строки: менеджер видит свои сделки, руководство и HR все
+-- Менеджер видит свои сделки, руководство и HR все
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY deals_visible ON deals FOR SELECT USING (
   owner_login = app_user() OR app_groups() && ARRAY['management', 'hr']
 );
 ```
+
+`app_user()` и `app_groups()` читают, кто спрашивает, из таблицы `request_context`. Почему из таблицы, объясню ниже.
 
 Логины `agent` и `agent_hr` создаются заранее, с паролями и без каких-либо прав на таблицы. Зачем их два, объясню ниже: это вторая дыра, которую мы нашли.
 
@@ -441,36 +230,19 @@ SELECT (SELECT * FROM x), (SELECT count(*) FROM deals)
 Теперь код, который выполняет запрос модели:
 
 ```ts
-// pg.ts
-import { SQL } from "bun";
-import type { User } from "./auth";
-
-// Два пула: обычный и для HR. Логин agent может стать только reader,
-// поэтому запрос сотрудника не сможет переключиться в hr_reader
-const pools = {
-  reader: new SQL(process.env.DATABASE_URL ?? "postgres://agent:agent@localhost/company"),
-  hr_reader: new SQL(process.env.DATABASE_URL_HR ?? "postgres://agent_hr:agent_hr@localhost/company"),
-};
-
-export async function queryAs(user: User, query: string) {
-  const role = user.groups.includes("hr") ? "hr_reader" : "reader";
-  const conn = await pools[role].reserve();
-  try {
-    await conn`BEGIN`;
-    // Записываем, кто спрашивает, пока у нас ещё права логина агента
-    await conn`INSERT INTO request_context (tx, login, groups)
-      VALUES (pg_current_xact_id(), ${user.id}, string_to_array(${user.groups.join(",")}, ','))`;
-    // Дальше только чтение и только права сотрудника
-    await conn`SET TRANSACTION READ ONLY`;
-    await conn.unsafe(`SET LOCAL ROLE ${role}`);
-    await conn`SET LOCAL statement_timeout = '5s'`;
-    // Пустой массив параметров включает extended protocol: ровно один оператор
-    return await conn.unsafe(query, []);
-  } finally {
-    // Ничего не фиксируем: строка контекста исчезает вместе с транзакцией
-    await conn`ROLLBACK`;
-    conn.release();
-  }
+// pool выбирается по группам: логин agent для всех, agent_hr для HR
+const conn = await pool.reserve();
+try {
+  await conn`BEGIN`;
+  await conn`INSERT INTO request_context (tx, login, groups)
+    VALUES (pg_current_xact_id(), ${user.id}, ${user.groups})`;
+  await conn`SET TRANSACTION READ ONLY`;
+  await conn.unsafe(`SET LOCAL ROLE ${role}`);
+  await conn`SET LOCAL statement_timeout = '5s'`;
+  return await conn.unsafe(query, []); // пустые параметры: ровно один оператор
+} finally {
+  await conn`ROLLBACK`; // контекст исчезает вместе с транзакцией
+  conn.release();
 }
 ```
 
@@ -502,80 +274,7 @@ SELECT set_config('role', 'hr_reader', true),
 
 Сам сервер базы устроен как вики: HTTP, проверка токена с адресатом `db`, сервер на каждый запрос.
 
-```ts
-// db-server.ts
-import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
-import { z } from "zod";
-import { type User, auditLog, protectedResource, userOf } from "./auth";
-import { queryAs } from "./pg";
-
-const PORT = 3002;
-const MAX_ROWS = 200;
-const resource = protectedResource(`http://localhost:${PORT}`, "db");
-
-const DOCS = `Таблицы базы компании (PostgreSQL):
-
-employees — сотрудники: id, login, name, department (отдел), position,
-  salary (оклад в рублях, доступен только HR)
-deals — сделки: id, client, owner_login → employees.login (менеджер),
-  amount (сумма в рублях), stage (lead | negotiation | won | lost), closed_at (date)
-
-Права проверяет база: строки и колонки, которые сотруднику не положены,
-вернутся пустыми или с ошибкой permission denied. Это не сбой, а ответ.`;
-
-function buildServer(user: User) {
-  const server = new McpServer({ name: "company-db", version: "2.0.0" });
-
-  server.registerTool(
-    "describe_schema",
-    {
-      description: "Описание таблиц и колонок базы компании. Вызывай перед первым запросом.",
-      annotations: { readOnlyHint: true },
-    },
-    async () => ({ content: [{ type: "text", text: DOCS }] }),
-  );
-
-  server.registerTool(
-    "query",
-    {
-      description: `Выполнить один SELECT к базе компании с правами текущего сотрудника. Вернёт до ${MAX_ROWS} строк в JSON.`,
-      inputSchema: z.object({ sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ sql }) => {
-      auditLog(user, "query", { sql });
-      try {
-        const rows = await queryAs(user, sql);
-        const shown = rows.slice(0, MAX_ROWS);
-        const note = rows.length > MAX_ROWS ? `\n(показано ${MAX_ROWS} из ${rows.length})` : "";
-        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: String(err) }] };
-      }
-    },
-  );
-
-  return server;
-}
-
-// Сервер собирается на каждый запрос из того, кто пришёл с токеном
-const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
-
-Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === resource.metadataPath) return resource.metadata();
-    if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-
-    // Без подходящего токена: 401 со ссылкой на метаданные, откуда клиент узнает, где взять токен
-    const auth = await resource.gate(req);
-    if (auth instanceof Response) return auth;
-    return handler.fetch(req, { authInfo: auth });
-  },
-});
-console.error(`db MCP на http://localhost:${PORT}/mcp`);
-```
+Инструменты те же два, `describe_schema` и `query`, только `query` теперь вызывает `queryAs(user, sql)`. В описании схемы появилась последняя фраза: «Права проверяет база: строки и колонки, которые сотруднику не положены, вернутся пустыми или с ошибкой permission denied. Это не сбой, а ответ».
 
 Обратите внимание на последнюю фразу в описании схемы. Без неё модель, получив permission denied, начинает перебирать варианты запроса, пытаясь «починить ошибку». С ней она понимает, что это ответ, и говорит сотруднику, что данные ему недоступны.
 
@@ -585,26 +284,7 @@ console.error(`db MCP на http://localhost:${PORT}/mcp`);
 
 В `agent.ts` меняется начало: агент получает токен сотрудника и передаёт его в `connectMcp`. Пока токен берём из переменной окружения, а в части про интерфейс его будет передавать бот или веб-чат после входа через SSO.
 
-```ts
-import Anthropic from "@anthropic-ai/sdk";
-import { decodeJwt } from "jose";
-import { connectMcp } from "./mcp";
-
-// Токен сотрудника после входа через SSO. Пока берём из переменной окружения,
-// в части про интерфейс его будет передавать бот или веб-чат
-const userToken = process.env.USER_TOKEN;
-if (!userToken) throw new Error("нет USER_TOKEN: войдите через SSO");
-const me = decodeJwt(userToken) as { sub: string; name: string };
-
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json(), userToken);
-
-const system = `Ты ассистент сотрудников компании. Отвечаешь на вопросы по данным компании,
-используя инструменты. Не выдумывай цифры: всё, что называешь, должно прийти из инструментов.
-Если данных не хватает, так и скажи. Отвечай кратко, в конце укажи, откуда данные.
-Сейчас с тобой говорит ${me.name} (логин ${me.sub}). Инструменты работают с его правами:
-если что-то не нашлось или доступ запрещён, скажи об этом прямо и не пытайся обойти.`;
-```
+Имя сотрудника агент берёт из того же токена через `decodeJwt`, и в системный промпт добавляются две строки: «Сейчас с тобой говорит Игорь Смирнов (логин igor). Инструменты работают с его правами: если что-то не нашлось или доступ запрещён, скажи об этом прямо и не пытайся обойти».
 
 `decodeJwt` не проверяет подпись, и здесь это нормально: имя нужно только для вежливости в промпте. Права проверяют серверы, каждый своим ключом. Если кто-то подсунет агенту поддельный токен с чужим именем, обмен на токены сервисов не пройдёт.
 

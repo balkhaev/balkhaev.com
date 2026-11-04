@@ -38,69 +38,19 @@ What this buys us:
 
 To keep everything runnable without real infrastructure we use SQLite, which is built into Bun. Three tables: employees, clients and deals. In a real company this is Postgres or ClickHouse, and the server code barely changes.
 
-```ts
-// seed.ts
-import { Database } from "bun:sqlite";
+`seed.ts` creates these tables and fills them: five employees with salaries, five clients from different regions and 60 deals from July to October 2026 with random amounts and stages. Only the table layout matters here:
 
-const db = new Database("company.db");
-db.exec(`
-  DROP TABLE IF EXISTS deals; DROP TABLE IF EXISTS clients; DROP TABLE IF EXISTS employees;
-  CREATE TABLE employees (
-    id INTEGER PRIMARY KEY, name TEXT, department TEXT, position TEXT, salary INTEGER
-  );
-  CREATE TABLE clients (
-    id INTEGER PRIMARY KEY, name TEXT, region TEXT, industry TEXT
-  );
-  CREATE TABLE deals (
-    id INTEGER PRIMARY KEY,
-    client_id INTEGER REFERENCES clients(id),
-    owner_id INTEGER REFERENCES employees(id),
-    amount INTEGER,           -- in dollars
-    stage TEXT,               -- lead | negotiation | won | lost
-    closed_at TEXT            -- close date, YYYY-MM-DD, NULL while open
-  );
-`);
-
-const employees = [
-  ["Anna Peters", "Sales", "Head of sales", 9500],
-  ["Ian Smith", "Sales", "Account manager", 5500],
-  ["Oliver Kim", "Sales", "Account manager", 5200],
-  ["Maria Orlova", "Engineering", "Team lead", 11000],
-  ["Dennis Wolf", "Engineering", "Backend developer", 8500],
-];
-for (const e of employees) {
-  db.run("INSERT INTO employees (name, department, position, salary) VALUES (?, ?, ?, ?)", e);
-}
-
-const clients = [
-  ["Northern Steel Service", "North-West", "Manufacturing"],
-  ["Fresh Corner", "Capital", "Retail"],
-  ["TransLogistics", "Central", "Logistics"],
-  ["MedTech", "Capital", "Healthcare"],
-  ["Lakeside Tours", "East", "Tourism"],
-];
-for (const c of clients) {
-  db.run("INSERT INTO clients (name, region, industry) VALUES (?, ?, ?)", c);
-}
-
-// A deterministic generator, so everyone gets the same data
-let seed = 42;
-const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
-const stages = ["lead", "negotiation", "won", "won", "lost"];
-for (let i = 0; i < 60; i++) {
-  const stage = stages[Math.floor(rand() * stages.length)];
-  const month = 7 + Math.floor(rand() * 4); // July to October
-  const day = 1 + Math.floor(rand() * 28);
-  const closed =
-    stage === "won" || stage === "lost"
-      ? `2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-      : null;
-  db.run(
-    "INSERT INTO deals (client_id, owner_id, amount, stage, closed_at) VALUES (?, ?, ?, ?, ?)",
-    [1 + Math.floor(rand() * 5), 1 + Math.floor(rand() * 3), 1_000 * (1 + Math.floor(rand() * 40)), stage, closed],
-  );
-}
-console.log("company.db is ready");
+```sql
+CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT, department TEXT, position TEXT, salary INTEGER);
+CREATE TABLE clients   (id INTEGER PRIMARY KEY, name TEXT, region TEXT, industry TEXT);
+CREATE TABLE deals (
+  id INTEGER PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id),
+  owner_id  INTEGER REFERENCES employees(id),
+  amount INTEGER,  -- in roubles
+  stage TEXT,      -- lead | negotiation | won | lost
+  closed_at TEXT   -- YYYY-MM-DD, NULL for open deals
+);
 ```
 
 ```bash
@@ -112,72 +62,30 @@ bun seed.ts
 
 The server offers two tools: `describe_schema` returns a description of the tables, `query` runs a single `SELECT`.
 
+Most of `db-server.ts` is registering the `query` tool:
+
 ```ts
-// db-server.ts
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
+const db = new Database("company.db", { readonly: true });
 
-// Read-only: even if the model sends a DELETE, the database will not run it
-const db = new Database(process.env.DB_PATH ?? "company.db", { readonly: true });
-const MAX_ROWS = 200;
-
-// Column descriptions matter more than the names: they are how the model understands the data
-const DOCS = `Company database tables:
-
-employees: id, name, department, position, salary (monthly, in dollars)
-clients: id, name, region, industry
-deals: id, client_id → clients.id, owner_id → employees.id (account manager),
-  amount (in dollars), stage (lead | negotiation | won | lost),
-  closed_at (close date YYYY-MM-DD, NULL for open deals)
-
-SQLite dialect. Month of a date: strftime('%Y-%m', closed_at).`;
-
-function buildServer() {
-  const server = new McpServer({ name: "company-db", version: "1.0.0" });
-
-  server.registerTool(
-    "describe_schema",
-    {
-      description: "Describes the tables and columns of the company database. Call it before the first query.",
-      annotations: { readOnlyHint: true },
-    },
-    async () => ({ content: [{ type: "text", text: DOCS }] }),
-  );
-
-  server.registerTool(
-    "query",
-    {
-      description: `Run one SELECT against the company database (SQLite, read-only). Returns up to ${MAX_ROWS} rows as JSON.`,
-      inputSchema: z.object({ sql: z.string().describe("One SELECT or WITH ... SELECT query") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ sql }) => {
-      const text = sql.trim().replace(/;$/, "");
-      if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: "Only a single SELECT query is allowed" }],
-        };
-      }
-      try {
-        const rows = db.query(text).all();
-        const shown = rows.slice(0, MAX_ROWS);
-        const note = rows.length > MAX_ROWS ? `\n(showing ${MAX_ROWS} of ${rows.length})` : "";
-        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: String(err) }] };
-      }
-    },
-  );
-
-  return server;
-}
-
-// One server per connection: serveStdio calls the factory when the agent starts the process
-serveStdio(buildServer);
+server.registerTool(
+  "query",
+  {
+    description: "Run one SELECT against the company database (SQLite, read-only). Returns up to 200 rows as JSON.",
+    inputSchema: z.object({ sql: z.string() }),
+    annotations: { readOnlyHint: true },
+  },
+  async ({ sql }) => {
+    try {
+      const rows = db.query(sql).all();
+      return { content: [{ type: "text", text: JSON.stringify(rows.slice(0, 200)) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text", text: String(err) }] };
+    }
+  },
+);
 ```
+
+`describe_schema` is registered the same way and returns hand-written text: what each column means, what units the amounts are in, which stages exist. The server is built in a `buildServer()` function and started with one line, `serveStdio(buildServer)`.
 
 Why it is built this way.
 
@@ -215,81 +123,28 @@ Now we teach the agent to connect to servers. The server list lives in `mcp.json
 
 The client connects to every server, fetches its tool list and turns each tool into the same `Tool` shape our local tools had. Export the `Tool` type from the previous part's `tools.ts`.
 
+The core of `mcp.ts` is these few lines for every server in the config:
+
 ```ts
-// mcp.ts
-import type Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@modelcontextprotocol/client";
-import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { z } from "zod";
-import type { Tool } from "./tools";
+const client = new Client({ name: "company-agent", version: "1.0.0" }, { versionNegotiation: { mode: "auto" } });
+await client.connect(new StdioClientTransport(params));
 
-type ServerConfig = { command: string; args?: string[]; env?: Record<string, string> };
-
-// Connects to every server in the config and turns its tools
-// into the same shape as our local tools from the previous part
-export async function connectMcp(config: Record<string, ServerConfig>) {
-  const tools: Record<string, Tool> = {};
-  const clients: Client[] = [];
-
-  for (const [serverName, params] of Object.entries(config)) {
-    // auto: speak the 2026-07-28 revision, fall back to the 2025 protocol for older servers
-    const client = new Client(
-      { name: "company-agent", version: "1.0.0" },
-      { versionNegotiation: { mode: "auto" } },
-    );
-    await client.connect(new StdioClientTransport({ ...params, stderr: "inherit" }));
-    clients.push(client);
-
-    const { tools: list } = await client.listTools();
-    for (const tool of list) {
-      const name = `${serverName}__${tool.name}`; // db__query, wiki__search
-      tools[name] = {
-        definition: {
-          name,
-          description: tool.description ?? "",
-          input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
-        },
-        // The server validates arguments against its own schema
-        schema: z.record(z.string(), z.unknown()),
-        // Anything the server did not mark read-only needs confirmation
-        dangerous: tool.annotations?.readOnlyHint !== true,
-        async run(input) {
-          const result = await client.callTool({ name: tool.name, arguments: input });
-          const text = (result.content as { type: string; text?: string }[])
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("\n");
-          if (result.isError) throw new Error(text);
-          return text;
-        },
-      };
-    }
-    console.log(`MCP ${serverName}: ${list.map((t) => t.name).join(", ")}`);
-  }
-
-  return { tools, close: () => Promise.all(clients.map((c) => c.close())) };
+const { tools: list } = await client.listTools();
+for (const tool of list) {
+  tools[`${serverName}__${tool.name}`] = {
+    definition: { name: `${serverName}__${tool.name}`, description: tool.description, input_schema: tool.inputSchema },
+    dangerous: tool.annotations?.readOnlyHint !== true,
+    run: (input) => client.callTool({ name: tool.name, arguments: input }),
+  };
 }
 ```
 
+In the real file `run` also joins the text parts of the result into one string and throws when the server returns `isError`, and `runTool` from the previous part turns that into an error `tool_result`.
+
 Tool names get the server as a prefix: `db__query`, `wiki__search`. Without it, two servers that both have a `search` tool would collide.
 
-In `agent.ts` only the top changes: the tools now come from MCP and the system prompt is about the company. `runTool` and `agentTurn` stay as in the previous part. Add `await mcp.close()` at the end of the file so the server child processes exit with the agent.
+In `agent.ts` only the top changes: the tools now come from `connectMcp(mcp.json)`, and the system prompt is about the company: answer from tool data, never invent numbers, say so when data is missing, and name the source at the end. `runTool` and `agentTurn` stay as in the previous part. Add `await mcp.close()` at the end of the file so the server child processes exit with the agent.
 
-```ts
-// agent.ts, the top
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
-import { connectMcp } from "./mcp";
-
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json());
-const tools = mcp.tools;
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-const system = `You are an assistant for the company's employees. You answer questions about company data
-using tools. Never make numbers up: everything you state must come from a tool.
-If the data is not enough, say so. Keep answers short and end with where the data came from.`;
-```
 
 The company agent does not need the file tools from the previous part. If it ever does, they can be plugged in as an MCP server too: the official `@modelcontextprotocol/server-filesystem` is one line in `mcp.json`.
 

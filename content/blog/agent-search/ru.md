@@ -47,70 +47,17 @@ access: [sales, management]
 
 ## Шаг 2. Индексация
 
-```ts
-// index.ts
-import { Database } from "bun:sqlite";
-import { readdir } from "node:fs/promises";
-import { YAML } from "bun";
+`index.ts` проходит по папке, разбирает frontmatter, режет каждый документ на фрагменты и пишет их в две таблицы: `docs` с документами целиком (для чтения) и полнотекстовую `chunks` (для поиска):
 
-const WIKI = process.argv[2] ?? "wiki";
-const MAX_CHUNK = 1500; // символов: примерно полстраницы
-
-const db = new Database("wiki.db");
-db.exec(`
-  DROP TABLE IF EXISTS docs;
-  DROP TABLE IF EXISTS chunks;
-  CREATE TABLE docs (path TEXT PRIMARY KEY, title TEXT, access TEXT, body TEXT);
-  CREATE VIRTUAL TABLE chunks USING fts5(
-    path UNINDEXED, title, heading, body,
-    tokenize = 'unicode61 remove_diacritics 2'
-  );
-`);
-
-// Режем документ по заголовкам второго уровня, длинные разделы ещё и по абзацам
-function split(body: string) {
-  const chunks: { heading: string; text: string }[] = [];
-  for (const section of body.split(/^## /m)) {
-    const [first, ...rest] = section.split("\n");
-    const heading = rest.length ? first.trim() : "";
-    const text = rest.length ? rest.join("\n") : section;
-    let current = "";
-    for (const paragraph of text.split(/\n\s*\n/)) {
-      if (current && current.length + paragraph.length > MAX_CHUNK) {
-        chunks.push({ heading, text: current.trim() });
-        current = "";
-      }
-      current += `${paragraph}\n\n`;
-    }
-    if (current.trim()) chunks.push({ heading, text: current.trim() });
-  }
-  return chunks;
-}
-
-let count = 0;
-for (const file of await readdir(WIKI)) {
-  if (!file.endsWith(".md")) continue;
-  const source = await Bun.file(`${WIKI}/${file}`).text();
-  const match = source.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) {
-    console.error(`${file}: нет frontmatter, пропускаю`);
-    continue;
-  }
-  const meta = YAML.parse(match[1]) as { title: string; access?: string[] };
-  const body = match[2];
-  db.run("INSERT INTO docs VALUES (?, ?, ?, ?)", [
-    file,
-    meta.title,
-    JSON.stringify(meta.access ?? ["all"]),
-    body,
-  ]);
-  for (const chunk of split(body)) {
-    db.run("INSERT INTO chunks VALUES (?, ?, ?, ?)", [file, meta.title, chunk.heading, chunk.text]);
-    count++;
-  }
-}
-console.log(`проиндексировано ${count} фрагментов`);
+```sql
+CREATE TABLE docs (path TEXT PRIMARY KEY, title TEXT, access TEXT, body TEXT);
+CREATE VIRTUAL TABLE chunks USING fts5(
+  path UNINDEXED, title, heading, body,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
 ```
+
+Режет он так: сначала по заголовкам `##`, а раздел длиннее 1500 символов ещё и по абзацам.
 
 ```bash
 bun index.ts wiki
@@ -124,90 +71,22 @@ bun index.ts wiki
 
 ## Шаг 3. MCP-сервер поиска
 
-```ts
-// wiki-server.ts
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
+`wiki-server.ts` устроен как сервер базы из прошлой части, только инструментов два: `search` и `read`. `read` достаёт документ из `docs` по пути. Вся работа `search` это один запрос:
 
-const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-
-// Бедный стемминг: «оплаты», «оплату», «оплатой» → оплат*
-// Полноценная морфология будет в Postgres или OpenSearch, для начала хватает и так
-function toFtsQuery(text: string) {
-  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  return words
-    .filter((w) => w.length > 2)
-    .map((w) => `"${w.length > 5 ? w.slice(0, -2) : w}"*`)
-    .join(" OR ");
-}
-
-function buildServer() {
-  const server = new McpServer({ name: "wiki", version: "1.0.0" });
-
-  server.registerTool(
-    "search",
-    {
-      description:
-        "Полнотекстовый поиск по вики компании: регламенты, договоры, разборы инцидентов. " +
-        "Возвращает фрагменты с путём к документу. Ищи короткими запросами из ключевых слов, " +
-        "переформулируй, если ничего не нашлось. Чтобы прочитать документ целиком, вызови read.",
-      inputSchema: z.object({
-        query: z.string().describe("Ключевые слова, например «суточные заграница»"),
-        limit: z.number().int().min(1).max(20).default(8),
-      }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ query, limit }) => {
-      const fts = toFtsQuery(query);
-      if (!fts) return { isError: true, content: [{ type: "text", text: "Пустой запрос" }] };
-      const rows = db
-        .query(
-          `SELECT path, title, heading,
-                  snippet(chunks, 3, '«', '»', '…', 32) AS snippet
-           FROM chunks WHERE chunks MATCH ?
-           ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
-        )
-        .all(fts, limit) as { path: string; title: string; heading: string; snippet: string }[];
-      if (!rows.length) {
-        return { content: [{ type: "text", text: "Ничего не найдено. Попробуй другие слова." }] };
-      }
-      const text = rows
-        .map((r, i) => `[${i + 1}] ${r.path} · ${r.title}${r.heading ? ` › ${r.heading}` : ""}\n${r.snippet}`)
-        .join("\n\n");
-      return { content: [{ type: "text", text }] };
-    },
-  );
-
-  server.registerTool(
-    "read",
-    {
-      description: "Прочитать документ вики целиком по пути из результатов search.",
-      inputSchema: z.object({ path: z.string().describe("Например, travel.md") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ path }) => {
-      const doc = db.query("SELECT title, body FROM docs WHERE path = ?").get(path) as
-        | { title: string; body: string }
-        | null;
-      if (!doc) return { isError: true, content: [{ type: "text", text: `Нет документа ${path}` }] };
-      return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
-    },
-  );
-
-  return server;
-}
-
-// Фабрика сервера: serveStdio вызывает её на каждое подключение агента
-serveStdio(buildServer);
+```sql
+SELECT path, title, heading, snippet(chunks, 3, '«', '»', '…', 32) AS snippet
+FROM chunks WHERE chunks MATCH ?
+ORDER BY bm25(chunks, 0, 5, 3, 1)
+LIMIT 8
 ```
+
+Перед запросом слова из вопроса приводятся к виду `"оплат"* OR "северстал"*`: у длинных слов отрезаются последние две буквы, и поиск идёт по префиксу. Описание инструмента подсказывает модели, как искать: «Ищи короткими запросами из ключевых слов, переформулируй, если ничего не нашлось. Чтобы прочитать документ целиком, вызови read».
 
 **`search` и `read` вместе.** Поиск возвращает короткие фрагменты, чтобы модель могла быстро просмотреть десяток вариантов и не потратить на это весь контекст. Если фрагмент выглядит нужным, модель открывает документ целиком через `read` и читает разделы вокруг. Человек делает то же самое: сначала смотрит выдачу, потом открывает страницу.
 
 **BM25 с весами.** `bm25(chunks, 0, 5, 3, 1)` задаёт вес каждой колонке: совпадение в названии документа в пять раз важнее совпадения в тексте, в заголовке раздела в три. Это простое правило заметно улучшает выдачу.
 
-**Морфология.** Встроенный токенизатор SQLite не знает русских окончаний: «оплата» и «оплаты» для него разные слова. Функция `toFtsQuery` обрезает длинные слова и ищет по префиксу. Это грубо, но для начала работает. В проде используйте Postgres с конфигурацией `russian` для полнотекстового поиска или OpenSearch с морфологическим анализатором.
+**Морфология.** Встроенный токенизатор SQLite не знает русских окончаний: «оплата» и «оплаты» для него разные слова. Поэтому мы обрезаем окончания длинных слов и ищем по префиксу. Это грубо, но для начала работает. В проде используйте Postgres с конфигурацией `russian` для полнотекстового поиска или OpenSearch с морфологическим анализатором.
 
 **`OR` вместо `AND`.** Запрос «условия оплаты Северсталь» находит фрагменты, где есть хотя бы одно слово, а BM25 поднимает наверх те, где совпало больше. Строгое `AND` чаще возвращает пустоту, а пустая выдача хуже длинной.
 

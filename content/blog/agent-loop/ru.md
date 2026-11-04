@@ -67,16 +67,28 @@ flowchart LR
 bun add zod
 ```
 
+Каждый инструмент в `tools.ts` это четыре вещи: описание для модели, zod-схема аргументов, флаг «опасный» и функция `run`. Вот `read_file` целиком, остальные три устроены так же:
+
 ```ts
-// tools.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { z } from "zod";
+read_file: {
+  definition: {
+    name: "read_file",
+    description: "Прочитать текстовый файл целиком.",
+    input_schema: {
+      type: "object",
+      properties: { path: { type: "string" } },
+      required: ["path"],
+    },
+  },
+  schema: z.object({ path: z.string() }),
+  dangerous: false,
+  run: async ({ path }) => (await readFile(safePath(path), "utf8")).slice(0, 50_000),
+},
+```
 
-// Агент работает только внутри этой папки
-export const ROOT = path.resolve(process.argv[2] ?? process.cwd());
+`list_files` читает папку через `readdir`, `write_file` пишет файл и помечен опасным, `run_command` запускает `bash -c` через `Bun.spawn` в рабочей папке и возвращает код выхода, stdout и stderr. Единственная функция, которую стоит показать отдельно, это `safePath`:
 
+```ts
 function safePath(p: string): string {
   const full = path.resolve(ROOT, p);
   if (full !== ROOT && !full.startsWith(ROOT + path.sep)) {
@@ -84,104 +96,6 @@ function safePath(p: string): string {
   }
   return full;
 }
-
-type Tool = {
-  definition: Anthropic.Tool;
-  schema: z.ZodType;
-  dangerous: boolean; // спрашивать ли подтверждение
-  run: (input: any) => Promise<string>;
-};
-
-export const tools: Record<string, Tool> = {
-  list_files: {
-    definition: {
-      name: "list_files",
-      description: "Список файлов и папок по относительному пути.",
-      input_schema: {
-        type: "object",
-        properties: { path: { type: "string", description: "Например, src" } },
-        required: ["path"],
-      },
-    },
-    schema: z.object({ path: z.string() }),
-    dangerous: false,
-    async run({ path: p }) {
-      const entries = await readdir(safePath(p), { withFileTypes: true });
-      return entries
-        .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
-        .join("\n");
-    },
-  },
-
-  read_file: {
-    definition: {
-      name: "read_file",
-      description: "Прочитать текстовый файл целиком.",
-      input_schema: {
-        type: "object",
-        properties: { path: { type: "string" } },
-        required: ["path"],
-      },
-    },
-    schema: z.object({ path: z.string() }),
-    dangerous: false,
-    async run({ path: p }) {
-      const text = await readFile(safePath(p), "utf8");
-      return text.length > 50_000 ? text.slice(0, 50_000) + "\n…(обрезано)" : text;
-    },
-  },
-
-  write_file: {
-    definition: {
-      name: "write_file",
-      description: "Создать или перезаписать файл. Перезаписывает целиком.",
-      input_schema: {
-        type: "object",
-        properties: {
-          path: { type: "string" },
-          content: { type: "string" },
-        },
-        required: ["path", "content"],
-      },
-    },
-    schema: z.object({ path: z.string(), content: z.string() }),
-    dangerous: true,
-    async run({ path: p, content }) {
-      await writeFile(safePath(p), content);
-      return `записано ${content.length} символов в ${p}`;
-    },
-  },
-
-  run_command: {
-    definition: {
-      name: "run_command",
-      description:
-        "Выполнить shell-команду в рабочей папке. Вернёт stdout, stderr и код выхода.",
-      input_schema: {
-        type: "object",
-        properties: { command: { type: "string" } },
-        required: ["command"],
-      },
-    },
-    schema: z.object({ command: z.string() }),
-    dangerous: true,
-    async run({ command }) {
-      const proc = Bun.spawn(["bash", "-c", command], {
-        cwd: ROOT,
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const timer = setTimeout(() => proc.kill(), 60_000);
-      const [stdout, stderr] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-      ]);
-      const code = await proc.exited;
-      clearTimeout(timer);
-      return `exit ${code}\n--- stdout\n${stdout.slice(-20_000)}\n--- stderr\n${stderr.slice(-5_000)}`;
-    },
-  },
-};
 ```
 
 Несколько решений, которые здесь важны.
@@ -193,98 +107,25 @@ export const tools: Record<string, Tool> = {
 
 ## Шаг 2. Цикл
 
+Сам цикл в `agent.ts` короткий. Отправляем историю вместе со списком инструментов, кладём ответ в историю и, пока модель просит инструменты, выполняем их и повторяем:
+
 ```ts
-// agent.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
-import { ROOT, tools } from "./tools";
+for (let step = 0; step < MAX_STEPS; step++) {
+  const reply = await client.messages
+    .stream({ model: "claude-opus-5-5", max_tokens: 32000, system, tools: definitions, messages })
+    .finalMessage();
+  messages.push({ role: "assistant", content: reply.content });
 
-const client = new Anthropic();
-const rl = createInterface({ input: process.stdin, output: process.stdout });
+  if (reply.stop_reason !== "tool_use") return; // ход агента закончен
 
-const system = `Ты агент-программист. Рабочая папка: ${ROOT}.
-Сначала изучи файлы, потом действуй. Проверяй результат командами.
-Когда задача решена, коротко опиши, что сделал.`;
-
-const messages: Anthropic.MessageParam[] = [];
-const MAX_STEPS = 30;
-
-async function runTool(block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
-  const tool = tools[block.name];
-  const fail = (text: string): Anthropic.ToolResultBlockParam => ({
-    type: "tool_result",
-    tool_use_id: block.id,
-    content: text,
-    is_error: true,
-  });
-
-  if (!tool) return fail(`нет инструмента ${block.name}`);
-
-  const parsed = tool.schema.safeParse(block.input);
-  if (!parsed.success) return fail(`неверные аргументы: ${parsed.error.message}`);
-
-  console.log(`\n🔧 ${block.name} ${JSON.stringify(parsed.data).slice(0, 200)}`);
-
-  if (tool.dangerous) {
-    const answer = await rl.question("   выполнить? [y/N] ");
-    if (answer.trim().toLowerCase() !== "y") {
-      return fail("пользователь отклонил вызов");
-    }
-  }
-
-  try {
-    const output = await tool.run(parsed.data);
-    return { type: "tool_result", tool_use_id: block.id, content: output };
-  } catch (err) {
-    return fail(String(err));
-  }
+  const calls = reply.content.filter((b) => b.type === "tool_use");
+  const results = [];
+  for (const call of calls) results.push(await runTool(call));
+  messages.push({ role: "user", content: results }); // все результаты одним сообщением
 }
-
-async function agentTurn() {
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const stream = client.messages.stream({
-      model: "claude-opus-5-5",
-      max_tokens: 32000,
-      output_config: { effort: "medium" },
-      system,
-      tools: Object.values(tools).map((t) => t.definition),
-      messages,
-    });
-    stream.on("text", (delta) => process.stdout.write(delta));
-    const reply = await stream.finalMessage();
-
-    messages.push({ role: "assistant", content: reply.content });
-
-    if (reply.stop_reason === "tool_use") {
-      const calls = reply.content.filter(
-        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-      );
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const call of calls) results.push(await runTool(call));
-      // Все результаты одним сообщением
-      messages.push({ role: "user", content: results });
-      continue;
-    }
-
-    if (reply.stop_reason === "max_tokens") {
-      console.log("\n[ответ упёрся в max_tokens]");
-    } else if (reply.stop_reason === "refusal") {
-      console.log("\n[модель отказалась продолжать]");
-    }
-    return;
-  }
-  console.log(`\n[остановлено после ${MAX_STEPS} шагов]`);
-}
-
-while (true) {
-  const input = (await rl.question("\n> ")).trim();
-  if (!input || input === "/exit") break;
-  messages.push({ role: "user", content: input });
-  await agentTurn();
-}
-
-rl.close();
 ```
+
+`runTool` делает четыре проверки по порядку: инструмент существует, аргументы проходят zod-схему, для опасного инструмента пользователь ответил «y», функция не бросила исключение. Если что-то из этого не так, модель получает `tool_result` с `is_error: true` и текстом ошибки. Снаружи цикла обычный чат из прошлой части: читаем строку, кладём в `messages`, запускаем ход агента.
 
 ```bash
 bun agent.ts ~/code/some-project
