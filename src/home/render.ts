@@ -12,6 +12,17 @@ const ENTITIES: Record<string, string> = {
 };
 const html = (text: string) =>
   text.replace(/[&<>"]/g, (char) => ENTITIES[char] ?? char);
+/** The project's one-line summary: the text before its first colon. */
+export const summary = (text: string) => text.split(":")[0]?.trim() ?? text;
+
+/** The summary of a project described in the Russian resume. */
+function summaryOf(name: string) {
+  const project = RESUMES.ru.projectGroups
+    .flatMap((group) => group.projects)
+    .find((item) => item.name === name);
+  return project ? summary(project.text) : "";
+}
+
 const SCHEME = /^https?:\/\//;
 const TRAILING_SLASH = /\/$/;
 const YEAR = /\d{4}/g;
@@ -35,14 +46,34 @@ export function latestPosts(posts: Post[], count = LATEST) {
     .slice(0, count);
 }
 
-/** Public projects from the Russian resume, except this site itself. */
-export function featuredProjects(): Project[] {
-  return RESUMES.ru.projectGroups
-    .flatMap((group) => group.projects)
-    .filter(
-      (project) => project.url && project.url !== "https://balkhaev.com/"
-    );
-}
+/** Projects Mikhail chose for the homepage, in his order. */
+export const HOME_PROJECTS: Project[] = [
+  {
+    name: "Adorely",
+    text: "Платформа AI-компаньонов: генерация фото и видео, чат и голос",
+    url: "https://adorely.co/",
+  },
+  {
+    name: "Sinly",
+    text: "Платформа AI-компаньонов на общем мультитенантном бэкенде",
+    url: "https://sinly.io/",
+  },
+  {
+    name: "Luv Club",
+    text: "AI-компаньоны со студией: фото, видео и 3D-сцены",
+    url: "https://luv.club/",
+  },
+  {
+    name: "ggpick.club",
+    text: summaryOf("ggpick.club"),
+    url: "https://ggpick.club/",
+  },
+  {
+    name: "Алтай — живая земля",
+    text: summaryOf("Алтай — живая земля"),
+    url: "https://алтайземля.рф/",
+  },
+];
 
 /** "Март 2026 – сейчас" → "2026 — н. в."; "Октябрь 2022 – август 2024" → "2022 — 2024". */
 export function years(period: string) {
@@ -52,9 +83,6 @@ export function years(period: string) {
   }
   return to && to !== from ? `${from} — ${to}` : (from ?? period);
 }
-
-/** The project's one-line summary: the text before its first colon. */
-export const summary = (text: string) => text.split(":")[0]?.trim() ?? text;
 
 const arrow = '<span aria-hidden="true" class="row-arrow">→</span>';
 
@@ -88,7 +116,7 @@ const renderProjects = (projects: Project[]) =>
           <li>
             <a class="row project-row" href="${html(project.url ?? "")}" rel="noopener noreferrer" target="_blank">
               <span class="row-title">${html(project.name)}</span>
-              <span class="row-text">${html(summary(project.text))}</span>
+              <span class="row-text">${html(project.text)}</span>
               <span class="row-side">${html(host)} <span aria-hidden="true" class="row-arrow">↗</span></span>
             </a>
           </li>`;
@@ -114,7 +142,7 @@ export function renderHome(template: string, posts: Post[]) {
   const { jobs, web } = RESUMES.ru;
   return template
     .replace("<!-- home:posts -->", renderPosts(latestPosts(posts)))
-    .replace("<!-- home:projects -->", renderProjects(featuredProjects()))
+    .replace("<!-- home:projects -->", renderProjects(HOME_PROJECTS))
     .replace(
       "<!-- home:experience -->",
       renderExperience([...jobs, ...web].slice(0, EXPERIENCE))

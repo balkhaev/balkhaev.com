@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { Post } from "../blog/content";
 import {
-  featuredProjects,
+  HOME_PROJECTS,
   latestPosts,
   renderHome,
   summary,
@@ -31,10 +31,17 @@ test("prefers the Russian version and falls back to English", () => {
   expect(picked.map((p) => `${p.slug}:${p.lang}`)).toEqual(["b:en", "a:ru"]);
 });
 
-test("features linked projects except this site", () => {
-  const urls = featuredProjects().map((project) => project.url);
-  expect(urls.length).toBeGreaterThan(2);
-  expect(urls).not.toContain("https://balkhaev.com/");
+test("lists the chosen projects with summaries", () => {
+  expect(HOME_PROJECTS.map((project) => project.url)).toEqual([
+    "https://adorely.co/",
+    "https://sinly.io/",
+    "https://luv.club/",
+    "https://ggpick.club/",
+    "https://алтайземля.рф/",
+  ]);
+  for (const project of HOME_PROJECTS) {
+    expect(project.text.length).toBeGreaterThan(10);
+  }
 });
 
 test("fills both placeholders", () => {
