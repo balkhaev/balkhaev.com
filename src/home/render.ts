@@ -84,26 +84,20 @@ export function years(period: string) {
   return to && to !== from ? `${from} — ${to}` : (from ?? period);
 }
 
-const arrow = '<span aria-hidden="true" class="row-arrow">→</span>';
-
 const renderPosts = (posts: Post[]) =>
   posts.length
     ? `<ol class="rows">${posts
         .map(
           (post) => `
-          <li>
-            <a class="row post-row" href="${blogPath(post.lang, post.slug)}"${post.lang === "ru" ? "" : ' hreflang="en" lang="en"'}>
-              <time class="row-meta" datetime="${post.date}">${shortDate(post.date)}</time>
-              <span class="row-main">
-                <span class="row-title">${html(post.title)}</span>
-                <span class="row-text">${html(post.description)}</span>
-              </span>
-              <span class="row-side">${post.minutes} мин ${arrow}</span>
-            </a>
-          </li>`
+              <li>
+                <a class="row post-row" href="${blogPath(post.lang, post.slug)}"${post.lang === "ru" ? "" : ' hreflang="en" lang="en"'}>
+                  <span class="row-title">${html(post.title)}</span>
+                  <span class="row-meta"><time datetime="${post.date}">${shortDate(post.date)}</time> · ${post.minutes} мин</span>
+                </a>
+              </li>`
         )
         .join("")}
-          </ol>`
+            </ol>`
     : '<p class="empty">Первые записи скоро появятся.</p>';
 
 const renderProjects = (projects: Project[]) =>
@@ -113,29 +107,27 @@ const renderProjects = (projects: Project[]) =>
         .replace(SCHEME, "")
         .replace(TRAILING_SLASH, "");
       return `
-          <li>
-            <a class="row project-row" href="${html(project.url ?? "")}" rel="noopener noreferrer" target="_blank">
-              <span class="row-title">${html(project.name)}</span>
-              <span class="row-text">${html(project.text)}</span>
-              <span class="row-side">${html(host)} <span aria-hidden="true" class="row-arrow">↗</span></span>
-            </a>
-          </li>`;
+              <li>
+                <a class="row project-row" href="${html(project.url ?? "")}" rel="noopener noreferrer" target="_blank" title="${html(project.text)}">
+                  <span class="row-title">${html(project.name)}</span>
+                  <span class="row-meta">${html(host)} <span aria-hidden="true" class="row-arrow">↗</span></span>
+                </a>
+              </li>`;
     })
     .join("")}
-          </ul>`;
+            </ul>`;
 
 const renderExperience = (jobs: Job[]) =>
   `<ol class="rows">${jobs
     .map(
       (job) => `
-          <li class="row job-row">
-            <span class="row-meta">${html(years(job.period))}</span>
-            <span class="row-title">${html(job.company)}</span>
-            <span class="row-text">${html(job.role)}</span>
-          </li>`
+              <li class="row job-row">
+                <span class="row-title">${html(job.company)} <span class="row-sub">${html(job.role)}</span></span>
+                <span class="row-meta">${html(years(job.period))}</span>
+              </li>`
     )
     .join("")}
-          </ol>`;
+            </ol>`;
 
 /** Fills the homepage template's placeholders with posts, projects and jobs. */
 export function renderHome(template: string, posts: Post[]) {
