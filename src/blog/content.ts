@@ -16,6 +16,10 @@ export interface Post {
   math: boolean;
   /** Rough reading time in minutes. */
   minutes: number;
+  /** Position in the series, from 1. Set together with `series`. */
+  part?: number;
+  /** Id of the series this post belongs to (a folder in content/series). */
+  series?: string;
   slug: string;
   tags: string[];
   title: string;
@@ -24,6 +28,8 @@ export interface Post {
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Folder names that would collide with blog routes. */
+const RESERVED = new Set(["ru", "series"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const WORDS_PER_MINUTE = 200;
 const WHITESPACE = /\s+/;
@@ -40,6 +46,21 @@ function text(file: string, data: Record<string, unknown>, key: string) {
   return value.trim();
 }
 
+/** `series` and `part` go together; returns both or neither. */
+function seriesFields(file: string, fields: Record<string, unknown>) {
+  const { part, series } = fields;
+  if (series === undefined && part === undefined) {
+    return {};
+  }
+  if (!(typeof series === "string" && SLUG.test(series))) {
+    fail(file, `"series" must be a series folder name`);
+  }
+  if (!(typeof part === "number" && Number.isInteger(part) && part >= 1)) {
+    fail(file, `"part" must be a whole number from 1 when "series" is set`);
+  }
+  return { part, series };
+}
+
 /**
  * Parses one post file: YAML frontmatter between `---` lines, then Markdown.
  * Throws with the file name on any missing or malformed field.
@@ -50,7 +71,7 @@ export async function parsePost(
   slug: string,
   lang: BlogLang
 ): Promise<Post> {
-  if (!(SLUG.test(slug) && slug !== "ru")) {
+  if (!(SLUG.test(slug) && !RESERVED.has(slug))) {
     fail(file, `folder name "${slug}" is not a valid slug`);
   }
   const match = FRONTMATTER.exec(source);
@@ -85,6 +106,7 @@ export async function parsePost(
     lang,
     math,
     minutes: Math.max(1, Math.round(words / WORDS_PER_MINUTE)),
+    ...seriesFields(file, fields),
     slug,
     tags,
     title: text(file, fields, "title"),
@@ -115,6 +137,113 @@ export async function loadPosts(root: string, drafts = false) {
   return posts
     .filter((post) => drafts || !post.draft)
     .sort(
-      (a, b) => b.date.localeCompare(a.date) || a.slug.localeCompare(b.slug)
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        (b.part ?? 0) - (a.part ?? 0) ||
+        a.slug.localeCompare(b.slug)
     );
+}
+
+export interface Series {
+  description: string;
+  html: string;
+  id: string;
+  lang: BlogLang;
+  /** Titles of every planned part, in order; part N is `plan[N - 1]`. */
+  plan: string[];
+  title: string;
+}
+
+/**
+ * Parses `content/series/<id>/<lang>.md`: title, description and the list of
+ * planned parts in frontmatter, an introduction in Markdown.
+ */
+export async function parseSeries(
+  file: string,
+  source: string,
+  id: string,
+  lang: BlogLang
+): Promise<Series> {
+  if (!SLUG.test(id)) {
+    fail(file, `folder name "${id}" is not a valid series id`);
+  }
+  const match = FRONTMATTER.exec(source);
+  if (!match) {
+    fail(file, "missing --- frontmatter ---");
+  }
+  const data = YAML.parse(match[1] ?? "");
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    fail(file, "frontmatter must be a mapping");
+  }
+  const fields = data as Record<string, unknown>;
+  const { plan } = fields;
+  if (
+    !(
+      Array.isArray(plan) &&
+      plan.length > 0 &&
+      plan.every((title) => typeof title === "string" && title.trim())
+    )
+  ) {
+    fail(file, `"plan" must be a list of part titles`);
+  }
+  const { html } = await renderMarkdown(match[2] ?? "", lang);
+  return {
+    description: text(file, fields, "description"),
+    html,
+    id,
+    lang,
+    plan: plan.map((title: string) => title.trim()),
+    title: text(file, fields, "title"),
+  };
+}
+
+/** Reads every `content/series/<id>/<lang>.md`. */
+export async function loadSeries(root: string) {
+  const all: Series[] = [];
+  const folders = await readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const folder of folders) {
+    if (!folder.isDirectory()) {
+      continue;
+    }
+    for (const lang of BLOG_LANGS) {
+      const file = join(root, folder.name, `${lang}.md`);
+      // biome-ignore lint/performance/noAwaitInLoops: a handful of small files
+      const source = await readFile(file, "utf8").catch(() => undefined);
+      if (source !== undefined) {
+        all.push(await parseSeries(file, source, folder.name, lang));
+      }
+    }
+  }
+  return all;
+}
+
+/** Throws if a post names a series or part that does not exist. */
+export function checkSeries(posts: Post[], series: Series[]) {
+  for (const post of posts) {
+    if (post.series === undefined) {
+      continue;
+    }
+    const own = series.find(
+      (item) => item.id === post.series && item.lang === post.lang
+    );
+    const where = `${post.lang}/${post.slug}`;
+    if (!own) {
+      throw new Error(`${where}: no ${post.lang} series "${post.series}"`);
+    }
+    if ((post.part ?? 0) > own.plan.length) {
+      throw new Error(
+        `${where}: part ${post.part} is past the plan of "${post.series}"`
+      );
+    }
+    const twin = posts.find(
+      (other) =>
+        other !== post &&
+        other.lang === post.lang &&
+        other.series === post.series &&
+        other.part === post.part
+    );
+    if (twin) {
+      throw new Error(`${where}: part ${post.part} is also ${twin.slug}`);
+    }
+  }
 }

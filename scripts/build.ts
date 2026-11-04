@@ -1,6 +1,11 @@
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { build } from "bun";
-import { BLOG_LANGS, loadPosts } from "../src/blog/content";
+import {
+  BLOG_LANGS,
+  checkSeries,
+  loadPosts,
+  loadSeries,
+} from "../src/blog/content";
 import {
   blogPath,
   blogUrls,
@@ -9,6 +14,8 @@ import {
   renderFeed,
   renderIndex,
   renderPost,
+  renderSeries,
+  seriesPath,
 } from "../src/blog/render";
 import { LANGS } from "../src/cv/content";
 import { CV_PATHS, renderCv } from "../src/cv/render";
@@ -45,11 +52,16 @@ const posts = await loadPosts(
   "content/blog",
   process.argv.includes("--drafts")
 );
+const series = await loadSeries("content/series");
+checkSeries(posts, series);
 for (const lang of BLOG_LANGS) {
-  pages.set(blogPath(lang), renderIndex(lang, posts));
+  pages.set(blogPath(lang), renderIndex(lang, posts, series));
+}
+for (const item of series) {
+  pages.set(seriesPath(item.lang, item.id), renderSeries(item, posts, series));
 }
 for (const post of posts) {
-  pages.set(blogPath(post.lang, post.slug), renderPost(post, posts));
+  pages.set(blogPath(post.lang, post.slug), renderPost(post, posts, series));
 }
 pages.set("/", renderHome(await readFile("index.html", "utf8"), posts));
 await Promise.all([...pages].map(([path, content]) => page(path, content)));
@@ -68,7 +80,7 @@ await cp("node_modules/katex/dist/fonts", `${katex}fonts`, {
   recursive: true,
 });
 
-const urls = ["/", ...Object.values(CV_PATHS), ...blogUrls(posts)];
+const urls = ["/", ...Object.values(CV_PATHS), ...blogUrls(posts, series)];
 await writeFile(
   "dist/sitemap.xml",
   `<?xml version="1.0" encoding="UTF-8"?>

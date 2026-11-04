@@ -1,4 +1,4 @@
-import { BLOG_LANGS, type BlogLang, type Post } from "./content";
+import { BLOG_LANGS, type BlogLang, type Post, type Series } from "./content";
 
 const ORIGIN = "https://balkhaev.com";
 
@@ -10,6 +10,14 @@ const LABELS: Record<
     description: string;
     empty: string;
     minutes: (count: number) => string;
+    next: string;
+    part: (part: number, total: number) => string;
+    parts: string;
+    prev: string;
+    published: (count: number, total: number) => string;
+    series: string;
+    seriesOne: string;
+    soon: string;
     switcher: string;
   }
 > = {
@@ -19,6 +27,14 @@ const LABELS: Record<
     description: "Notes on machine learning by Mikhail Balkhaev.",
     empty: "No posts yet.",
     minutes: (count) => `${count} min read`,
+    next: "Next",
+    part: (part, total) => `part ${part} of ${total}`,
+    parts: "All parts",
+    prev: "Previous",
+    published: (count, total) => `${count} of ${total} parts out`,
+    series: "Series",
+    seriesOne: "Series",
+    soon: "coming soon",
     switcher: "Language",
   },
   ru: {
@@ -27,6 +43,14 @@ const LABELS: Record<
     description: "Заметки о машинном обучении. Михаил Балхаев.",
     empty: "Постов пока нет.",
     minutes: (count) => `${count} мин чтения`,
+    next: "Дальше",
+    part: (part, total) => `часть ${part} из ${total}`,
+    parts: "Все части",
+    prev: "Назад",
+    published: (count, total) => `вышло ${count} из ${total} частей`,
+    series: "Серии",
+    seriesOne: "Серия",
+    soon: "скоро",
     switcher: "Язык",
   },
 };
@@ -42,6 +66,9 @@ const html = (text: string) =>
 
 export const blogPath = (lang: BlogLang, slug?: string) =>
   `/blog/${lang === "en" ? "" : `${lang}/`}${slug ? `${slug}/` : ""}`;
+
+export const seriesPath = (lang: BlogLang, id: string) =>
+  blogPath(lang, `series/${id}`);
 
 export const feedPath = (lang: BlogLang) => `${blogPath(lang)}atom.xml`;
 
@@ -109,12 +136,123 @@ ${body}
 `;
 }
 
-const meta = (post: Post) =>
-  `<p class="meta"><time datetime="${post.date}">${formatDate(post.date, post.lang)}</time><span>${LABELS[post.lang].minutes(post.minutes)}</span>${post.tags.map((tag) => `<span class="tag">${html(tag)}</span>`).join("")}</p>`;
+const seriesOf = (post: Post, series: Series[]) =>
+  series.find((item) => item.id === post.series && item.lang === post.lang);
+
+const meta = (post: Post, series: Series[] = []) => {
+  const own = seriesOf(post, series);
+  const badge = own
+    ? `<a class="series-tag" href="${seriesPath(post.lang, own.id)}">${html(own.title)} · ${LABELS[post.lang].part(post.part ?? 0, own.plan.length)}</a>`
+    : "";
+  return `<p class="meta"><time datetime="${post.date}">${formatDate(post.date, post.lang)}</time><span>${LABELS[post.lang].minutes(post.minutes)}</span>${badge}${post.tags.map((tag) => `<span class="tag">${html(tag)}</span>`).join("")}</p>`;
+};
+
+/** Published posts of a series in one language, by part. */
+const partsOf = (series: Series, posts: Post[]) =>
+  posts
+    .filter((post) => post.series === series.id && post.lang === series.lang)
+    .sort((a, b) => (a.part ?? 0) - (b.part ?? 0));
+
+/** The whole plan of a series: published parts link, the rest say so. */
+function partList(series: Series, posts: Post[], current?: Post) {
+  const published = partsOf(series, posts);
+  const items = series.plan.map((title, index) => {
+    const post = published.find((item) => item.part === index + 1);
+    if (!post) {
+      return `<li class="soon"><span>${html(title)}</span> <em>${LABELS[series.lang].soon}</em></li>`;
+    }
+    return post === current
+      ? `<li><a aria-current="page" href="${blogPath(post.lang, post.slug)}">${html(post.title)}</a></li>`
+      : `<li><a href="${blogPath(post.lang, post.slug)}">${html(post.title)}</a></li>`;
+  });
+  return `<ol class="parts">${items.join("")}</ol>`;
+}
+
+function seriesBox(post: Post, series: Series[], posts: Post[]) {
+  const own = seriesOf(post, series);
+  if (!own) {
+    return "";
+  }
+  const label = LABELS[post.lang];
+  return `<nav aria-label="${html(own.title)}" class="series-box">
+          <p><a href="${seriesPath(post.lang, own.id)}">${html(own.title)}</a>, ${label.part(post.part ?? 0, own.plan.length)}</p>
+          <details>
+            <summary class="series-toggle">${label.parts}</summary>
+            ${partList(own, posts, post)}
+          </details>
+        </nav>`;
+}
+
+function pager(post: Post, series: Series[], posts: Post[]) {
+  const own = seriesOf(post, series);
+  if (!own) {
+    return "";
+  }
+  const published = partsOf(own, posts);
+  const at = published.indexOf(post);
+  const prev = published[at - 1];
+  const next = published[at + 1];
+  if (!(prev || next)) {
+    return "";
+  }
+  const label = LABELS[post.lang];
+  const link = (item: Post | undefined, rel: "next" | "prev") =>
+    item
+      ? `<a class="pager-link ${rel}" href="${blogPath(item.lang, item.slug)}" rel="${rel}"><span class="pager-label">${label[rel]}</span>${html(item.title)}</a>`
+      : "<span></span>";
+  return `<nav class="pager">${link(prev, "prev")}${link(next, "next")}</nav>`;
+}
+
+/** A series page: introduction and the whole plan. */
+export function renderSeries(series: Series, posts: Post[], all: Series[]) {
+  const paths: Partial<Record<BlogLang, string>> = {};
+  for (const other of all) {
+    if (other.id === series.id) {
+      paths[other.lang] = seriesPath(other.lang, other.id);
+    }
+  }
+  const count = partsOf(series, posts).length;
+  return layout({
+    body: `      <article>
+        <header>
+          <h1>${html(series.title)}</h1>
+          <p class="meta"><span>${LABELS[series.lang].published(count, series.plan.length)}</span></p>
+        </header>
+        <div class="prose">
+${series.html}
+        </div>
+        ${partList(series, posts)}
+      </article>`,
+    description: series.description,
+    lang: series.lang,
+    paths,
+    title: `${series.title} · balkhaev`,
+    type: "website",
+  });
+}
 
 /** The list of posts in one language, newest first. */
-export function renderIndex(lang: BlogLang, posts: Post[]) {
+export function renderIndex(
+  lang: BlogLang,
+  posts: Post[],
+  series: Series[] = []
+) {
   const own = posts.filter((post) => post.lang === lang);
+  const cycles = series.filter((item) => item.lang === lang);
+  const shelf = cycles.length
+    ? `<section class="shelf" aria-label="${LABELS[lang].series}">${cycles
+        .map(
+          (item) => `
+        <a class="cycle" href="${seriesPath(lang, item.id)}">
+          <span class="cycle-label">${LABELS[lang].seriesOne}</span>
+          <strong>${html(item.title)}</strong>
+          <span>${html(item.description)}</span>
+          <span class="cycle-count">${LABELS[lang].published(partsOf(item, posts).length, item.plan.length)}</span>
+        </a>`
+        )
+        .join("")}
+      </section>`
+    : "";
   const items = own.length
     ? `<ol class="posts">${own
         .map(
@@ -122,7 +260,7 @@ export function renderIndex(lang: BlogLang, posts: Post[]) {
         <li>
           <h2><a href="${blogPath(lang, post.slug)}">${html(post.title)}</a></h2>
           <p>${html(post.description)}</p>
-          ${meta(post)}
+          ${meta(post, series)}
         </li>`
         )
         .join("")}
@@ -133,6 +271,7 @@ export function renderIndex(lang: BlogLang, posts: Post[]) {
         <h1>${LABELS[lang].blog}</h1>
         <p>${LABELS[lang].description}</p>
       </header>
+      ${shelf}
       ${items}`,
     description: LABELS[lang].description,
     lang,
@@ -153,7 +292,7 @@ const contents = (post: Post) =>
         </nav>`;
 
 /** One post; `posts` is used to link the same slug in the other language. */
-export function renderPost(post: Post, posts: Post[]) {
+export function renderPost(post: Post, posts: Post[], series: Series[] = []) {
   const paths: Partial<Record<BlogLang, string>> = {};
   for (const other of posts) {
     if (other.slug === post.slug) {
@@ -164,12 +303,14 @@ export function renderPost(post: Post, posts: Post[]) {
     body: `      <article>
         <header>
           <h1>${html(post.title)}</h1>
-          ${meta(post)}
+          ${meta(post, series)}
         </header>
+        ${seriesBox(post, series, posts)}
         ${contents(post)}
         <div class="prose">
 ${post.html}
         </div>
+        ${pager(post, series, posts)}
       </article>`,
     description: post.description,
     lang: post.lang,
@@ -181,8 +322,9 @@ ${post.html}
 }
 
 /** Every blog URL, for the sitemap. */
-export const blogUrls = (posts: Post[]) => [
+export const blogUrls = (posts: Post[], series: Series[] = []) => [
   ...BLOG_LANGS.map((lang) => blogPath(lang)),
+  ...series.map((item) => seriesPath(item.lang, item.id)),
   ...posts.map((post) => blogPath(post.lang, post.slug)),
 ];
 
