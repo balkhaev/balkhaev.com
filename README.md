@@ -85,7 +85,15 @@ tags: [meta]
 draft: false # optional; drafts are built only with `bun scripts/build.ts --drafts`
 ```
 
-`src/blog/content.ts` reads and validates posts (the build fails with the file name on a bad field), `src/blog/markdown.ts` renders GitHub-flavoured Markdown with heading anchors and drops raw HTML, and `src/blog/render.ts` writes the list and post pages. The build also generates `sitemap.xml` from every page. Styles are in `public/blog/blog.css` and reuse the resume's self-hosted IBM Plex Sans; the theme follows `prefers-color-scheme`.
+`src/blog/content.ts` reads and validates posts (the build fails with the file name on a bad field), `src/blog/markdown.ts` renders them, and `src/blog/render.ts` writes the list, post pages and an Atom feed per language (`/blog/atom.xml`, `/blog/ru/atom.xml`). The build also generates `sitemap.xml` from every page. Styles are in `public/blog/blog.css` and reuse the resume's self-hosted IBM Plex Sans; the theme follows `prefers-color-scheme`.
+
+What a post body supports, all rendered at build time with no JavaScript on the page:
+
+- GitHub-flavoured Markdown: tables, task lists, footnotes (`[^1]`). Raw HTML is dropped.
+- Formulas: `$inline$` and `$$display$$`, rendered by KaTeX. An invalid formula fails the build. The KaTeX stylesheet and woff2 fonts are copied to `/blog/katex/` and linked only on posts with math.
+- Code: fenced blocks highlighted by Shiki in GitHub light and dark themes; unknown languages fall back to plain text.
+- Callouts: `:::note`, `:::warning`, `:::tldr`, and `:::proof`, which collapses.
+- A table of contents from `##` and `###` headings, shown when a post has three or more.
 
 ## Production
 

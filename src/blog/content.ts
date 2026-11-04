@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { YAML } from "bun";
-import { renderMarkdown } from "./markdown";
+import { type Heading, renderMarkdown } from "./markdown";
 
 export const BLOG_LANGS = ["en", "ru"] as const;
 export type BlogLang = (typeof BLOG_LANGS)[number];
@@ -12,11 +12,14 @@ export interface Post {
   draft: boolean;
   html: string;
   lang: BlogLang;
+  /** The post has formulas and needs the KaTeX stylesheet. */
+  math: boolean;
   /** Rough reading time in minutes. */
   minutes: number;
   slug: string;
   tags: string[];
   title: string;
+  toc: Heading[];
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
@@ -41,12 +44,12 @@ function text(file: string, data: Record<string, unknown>, key: string) {
  * Parses one post file: YAML frontmatter between `---` lines, then Markdown.
  * Throws with the file name on any missing or malformed field.
  */
-export function parsePost(
+export async function parsePost(
   file: string,
   source: string,
   slug: string,
   lang: BlogLang
-): Post {
+): Promise<Post> {
   if (!(SLUG.test(slug) && slug !== "ru")) {
     fail(file, `folder name "${slug}" is not a valid slug`);
   }
@@ -73,16 +76,19 @@ export function parsePost(
   }
   const body = match[2] ?? "";
   const words = body.split(WHITESPACE).filter(Boolean).length;
+  const { html, math, toc } = await renderMarkdown(body, lang);
   return {
     date,
     description: text(file, fields, "description"),
     draft,
-    html: renderMarkdown(body),
+    html,
     lang,
+    math,
     minutes: Math.max(1, Math.round(words / WORDS_PER_MINUTE)),
     slug,
     tags,
     title: text(file, fields, "title"),
+    toc,
   };
 }
 
@@ -102,7 +108,7 @@ export async function loadPosts(root: string, drafts = false) {
       // biome-ignore lint/performance/noAwaitInLoops: a handful of small files
       const source = await readFile(file, "utf8").catch(() => undefined);
       if (source !== undefined) {
-        posts.push(parsePost(file, source, folder.name, lang));
+        posts.push(await parsePost(file, source, folder.name, lang));
       }
     }
   }
