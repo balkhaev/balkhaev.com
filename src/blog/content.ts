@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { YAML } from "bun";
+import { parseStoryboard, timeline } from "../video/storyboard";
 import { type Heading, renderMarkdown } from "./markdown";
 
 export const BLOG_LANGS = ["en", "ru"] as const;
@@ -28,6 +29,8 @@ export interface Post {
   toc: Heading[];
   /** Day the post was last revised, when later than `date`. */
   updated?: string;
+  /** Length in seconds of the post's video, when it has a storyboard. */
+  video?: number;
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
@@ -133,6 +136,21 @@ export async function parsePost(
 }
 
 /**
+ * Length of the video rendered from `video.<lang>.yml` next to the post, or
+ * undefined without one. Parsing here also fails the build on a broken
+ * storyboard.
+ */
+async function videoLength(folder: string, lang: BlogLang) {
+  const file = join(folder, `video.${lang}.yml`);
+  const source = await readFile(file, "utf8").catch(() => undefined);
+  if (source === undefined) {
+    return;
+  }
+  const last = timeline(parseStoryboard(file, source)).at(-1);
+  return last ? Math.round(last.start + last.duration) : undefined;
+}
+
+/**
  * Reads every `content/blog/<slug>/<lang>.md`, newest first. A post can exist
  * in one language or both; drafts are left out unless `drafts` is set.
  */
@@ -148,7 +166,9 @@ export async function loadPosts(root: string, drafts = false) {
       // biome-ignore lint/performance/noAwaitInLoops: a handful of small files
       const source = await readFile(file, "utf8").catch(() => undefined);
       if (source !== undefined) {
-        posts.push(await parsePost(file, source, folder.name, lang));
+        const post = await parsePost(file, source, folder.name, lang);
+        const video = await videoLength(join(root, folder.name), lang);
+        posts.push(video ? { ...post, video } : post);
       }
     }
   }

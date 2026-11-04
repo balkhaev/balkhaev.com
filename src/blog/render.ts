@@ -22,6 +22,7 @@ const LABELS: Record<
     seriesOne: string;
     soon: string;
     switcher: string;
+    video: string;
     writings: string;
   }
 > = {
@@ -43,6 +44,7 @@ const LABELS: Record<
     soon: "coming soon",
     switcher: "Language",
     updated: "updated",
+    video: "Video version, no code",
     writings: "All posts",
   },
   ru: {
@@ -63,6 +65,7 @@ const LABELS: Record<
     soon: "скоро",
     switcher: "Язык",
     updated: "обновлено",
+    video: "Видеоверсия без кода",
     writings: "Все записи",
   },
 };
@@ -363,6 +366,23 @@ export function renderIndex(
   });
 }
 
+export const videoPath = (post: Post, ext: "jpg" | "mp4") =>
+  `/video/${post.slug}/${post.lang}.${ext}`;
+
+const clock = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+/** The post's video player, or nothing when the post has no storyboard. */
+function video(post: Post) {
+  if (!post.video) {
+    return "";
+  }
+  return `<figure class="post-video">
+                <video controls playsinline preload="none" poster="${videoPath(post, "jpg")}" src="${videoPath(post, "mp4")}" width="1920" height="1080"></video>
+                <figcaption><span>${LABELS[post.lang].video}</span><span>${clock(post.video)}</span></figcaption>
+              </figure>`;
+}
+
 /** One post; `posts` is used to link the same slug in the other language. */
 export function renderPost(post: Post, posts: Post[], series: Series[] = []) {
   const paths: Partial<Record<BlogLang, string>> = {};
@@ -388,6 +408,7 @@ export function renderPost(post: Post, posts: Post[], series: Series[] = []) {
             ${sidebar(post, own, posts)}
             <div class="post-body">
               ${seriesBox(post, own, posts)}
+              ${video(post)}
               <div class="prose">
 ${post.html}
               </div>

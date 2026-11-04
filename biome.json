@@ -1,4 +1,6 @@
 {
   "extends": ["ultracite/biome/core", "ultracite/biome/react"],
-  "files": { "includes": ["!dist", "!.devhub", "!devhub.json", "!examples"] }
+  "files": {
+    "includes": ["!dist", "!.devhub", "!devhub.json", "!examples", "!.video", "!video"]
+  }
 }
