@@ -684,6 +684,10 @@ h1 span {
   }
 }
 @media (max-width: 350px) {
+  .masthead,
+  .contacts {
+    gap: 10px;
+  }
   :root {
     --gutter: 16px;
   }

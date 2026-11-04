@@ -2,6 +2,7 @@ import { cp, mkdir, writeFile } from "node:fs/promises";
 import { build } from "bun";
 import { LANGS } from "../src/cv/content";
 import { CV_PATHS, renderCv } from "../src/cv/render";
+import { renderNews } from "../src/news/render";
 
 await mkdir("dist", { recursive: true });
 const result = await build({
@@ -17,6 +18,7 @@ if (!result.success) {
 }
 await cp("public", "dist", { recursive: true });
 await cp("index.html", "dist/index.html");
+await writeFile("dist/news/index.html", renderNews());
 for (const lang of LANGS) {
   const folder = `dist${CV_PATHS[lang]}`;
   // biome-ignore lint/performance/noAwaitInLoops: two small pages
