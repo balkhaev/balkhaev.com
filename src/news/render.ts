@@ -1,6 +1,7 @@
 import { escapeHTML as html } from "bun";
 import { siteFooter, siteHeader } from "../site/chrome";
-import { FIRST_ISSUE, type Issue, type Story } from "./content";
+import type { Issue, Story } from "./content";
+import { mergeIssues } from "./feed";
 
 const dateFormat = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
@@ -63,18 +64,7 @@ function edition(issue: Issue, issueIndex: number) {
 }
 
 export function renderNews(updates: Issue[] = []) {
-  const issues = new Map<string, Issue>();
-  for (const issue of updates) {
-    if (issue.date >= FIRST_ISSUE.date && !issues.has(issue.date)) {
-      issues.set(issue.date, issue);
-    }
-  }
-  if (!issues.has(FIRST_ISSUE.date)) {
-    issues.set(FIRST_ISSUE.date, FIRST_ISSUE);
-  }
-  const ordered = [...issues.values()].sort((a, b) =>
-    b.date.localeCompare(a.date)
-  );
+  const ordered = mergeIssues(updates);
   return `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Новости AI · Balkhaev</title><meta name="description" content="Дайджест раз в два дня. Крупные релизы AI, открытые веса и новые возможности со ссылками на первоисточники.">

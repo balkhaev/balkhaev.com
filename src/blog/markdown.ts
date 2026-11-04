@@ -13,6 +13,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { visit } from "unist-util-visit";
+import { mergeIssues, nearDate } from "../news/feed";
 import { parseLimit, parseTopics, renderWidget } from "../news/widget";
 import { rehypeCodeBlocks } from "./code";
 import { rehypeDiagrams } from "./diagram";
@@ -72,7 +73,7 @@ function remarkNews() {
   };
 }
 
-function rehypeNews(lang: string, found: Collected) {
+function rehypeNews(lang: string, found: Collected, date?: string) {
   return () => (tree: HastRoot) => {
     visit(tree, "element", (node: Element, index, parent) => {
       if (node.tagName !== NEWS || !parent || index === undefined) {
@@ -83,7 +84,13 @@ function rehypeNews(lang: string, found: Collected) {
       const limit = Number(node.properties.limit);
       parent.children.splice(index, 1, {
         type: "raw",
-        value: renderWidget(topics, limit, lang === "ru" ? "ru" : "en"),
+        value: renderWidget(
+          topics,
+          limit,
+          lang === "ru" ? "ru" : "en",
+          nearDate(date),
+          mergeIssues([])
+        ),
       });
     });
   };
@@ -169,7 +176,9 @@ function rehypeCollect(lang: string, found: Collected) {
  */
 export async function renderMarkdown(
   source: string,
-  lang = "en"
+  lang = "en",
+  /** The post's date: its news widgets prefer stories from around then. */
+  date?: string
 ): Promise<Rendered> {
   const found: Collected = { errors: [], math: false, news: false, toc: [] };
   const file = await unified()
@@ -193,7 +202,7 @@ export async function renderMarkdown(
     })
     .use(rehypeSlug)
     .use(rehypeCollect(lang, found))
-    .use(rehypeNews(lang, found))
+    .use(rehypeNews(lang, found, date))
     // Only the build-time diagram SVG is raw here: Markdown HTML was dropped
     // by remark-rehype above.
     .use(rehypeStringify, { allowDangerousHtml: true })

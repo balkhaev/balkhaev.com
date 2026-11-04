@@ -113,7 +113,7 @@ export async function parsePost(
   }
   const body = match[2] ?? "";
   const words = body.split(WHITESPACE).filter(Boolean).length;
-  const { html, math, news, toc } = await renderMarkdown(body, lang);
+  const { html, math, news, toc } = await renderMarkdown(body, lang, date);
   return {
     date,
     description: text(file, fields, "description"),
