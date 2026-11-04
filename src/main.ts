@@ -562,7 +562,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     transition(open);
   }
-  openButton?.addEventListener("click", () => openScene(true));
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "#scene-open, [data-open-scene]"
+  )) {
+    button.addEventListener("click", () => openScene(true));
+  }
   closeButton?.addEventListener("click", () => openScene(false));
   window.addEventListener("popstate", () => {
     transition(location.hash === SCENE_HASH);
