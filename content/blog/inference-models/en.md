@@ -89,7 +89,7 @@ Kimi K3, DeepSeek V4 Pro, GLM-5.3, Mistral Large 4 and similar models weigh a te
 
 **Search: embeddings and rerankers.** The most underrated case for your own inference. Embedding models are small (0.6B to 8B), but every company document and every query has to go through them. The Qwen3-Embedding and BGE families run on the cheapest GPU, and vLLM serves embeddings through the same OpenAI-compatible API. If you built document search from the [agent series](/blog/agent-search/), this is the first thing worth moving to your own GPU.
 
-**Images, video and 3D.** This is a separate world with its own models and tools; part six is devoted to it.
+**Images, video and 3D.** This is a separate world with its own models and tools; [part six](/blog/inference-media/) is devoted to it.
 
 ## Test the model before renting a GPU
 

@@ -44,7 +44,7 @@ Take a GPU at 3 dollars an hour and see how the price depends on load.
 | 1500 (GPU packed with batches) | about 0.55 dollars |
 | 0 (night, weekend, nobody is writing) | infinity |
 
-The speeds here are illustrative; we measure real ones in part five. What matters is the shape of the relationship. One GPU can serve dozens or hundreds of requests at once with little slowdown for each. With a single request you pay for the whole GPU and use a small part of it. With many requests the price per token drops several times over.
+The speeds here are illustrative; we measure real ones in [part five](/blog/inference-serve/). What matters is the shape of the relationship. One GPU can serve dozens or hundreds of requests at once with little slowdown for each. With a single request you pay for the whole GPU and use a small part of it. With many requests the price per token drops several times over.
 
 That is exactly how a per-token provider makes money: it gathers requests from thousands of customers onto the same GPUs and keeps them busy. You can only beat it on price if you have enough load of your own to keep a GPU occupied.
 
@@ -58,7 +58,7 @@ That is exactly how a per-token provider makes money: it gathers requests from t
 
 **Control over the version.** Commercial models are updated and retired on the provider's schedule. Your own model will not change until you update it. For pipelines where reproducibility matters, that is an argument.
 
-**Images, video and 3D.** This is where your own GPU wins most often. ComfyUI pipelines with your own LoRAs, control networks and chains of models cannot be reproduced at API providers, and paying per generation is expensive. Part six is about this.
+**Images, video and 3D.** This is where your own GPU wins most often. ComfyUI pipelines with your own LoRAs, control networks and chains of models cannot be reproduced at API providers, and paying per generation is expensive. [Part six](/blog/inference-media/) is about this.
 
 **Data must not go to the model provider.** A caveat is needed here. A rented GPU on RunPod or Vast.ai is also someone else's computer. On Vast.ai it may literally be a private individual's computer. If your data requirements are serious, look at isolated clouds with a contract (RunPod's Secure Cloud, verified data centres, the large clouds) or at your own hardware.
 
