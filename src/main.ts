@@ -9,6 +9,15 @@ import { createFlightAudio } from "./lib/flight-audio";
 import { createObserverLook } from "./lib/observer-look";
 import { createPhysicsPanel } from "./lib/physics-panel";
 import { skyShiftAt } from "./lib/relativity";
+import {
+  CLOSE_MS,
+  COMPACT_ZOOM,
+  type DiveGeometry,
+  diveKeyframes,
+  diveStyles,
+  OPEN_MS,
+  zoomedFov,
+} from "./lib/scene-dive";
 import { OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
 import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
 
@@ -114,6 +123,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let renderer: HoleRenderer | null = null;
   // The scene starts as a small preview on the page and opens to full screen.
   let expanded = false;
+  // Lens magnification: the dot on the page looks closer than the full scene.
+  let lensZoom = COMPACT_ZOOM;
   let visible = true;
   let frame = 0;
   let last = 0;
@@ -134,6 +145,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     view.distance = journey.radius;
     Object.assign(view, opticsAt(journey.radius));
     Object.assign(view, look.advance(0, still.matches || previewStill));
+    view.fov = zoomedFov(view.fov, lensZoom);
     view.x = 0.5;
     view.y = 0.5;
     surface.dataset.observerRadius = view.distance.toFixed(4);
@@ -198,6 +210,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     if (!renderer) {
       return;
     }
+    diveZoom();
     frameView();
     renderer.draw({
       accretion: 1,
@@ -214,8 +227,12 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
 
   const fit = () => {
-    const box = surface.getBoundingClientRect();
-    renderer?.resize(box.width, box.height, devicePixelRatio || 1);
+    // Layout size, not the on-screen box: the dive scales the scene with CSS.
+    renderer?.resize(
+      surface.clientWidth,
+      surface.clientHeight,
+      devicePixelRatio || 1
+    );
     draw();
   };
 
@@ -517,6 +534,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const closeButton = document.querySelector<HTMLButtonElement>("#scene-close");
   const applyScene = (open: boolean) => {
     expanded = open;
+    lensZoom = open ? 1 : COMPACT_ZOOM;
     if (scene) {
       scene.dataset.state = open ? "expanded" : "compact";
     }
@@ -533,19 +551,118 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     fit();
     resume();
   };
+
+  // The dive: see lib/scene-dive.ts. The compositor runs the CSS side; each
+  // drawn frame reads the animation's clock for the matching lens zoom.
+  const page = [
+    ...document.querySelectorAll<HTMLElement>(
+      ".topbar, .masthead h1, .lead, .columns, .contacts, .site-foot"
+    ),
+  ];
+  let dive: {
+    animations: Animation[];
+    done: () => void;
+    geo: DiveGeometry;
+    open: boolean;
+  } | null = null;
+  const diveGeometry = (): DiveGeometry => {
+    const anchor = (scene?.parentElement ?? scene)?.getBoundingClientRect();
+    const screen = scene?.getBoundingClientRect();
+    const w = screen?.width ?? innerWidth;
+    const h = screen?.height ?? innerHeight;
+    if (!anchor || anchor.bottom < 0 || anchor.top > h) {
+      return { cx: w / 2, cy: h / 2, d: Math.min(w, h) * 0.2, h, w };
+    }
+    return {
+      cx: anchor.left + anchor.width / 2,
+      cy: anchor.top + anchor.height / 2,
+      d: anchor.width,
+      h,
+      w,
+    };
+  };
+  const diveZoom = () => {
+    const animation = dive?.animations[0];
+    if (!(dive && animation)) {
+      return;
+    }
+    const duration = dive.open ? OPEN_MS : CLOSE_MS;
+    const at = Math.min(1, Number(animation.currentTime ?? 0) / duration);
+    lensZoom = diveStyles(dive.open ? at : 1 - at, dive.geo).zoom;
+  };
+  const settle = () => {
+    document.documentElement.classList.remove("scene-diving");
+    for (const animation of dive?.animations ?? []) {
+      animation.cancel();
+    }
+    for (const element of page) {
+      element.style.transformOrigin = "";
+    }
+    dive = null;
+  };
+  const animateDive = (open: boolean, done: () => void) => {
+    const geo = diveGeometry();
+    for (const element of page) {
+      const box = element.getBoundingClientRect();
+      element.style.transformOrigin = `${geo.cx - box.left}px ${geo.cy - box.top}px`;
+    }
+    document.documentElement.classList.add("scene-diving");
+    const frames = diveKeyframes(geo);
+    const timing: KeyframeAnimationOptions = {
+      direction: open ? "normal" : "reverse",
+      duration: open ? OPEN_MS : CLOSE_MS,
+      fill: "both",
+    };
+    const animations = [
+      ...(scene ? [scene.animate(frames.scene, timing)] : []),
+      ...page.map((element) => element.animate(frames.page, timing)),
+    ];
+    dive = { animations, done, geo, open };
+    diveZoom();
+    draw();
+    const finish = () => {
+      // A newer dive has already cancelled this one and called its `done`.
+      if (dive?.animations !== animations) {
+        return;
+      }
+      settle();
+      done();
+      redraw();
+    };
+    animations[0]?.finished.then(finish).catch(() => undefined);
+    // The timeline can stall in a background tab; the page must still settle.
+    setTimeout(finish, Number(timing.duration) + 150);
+  };
   const transition = (open: boolean) => {
+    const running = dive;
+    if (running) {
+      settle();
+      running.done();
+    }
     if (open === expanded) {
       return;
     }
-    const swap = () => {
-      applyScene(open);
+    const focus = () =>
       (open ? input : openButton)?.focus({ preventScroll: true });
-    };
-    if (still.matches || !document.startViewTransition) {
-      swap();
-    } else {
-      document.startViewTransition(swap);
+    if (still.matches || !renderer) {
+      applyScene(open);
+      focus();
+      return;
     }
+    if (open) {
+      // Full screen first, drawn at full size under the first dive frame.
+      applyScene(true);
+      animateDive(true, () => {
+        lensZoom = 1;
+      });
+      focus();
+      return;
+    }
+    flight.pause();
+    animateDive(false, () => {
+      applyScene(false);
+      focus();
+    });
   };
   function openScene(open: boolean) {
     if (open === expanded) {

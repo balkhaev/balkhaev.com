@@ -50,6 +50,8 @@ flowchart TD
   uptime -- no answer --> tg
 ```
 
+::news{topic="cost automation"}
+
 ## Step 1. Outside monitoring
 
 The alerts from the previous part run in the worker itself. If it dies, nobody sends them. A system can't reliably report its own death, so it needs an outside watcher. There are two checks, and each catches its own kind of problem.

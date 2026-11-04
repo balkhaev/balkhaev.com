@@ -11,6 +11,7 @@ import {
   blogUrls,
   feedPath,
   KATEX_PATH,
+  NEWS_SCRIPT,
   renderFeed,
   renderIndex,
   renderPost,
@@ -20,7 +21,9 @@ import {
 import { LANGS } from "../src/cv/content";
 import { CV_PATHS, renderCv } from "../src/cv/render";
 import { renderHome } from "../src/home/render";
+import { mergeIssues } from "../src/news/feed";
 import { renderNews } from "../src/news/render";
+import { FEED_PATH } from "../src/news/widget";
 
 const ORIGIN = "https://balkhaev.com";
 const LEGACY_FONT = /\.(?:ttf|woff)$/;
@@ -42,6 +45,16 @@ const result = await build({
 });
 if (!result.success) {
   throw new AggregateError(result.logs, "Browser build failed");
+}
+const widget = await build({
+  entrypoints: ["src/news/client.ts"],
+  minify: true,
+  naming: NEWS_SCRIPT.split("/").at(-1),
+  outdir: `dist${NEWS_SCRIPT.slice(0, NEWS_SCRIPT.lastIndexOf("/"))}`,
+  target: "browser",
+});
+if (!widget.success) {
+  throw new AggregateError(widget.logs, "News widget build failed");
 }
 await cp("public", "dist", { recursive: true });
 
@@ -67,6 +80,8 @@ for (const post of posts) {
 }
 pages.set("/", renderHome(await readFile("index.html", "utf8"), posts));
 await Promise.all([...pages].map(([path, content]) => page(path, content)));
+// The server's refresher adds editions to this file as the channel posts them.
+await writeFile(`dist${FEED_PATH}`, JSON.stringify(mergeIssues([])));
 await Promise.all(
   BLOG_LANGS.map((lang) =>
     writeFile(`dist${feedPath(lang)}`, renderFeed(lang, posts))

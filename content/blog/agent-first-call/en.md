@@ -23,6 +23,8 @@ Strip the marketing away and an agent has three parts:
 
 The model is the most expensive part and the easiest to swap. Everything interesting happens in the loop, and we will write it ourselves. First, though, we need to simply talk to a model.
 
+::news{topic="llm-api"}
+
 ## Step 1. The key
 
 I will use Claude from Anthropic, but commercial APIs all look alike, and porting the code to another provider is not hard.

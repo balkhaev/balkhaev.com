@@ -49,6 +49,8 @@ Let's price a typical conversation. Tools and prompt take 1500 tokens. For each 
 
 Output is expensive per token, but in a long conversation you pay for input: by the tenth question every step sends almost 80 thousand tokens of history. So almost everything in this part is about input.
 
+::news{topic="cost llm-api"}
+
 ## Measure first
 
 Every API response has a `usage` field: how many tokens went to input, how many to output, how many were written to the cache and how many were read from it. We record this for every step together with the employee's login. Without such a log every optimisation is blind, and in a month accounting will ask which department spent how much.

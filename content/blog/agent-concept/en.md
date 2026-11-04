@@ -19,6 +19,8 @@ The answers exist somewhere: the contract is in the wiki or on a shared drive, t
 
 We want an agent you can ask in plain language and get an answer with links to the sources. And the developer must not see salaries, and the intern must not see a contract they have no access to.
 
+::news{topic="agents llm-api"}
+
 ## Why not a regular chat bot
 
 The first idea is to give everyone ChatGPT or Claude. That is useful, but it does not solve this problem.

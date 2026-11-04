@@ -16,6 +16,8 @@ export interface Post {
   math: boolean;
   /** Rough reading time in minutes. */
   minutes: number;
+  /** The post has a news widget and needs its script. */
+  news: boolean;
   /** Position in the series, from 1. Set together with `series`. */
   part?: number;
   /** Id of the series this post belongs to (a folder in content/series). */
@@ -97,7 +99,7 @@ export async function parsePost(
   }
   const body = match[2] ?? "";
   const words = body.split(WHITESPACE).filter(Boolean).length;
-  const { html, math, toc } = await renderMarkdown(body, lang);
+  const { html, math, news, toc } = await renderMarkdown(body, lang);
   return {
     date,
     description: text(file, fields, "description"),
@@ -106,6 +108,7 @@ export async function parsePost(
     lang,
     math,
     minutes: Math.max(1, Math.round(words / WORDS_PER_MINUTE)),
+    news,
     ...seriesFields(file, fields),
     slug,
     tags,

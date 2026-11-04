@@ -1,196 +1,54 @@
-@font-face {
-  font-family: Plex;
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("/cv/fonts/plex-cyrillic.woff2") format("woff2");
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+/* The masthead, lead, featured tile and article rows come from the blog. */
+.news .masthead h1 {
+  font-size: clamp(48px, 16vw, 252px);
+  white-space: nowrap;
 }
-@font-face {
-  font-family: Plex;
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("/cv/fonts/plex-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2191-2199;
+.news .label {
+  flex-wrap: wrap;
+  align-items: baseline;
 }
-:root {
-  --rule: #d4cfc3;
-  --accent: #924d21;
-  font-family: Plex, system-ui, sans-serif;
-  color: #211f1a;
-  color-scheme: light;
-  background: #f8f6ef;
-}
-* {
-  box-sizing: border-box;
-}
-body,
-h1,
-h2,
-h3,
-p {
+.news .label h2 {
   margin: 0;
+  font: inherit;
 }
-a {
-  color: inherit;
-  text-underline-offset: 0.22em;
-}
-a:hover {
-  color: var(--accent);
-}
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
-}
-.sheet {
-  max-width: 74rem;
-  padding: 0 clamp(1.15rem, 5vw, 4.5rem);
-  margin: auto;
-}
-header,
-footer {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-}
-header {
-  height: 5rem;
-  border-bottom: 1px solid var(--rule);
-}
-.wordmark {
-  font-size: 1.55rem;
-  font-weight: 650;
-  letter-spacing: -0.055em;
-  text-decoration: none;
-}
-.wordmark span,
-h1 em,
-.number {
-  color: var(--accent);
-}
-.channel,
-footer,
-.source,
-.post {
-  font-size: 0.9rem;
-}
-.channel,
-.post {
-  text-decoration: none;
-}
-.lead {
-  padding: clamp(3rem, 7vw, 6rem) 0 clamp(2.5rem, 5vw, 4rem);
-}
-.kicker,
-.number {
-  font:
-    0.76rem / 1.5 ui-monospace,
-    monospace;
-  letter-spacing: 0.09em;
-}
-.kicker {
-  color: #63594b;
-  text-transform: uppercase;
-}
-.dot {
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.4rem;
-  background: var(--accent);
-  border-radius: 50%;
-}
-h1 {
-  margin: 0.6rem 0 1rem;
-  font-size: clamp(3.4rem, 8vw, 6.8rem);
-  font-weight: 550;
-  line-height: 1;
-  letter-spacing: -0.065em;
-}
-h1 em {
-  font-family: Georgia, serif;
-  font-weight: 400;
-}
-.intro {
-  max-width: 38rem;
-  font-size: clamp(1.06rem, 2.3vw, 1.3rem);
-  line-height: 1.5;
-  color: #595348;
-}
-.edition {
+.news-spread {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(0, 3fr);
-  gap: 2rem;
-  padding: 2rem 0 2.7rem;
-  border-top: 2px solid #322e25;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(20px, 3vw, 48px);
+  align-items: start;
+  margin-top: 16px;
 }
-.dateline h2 {
-  margin: 0.3rem 0;
-  font-size: 1.25rem;
-  font-weight: 550;
+.news-spread:has(> :only-child) {
+  grid-template-columns: minmax(0, 52rem);
 }
-.post {
-  color: #63594b;
-}
-.story {
-  display: grid;
-  grid-template-columns: 1.7rem minmax(0, 1fr);
-  gap: 0.75rem;
-  padding: 1.6rem 0;
-  border-bottom: 1px solid var(--rule);
-}
-.story:first-child {
-  padding-top: 0;
-}
-.story:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-.number {
-  padding-top: 0.35rem;
-}
-h3 {
-  font-size: clamp(1.4rem, 2.7vw, 2rem);
-  font-weight: 580;
-  line-height: 1.18;
-  letter-spacing: -0.032em;
+.news-feature h3,
+.news-row h3,
+.news .story p {
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.story p {
-  max-width: 65ch;
-  margin: 0.75rem 0;
-  font-size: 1.05rem;
-  line-height: 1.6;
-  color: #49443b;
+.news-feature .cycle-foot {
+  gap: 6px;
+  justify-content: flex-start;
 }
-.source {
-  font-weight: 550;
+.news-row .row-main {
+  gap: 8px;
+  min-width: 0;
+  max-width: 66ch;
 }
-footer {
-  padding: 1.3rem 0 2.2rem;
-  border-top: 1px solid var(--rule);
+.news-row .row-meta {
+  flex-direction: row;
+  gap: 5px;
 }
-@media (max-width: 43rem) {
-  header {
-    height: 3.8rem;
-  }
-  .edition {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-    padding-top: 1.25rem;
-  }
-  .dateline h2 {
-    display: inline;
-    margin-left: 0.6rem;
-  }
-  .post {
-    display: block;
-    margin-top: 0.3rem;
-  }
-  .story {
-    grid-template-columns: 1.35rem minmax(0, 1fr);
-    gap: 0.55rem;
+.news-spread .rows > li:first-child .row {
+  padding-top: 0;
+}
+.news-spread .rows > li:first-child .row::before {
+  top: 6px;
+}
+@media (max-width: 820px) {
+  .news-spread {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
   }
 }
