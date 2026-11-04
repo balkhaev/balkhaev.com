@@ -363,4 +363,4 @@ The order of magnitude for a hundred-person company: if everyone asks ten questi
 
 ## Next
 
-The agent counts money, handles long conversations and stays within limits. For now it lives in a terminal and takes the employee's token from an environment variable. The next part gives it an interface: a bot in the team chat and a web chat with company SSO sign-in, streamed answers and conversation history.
+The agent counts money, handles long conversations and stays within limits. For now it lives in a terminal and takes the employee's token from an environment variable. The [next part](/blog/agent-interface/) gives it an interface: a bot in the team chat and a web chat with company SSO sign-in, streamed answers and conversation history.
