@@ -20,7 +20,7 @@ export function siteHeader(
     ${section === "blog" ? `<a class="topbar-role" href="${blog}">${role}</a>` : `<span class="topbar-role">${role}</span>`}
     <nav aria-label="${ru ? "Разделы" : "Sections"}" class="topbar-nav">
       <a href="${blog}"${section === "blog" ? ' aria-current="location"' : ""}>${ru ? "Блог" : "Blog"}</a>
-      <a href="/news/"${section === "news" ? ' aria-current="page"' : ""}${ru ? "" : ' hreflang="ru"'}>${ru ? "Новости AI" : "AI news"}</a>
+      <a href="/news/"${section === "news" ? ' aria-current="page"' : ""}${ru ? "" : ' hreflang="ru"'}>${ru ? "Новости" : "News"}</a>
       <a href="${ru ? "/cv/ru/" : "/cv/"}">${ru ? "Резюме" : "Resume"}</a>
       <a href="https://t.me/balkhaev" rel="noopener noreferrer" target="_blank">Telegram</a>
       ${languageLinks}

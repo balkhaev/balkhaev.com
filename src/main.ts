@@ -556,7 +556,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   // drawn frame reads the animation's clock for the matching lens zoom.
   const page = [
     ...document.querySelectorAll<HTMLElement>(
-      ".topbar, .masthead h1, .lead, .columns, .contacts, .site-foot"
+      ".topbar, .masthead h1, .lead, .columns, .news-side, .contacts, .site-foot"
     ),
   ];
   let dive: {

@@ -161,12 +161,19 @@ button:focus-visible {
   transform: translateX(3px);
 }
 
-/* Three columns: blog, projects, experience */
+/* Three columns (blog, projects, experience) and the news sidebar */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+  margin-top: clamp(32px, 4vw, 56px);
+}
 .columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-column: 1 / span 9;
   gap: 20px;
-  margin-top: clamp(32px, 4vw, 56px);
 }
 .column h2,
 .contacts h2 {
@@ -256,6 +263,70 @@ a.row:hover::before {
   color: var(--muted);
 }
 
+/* News sidebar: the newest digest stories */
+.news-side {
+  grid-column: 10 / span 3;
+  padding: 0 16px 6px;
+  background: #e5e1d9;
+  border-top: 2px solid var(--line);
+}
+.news-side h2 {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.news-side-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  vertical-align: 1px;
+  background: var(--signal);
+  border-radius: 50%;
+  animation: news-pulse 2.4s ease-in-out infinite;
+}
+@keyframes news-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.news-side-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.news-side-list > li + li {
+  border-top: 1px solid var(--hair);
+}
+.news-side-item {
+  display: grid;
+  gap: 4px;
+  padding: 11px 0;
+}
+.news-side-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.news-side-title {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  transition: color 0.2s;
+}
+.news-side-item:hover .news-side-title {
+  color: var(--signal);
+}
+
 /* Contacts: Telegram first */
 .contacts {
   display: grid;
@@ -301,6 +372,24 @@ a.row:hover::before {
   color: var(--signal);
 }
 
+@media (max-width: 1100px) {
+  .columns,
+  .news-side {
+    grid-column: 1 / -1;
+  }
+  .news-side-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: 20px;
+  }
+  .news-side-list > li + li {
+    border-top: 0;
+  }
+  /* One row of three across the page. */
+  .news-side-list > li:nth-child(n + 4) {
+    display: none;
+  }
+}
 @media (max-width: 900px) {
   .lead > p:first-child,
   .lead-actions {
@@ -310,6 +399,15 @@ a.row:hover::before {
   .columns {
     grid-template-columns: 1fr;
     gap: 32px;
+  }
+  .news-side-list {
+    grid-template-columns: 1fr;
+  }
+  .news-side-list > li + li {
+    border-top: 1px solid var(--hair);
+  }
+  .news-side-list > li:nth-child(n + 4) {
+    display: block;
   }
 }
 @media (max-width: 560px) {
@@ -350,7 +448,15 @@ a.row:hover::before {
   will-change: transform, clip-path;
 }
 .scene-diving
-  :is(.topbar, .masthead h1, .lead, .columns, .contacts, .site-foot) {
+  :is(
+    .topbar,
+    .masthead h1,
+    .lead,
+    .columns,
+    .news-side,
+    .contacts,
+    .site-foot
+  ) {
   will-change: transform, opacity;
 }
 html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
