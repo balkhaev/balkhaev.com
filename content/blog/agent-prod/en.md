@@ -264,6 +264,8 @@ The perimeter closes everything except one thing: employees' questions and tool 
 - The provider's data retention terms and the region where processing happens.
 - Whether you can reach the model through a cloud provider the company already has a contract with. Claude is available on several clouds, and then squid allows that cloud's address instead of `api.anthropic.com`.
 
+::news{topic="security agents"}
+
 ## The audit log
 
 In part 6 the MCP servers already logged who called which tool. That's not enough to investigate a complaint: you need the whole turn. What was asked, which tools the agent called, what they returned and what the agent answered.

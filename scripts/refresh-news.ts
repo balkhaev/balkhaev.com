@@ -2,11 +2,34 @@ import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { file, sleep } from "bun";
 import { readIssues } from "../src/news/channel";
-import { FIRST_ISSUE } from "../src/news/content";
+import { FIRST_ISSUE, type Issue } from "../src/news/content";
+import { mergeIssues } from "../src/news/feed";
 import { renderNews } from "../src/news/render";
 
 const feed = new URL("https://t.me/s/bestburyat");
 feed.searchParams.set("q", "AI за два дня");
+
+async function replace(target: string, content: string) {
+  if (
+    (await file(target).exists()) &&
+    (await file(target).text()) === content
+  ) {
+    return;
+  }
+  const temporary = `${target}.${process.pid}.tmp`;
+  await writeFile(temporary, content);
+  await rename(temporary, target);
+}
+
+/** Editions already published, so the widgets keep older stories too. */
+async function known(target: string): Promise<Issue[]> {
+  try {
+    const data = await file(target).json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
 
 async function refresh(folder: string) {
   const response = await fetch(feed, {
@@ -22,14 +45,12 @@ async function refresh(folder: string) {
   if (issues.length === 0) {
     return;
   }
-  const page = renderNews(issues);
-  const target = join(folder, "index.html");
-  if ((await file(target).text()) === page) {
-    return;
-  }
-  const temporary = join(folder, `.index-${process.pid}.tmp`);
-  await writeFile(temporary, page);
-  await rename(temporary, target);
+  const json = join(folder, "feed.json");
+  await replace(
+    json,
+    JSON.stringify(mergeIssues([...issues, ...(await known(json))]))
+  );
+  await replace(join(folder, "index.html"), renderNews(issues));
 }
 
 const directory = process.argv.at(2) ?? "dist/news";

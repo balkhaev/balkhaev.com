@@ -34,6 +34,8 @@ What this buys us:
 - **Reuse.** The same server plugs into Claude Desktop, Claude Code or Cursor. Employees can use it without our agent.
 - **Isolation.** Only the MCP server process knows the database password, not the agent and certainly not the model.
 
+::news{topic="mcp agents"}
+
 ## Step 1. A demo company database
 
 To keep everything runnable without real infrastructure we use SQLite, which is built into Bun. Three tables: employees, clients and deals. In a real company this is Postgres or ClickHouse, and the server code barely changes.

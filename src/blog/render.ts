@@ -81,6 +81,9 @@ export const seriesPath = (lang: BlogLang, id: string) =>
 
 export const feedPath = (lang: BlogLang) => `${blogPath(lang)}atom.xml`;
 
+/** Script that refreshes news widgets from the live digest feed. */
+export const NEWS_SCRIPT = "/blog/news.js";
+
 /** Folder the build copies KaTeX's stylesheet and fonts into. */
 export const KATEX_PATH = "/blog/katex/";
 
@@ -100,13 +103,24 @@ interface Page {
   description: string;
   lang: BlogLang;
   math?: boolean;
+  /** The page has a news widget: load the script that refreshes it. */
+  news?: boolean;
   /** Path of this page in every language it exists in. */
   paths: Partial<Record<BlogLang, string>>;
   title: string;
   type: "article" | "website";
 }
 
-function layout({ body, description, lang, math, paths, title, type }: Page) {
+function layout({
+  body,
+  description,
+  lang,
+  math,
+  news,
+  paths,
+  title,
+  type,
+}: Page) {
   const label = LABELS[lang];
   const path = paths[lang] ?? blogPath(lang);
   const alternates = BLOG_LANGS.flatMap((code) => {
@@ -138,7 +152,7 @@ function layout({ body, description, lang, math, paths, title, type }: Page) {
     <meta content="#efece6" name="theme-color">
     <link as="font" crossorigin href="/cv/fonts/plex-cyrillic.woff2" rel="preload" type="font/woff2">
     <link href="/site.css" rel="stylesheet">
-    <link href="/blog/blog.css" rel="stylesheet">${math ? `\n    <link href="${KATEX_PATH}katex.min.css" rel="stylesheet">` : ""}
+    <link href="/blog/blog.css" rel="stylesheet">${math ? `\n    <link href="${KATEX_PATH}katex.min.css" rel="stylesheet">` : ""}${news ? `\n    <script defer src="${NEWS_SCRIPT}"></script>` : ""}
     <title>${html(title)}</title>
   </head>
   <body id="top">
@@ -381,6 +395,7 @@ ${post.html}
     description: post.description,
     lang: post.lang,
     math: post.math,
+    news: post.news,
     paths,
     title: `${post.title} · balkhaev`,
     type: "article",

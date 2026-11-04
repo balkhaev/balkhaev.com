@@ -24,6 +24,8 @@ Before writing code, let's list what we are protecting against. All of it happen
 - **A bug in our code.** The job fails on every attempt until we fix the code.
 - **Nobody notices.** The most dangerous one: an automation silently does nothing for a week.
 
+::news{topic="automation"}
+
 ## How it fits together
 
 ```mermaid

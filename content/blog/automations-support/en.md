@@ -28,6 +28,8 @@ In a small company support is usually someone's side job: a manager, a developer
 
 The decision and the last word stay with a person. The system removes everything that happens before they start thinking.
 
+::news{topic="automation agents"}
+
 ## Why a draft and not an auto-reply
 
 It's tempting to send the model's answer to the client straight away. Don't, for three reasons.
