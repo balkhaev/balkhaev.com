@@ -92,7 +92,7 @@ The order of the parts follows the order in which it makes sense to build such a
 5. **[Company knowledge](/blog/agent-search/).** Indexing documents and teaching the agent to search them.
 6. **[Permissions](/blog/agent-auth/).** SSO, OAuth and an agent that acts on behalf of an employee.
 7. **[Context and money](/blog/agent-cost/).** Caching, compacting history, limits.
-8. **The interface.** A chat bot and a web chat.
+8. **[The interface](/blog/agent-interface/).** A chat bot and a web chat.
 9. **Production.** Deploying inside the perimeter, audit, quality checks and prompt-injection defence.
 
 The next two parts look like a teaching agent that works with files. That is deliberate: the loop is easier to see on a simple example, and from part 4 the same code starts calling the company's systems.
