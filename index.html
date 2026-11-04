@@ -4,367 +4,492 @@
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="#000000" name="theme-color">
-    <meta content="Balkhaev. Погружение в чёрную дыру." name="description">
-    <meta content="Balkhaev" property="og:title">
-    <meta content="Погружение в чёрную дыру." property="og:description">
+    <meta
+      content="Михаил Бальхаев, ML-инженер в генеративном AI. Блог о машинном обучении, проекты и резюме."
+      name="description"
+    >
+    <meta content="Михаил Бальхаев" property="og:title">
+    <meta
+      content="ML-инженер в генеративном AI. Блог о машинном обучении, проекты и резюме."
+      property="og:description"
+    >
     <meta content="https://balkhaev.com/" property="og:url">
     <meta content="website" property="og:type">
     <link href="https://balkhaev.com/" rel="canonical">
     <link href="/icon.svg" rel="icon" type="image/svg+xml">
+    <link
+      href="/blog/ru/atom.xml"
+      rel="alternate"
+      title="Блог · balkhaev"
+      type="application/atom+xml"
+    >
     <link href="/style.css" rel="stylesheet">
-    <title>Balkhaev</title>
+    <title>Михаил Бальхаев · balkhaev</title>
   </head>
   <body>
-    <main aria-label="Balkhaev">
-      <div aria-hidden="true" class="fallback"></div>
-      <canvas aria-hidden="true" id="hole"></canvas>
-      <button
-        aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — ближе к центру. Скролл вверх, сведение пальцев или минус — дальше от центра. Скролл меняет только расстояние; время всегда идёт вперёд. Пробел — начать или приостановить движение камеры. P — физика. M — звуковая атмосфера. F — полный экран. Tab — контакты и управление."
-        id="observer"
-        type="button"
-      ></button>
-      <header class="masthead">
-        <h1>balkhaev<span aria-hidden="true">.</span></h1>
-        <nav aria-label="Ссылки" class="contacts">
-          <a href="/blog/ru/">Блог</a>
-          <a
-            href="https://t.me/balkhaev"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Telegram <span aria-hidden="true">↗</span>
-          </a>
-          <a href="mailto:m.balkhaev@gmail.com">
-            Почта <span aria-hidden="true">↗</span>
-          </a>
-        </nav>
-      </header>
-      <footer class="flight-info">
-        <div class="flight-state">
-          <div class="flight-heading">
-            <span aria-hidden="true" class="stage-mark"></span>
-            <span aria-live="polite" id="flight-status">На краю тишины</span>
-          </div>
-          <p id="flight-note">Один путь. Всё ближе к горизонту.</p>
-        </div>
-        <p aria-hidden="true" id="hint">
-          <span class="scroll-mark"></span>
-          <span
-            ><span class="hint-desktop"
-              >Потяните — обзор<span class="hint-divider">/</span>Скролл ↓ —
-              ближе · ↑ — дальше</span
-            ><span class="hint-touch"
-              >Коснитесь — волны · Потяните — обзор · Щипок — расстояние</span
-            ></span
-          >
-        </p>
-        <div class="flight-toolbar">
-          <button
-            aria-keyshortcuts="Space"
-            class="travel-control"
-            id="travel-toggle"
-            type="button"
-          >
-            <svg aria-hidden="true" class="travel-icon" viewBox="0 0 16 16">
-              <path class="play-shape" d="M5 3.5 12 8l-7 4.5Z"></path>
-              <path class="pause-shape" d="M5 4v8m6-8v8"></path>
-            </svg>
-            <span id="travel-label">Начать падение</span>
-          </button>
-          <fieldset aria-label="Атмосфера и обзор" class="scene-controls">
-            <button
-              aria-controls="physics-panel"
-              aria-expanded="false"
-              aria-keyshortcuts="P"
-              aria-label="Физика света"
-              class="scene-control"
-              id="physics-toggle"
-              title="Физика света · P"
-              type="button"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="6.5"></circle>
-                <path d="M10 9v5m0-8v.5"></path>
-              </svg>
-              <span>Физика</span>
-            </button>
-            <button
-              aria-label="Взгляд в центр"
-              aria-pressed="true"
-              class="scene-control"
-              id="gaze-toggle"
-              title="Взгляд в центр. Потяните сцену для свободного обзора."
-              type="button"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="6.5"></circle>
-                <path d="m12.5 7.5-1.3 3.7-3.7 1.3 1.3-3.7Z"></path>
-              </svg>
-              <span>Взгляд</span>
-            </button>
-            <button
-              aria-keyshortcuts="M"
-              aria-label="Звуковая атмосфера"
-              aria-pressed="false"
-              class="scene-control"
-              id="sound-toggle"
-              title="Включить звуковую атмосферу · M"
-              type="button"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <path d="M3 8h3l4-3v10l-4-3H3Z"></path>
-                <path
-                  class="sound-waves"
-                  d="M13 7c1.5 1.6 1.5 4.4 0 6m2.5-9c3 3.3 3 8.7 0 12"
-                ></path>
-                <path class="sound-off" d="m13.5 8 4 4m0-4-4 4"></path>
-              </svg>
-              <span>Звук</span>
-            </button>
-            <button
-              aria-keyshortcuts="F"
-              aria-label="Полный экран"
-              aria-pressed="false"
-              class="scene-control"
-              id="fullscreen-toggle"
-              title="Полный экран · F"
-              type="button"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4"></path>
-              </svg>
-              <span>Экран</span>
-            </button>
-          </fieldset>
-        </div>
-        <div aria-hidden="true" class="journey-position">
-          <div>
-            <span id="journey-radius">12.50</span
-            ><span class="radius-unit" id="journey-unit">rₛ</span>
-          </div>
-          <span class="journey-signal" hidden id="journey-signal"></span>
-        </div>
-        <div aria-hidden="true" class="journey-track">
-          <span id="journey-progress"></span
-          ><i class="horizon-tick" title="Горизонт событий"></i>
-        </div>
-      </footer>
-      <aside
-        aria-labelledby="physics-title"
-        class="physics-panel"
-        hidden
-        id="physics-panel"
-      >
-        <div class="physics-heading">
-          <div>
-            <p class="physics-eyebrow">Наблюдение света</p>
-            <h2 id="physics-title">В искривлённом пространстве</h2>
-          </div>
-          <button
-            aria-label="Закрыть физику"
-            class="physics-close"
-            id="physics-close"
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-        <p class="physics-intro">
-          Скролл выбирает расстояние. Время источников идёт вперёд; каждый луч
-          приносит свет из своего момента прошлого.
-        </p>
-        <div id="physics-measurements">
-          <dl class="physics-metrics">
-            <div>
-              <dt>Радиус от центра</dt>
-              <dd id="physics-radius">12.50 rₛ</dd>
-            </div>
-            <div>
-              <dt>Часы сцены · T<sub>PG</sub></dt>
-              <dd id="physics-time">0.0 rₛ/c</dd>
-            </div>
-            <div>
-              <dt>Падение · v/c</dt>
-              <dd id="physics-speed">0.283</dd>
-            </div>
-            <div>
-              <dt>Статические часы · dτ/dt</dt>
-              <dd id="physics-lapse">0.959</dd>
-            </div>
-            <div>
-              <dt>Приливной градиент</dt>
-              <dd id="physics-tides">1×</dd>
-            </div>
-            <div>
-              <dt>Видимый диаметр тени</dt>
-              <dd id="physics-shadow">—</dd>
-            </div>
-          </dl>
-          <p class="physics-fine" id="physics-frame-note">
-            Скорость — относительно местного статического наблюдателя. Его часы
-            — относительно времени на бесконечности. Приливной градиент
-            сравнивается с начальной глубиной.
+    <header class="site-bar">
+      <a class="brand" href="/">balkhaev<span aria-hidden="true">.</span></a>
+      <nav aria-label="Разделы" class="site-nav">
+        <a href="/blog/ru/">Блог</a>
+        <a href="/cv/ru/">Резюме</a>
+        <a
+          href="https://t.me/balkhaev"
+          rel="noopener noreferrer"
+          target="_blank"
+          >Telegram <span aria-hidden="true" class="nav-arrow">↗</span></a
+        >
+        <a href="mailto:m.balkhaev@gmail.com"
+          >Почта <span aria-hidden="true" class="nav-arrow">↗</span></a
+        >
+      </nav>
+    </header>
+    <main class="home">
+      <section class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">ML-инженер · генеративный AI</p>
+          <h1>Михаил Бальхаев</h1>
+          <p class="lead">
+            Делаю продукты на генеративных моделях целиком: диффузия для фото и
+            видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Пишу о
+            том, как это устроено на практике.
           </p>
-          <div class="physics-spectrum">
-            <button
-              aria-describedby="physics-spectrum-note"
-              aria-pressed="false"
-              class="spectral-switch"
-              id="spectral-toggle"
-              type="button"
+          <p class="actions">
+            <a class="action primary" href="/blog/ru/"
+              >Читать блог <span aria-hidden="true">→</span></a
             >
-              <span>Карта частот</span
-              ><span aria-hidden="true" class="switch-track"></span>
-            </button>
-            <p class="physics-fine" id="physics-spectrum-note">
-              Условные цвета показывают g = νнабл / νист: красный — частота
-              ниже, голубой — выше. Это суммарный гравитационный и доплеровский
-              сдвиг каждого источника. Яркость карты условная, чтобы оставались
-              видны сильно смещённые источники.
-            </p>
-            <div class="spectrum-legend" hidden id="spectrum-legend">
-              <span>¼×</span><span>½×</span><span>1×</span><span>2×</span
-              ><span>4×</span>
-            </div>
-          </div>
-          <div class="physics-sky">
-            <h3>Свет и видимый ход часов</h3>
-            <p class="physics-fine">
-              Более частые сигналы синеют, более редкие — краснеют. Темп зависит
-              от направления: всё небо не ускоряется одновременно.
-            </p>
-            <dl class="sky-shifts">
-              <div>
-                <dt>По центру обзора</dt>
-                <dd id="physics-forward">Тень</dd>
-              </div>
-              <div>
-                <dt>Поперёк падения · 90°</dt>
-                <dd id="physics-side">1×</dd>
-              </div>
-              <div>
-                <dt>Против падения · 180°</dt>
-                <dd id="physics-rear">—</dd>
-              </div>
-            </dl>
-            <div class="light-clocks" id="light-clocks">
-              <p class="clock-heading">Локальное сравнение сигналов</p>
-              <div class="light-clock" data-clock="local">
-                <span>Ваш эталон</span><output>1×</output>
-                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
-              </div>
-              <div class="light-clock" data-clock="rim">
-                <span>За краем тени · 2°</span><output>—</output>
-                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
-              </div>
-              <div class="light-clock" data-clock="forward">
-                <span>По центру обзора</span><output>—</output>
-                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
-              </div>
-              <div class="light-clock" data-clock="rear">
-                <span>Сзади · 180°</span><output>—</output>
-                <div aria-hidden="true" class="clock-path"><i></i><b></b></div>
-              </div>
-              <p class="physics-fine">
-                Движущиеся точки сравнивают мгновенный приём одинаковых сигналов
-                в выбранном падающем кадре. Это локальная иллюстрация отношения
-                частот, а не отдельные часы сцены.
-              </p>
-            </div>
-          </div>
+            <a class="action" href="/cv/ru/">Резюме</a>
+          </p>
         </div>
-        <div class="physics-explanation">
-          <details open>
-            <summary>Почему свет меняется</summary>
-            <p>
-              Искривление лучей создаёт несколько изображений диска и звёзд.
-              Лучи, проходящие у сферы фотонов на 1.5 rₛ, могут сделать
-              дополнительные обороты — отсюда тонкие световые кольца.
-            </p>
-            <p>
-              Движение плазмы усиливает свет приближающейся стороны и ослабляет
-              удаляющуюся. Гравитация и скорость камеры вместе меняют частоту,
-              цвет и яркость. Для теплового света рассчитывается спектр при
-              температуре gT.
-            </p>
-            <p>
-              На горизонте, r = 1 rₛ, у свободно падающего наблюдателя нет
-              вспышки или поверхности. Внешний свет продолжает приходить. Глубже
-              его изображение всё сильнее собирается у краёв обзора, пока
-              направление падения остаётся в центре.
-            </p>
-            <p>
-              Несколько переменных источников снаружи посылают узнаваемые
-              световые импульсы. Каждый повторный образ приносит тот же источник
-              из другого момента прошлого. Вспышка в диске тоже возвращается в
-              задержанных изображениях.
-            </p>
-            <p>
-              При скользящем прохождении через плазму луч пересекает больше
-              вещества. Ближние потоки сильнее заслоняют дальний свет; сквозь
-              промежутки остаются видны более старые изображения того же диска.
-            </p>
-          </details>
-          <details>
-            <summary>Часы, задержки и расстояние</summary>
-            <p>
-              Общие часы сцены никогда не перематываются. Расстояние меняет
-              время пути конкретного луча: Tисп = Tнабл − ΔT. Поэтому прямое
-              изображение и свет, обогнувший дыру, показывают один источник в
-              разные моменты.
-            </p>
-            <p>
-              Камера использует локальную систему свободного падения из
-              состояния покоя на бесконечности. В регулярном времени Пенлеве —
-              Гулльстранда вдоль этой траектории dT/dτ = 1. Поэтому к общему
-              ходу времени не добавляется ещё один произвольный коэффициент
-              замедления.
-            </p>
-            <p>
-              Скролл исследует локальные кадры на разных радиусах. Он не
-              моделирует физическое зависание или выход из горизонта: внутри все
-              будущие пути ведут к меньшему радиусу.
-            </p>
-            <p>
-              При удержании глубины картинка показывает последовательность
-              выбранных локальных кадров. Частота получаемых сигналов для
-              реального падающего наблюдателя сравнивается отдельно выше.
-            </p>
-          </details>
-          <details>
-            <summary>Приливы и границы модели</summary>
-            <p>
-              Радиальное растяжение растёт как 1/r³; поперечные направления
-              сжимаются. В панели показана относительная сила этого градиента, а
-              не искусственная деформация всей картинки.
-            </p>
-            <p>
-              Модель описывает невращающуюся чёрную дыру Шварцшильда. Радиусы
-              даны в rₛ = 2GM/c², время — в rₛ/c. Масса не задана, поэтому
-              секунды, километры и сила на тело не подменяются произвольными
-              числами. Расчёт заканчивается на 0.02 rₛ. Сингулярность и
-              дальнейший путь здесь не изображаются.
-            </p>
-          </details>
+        <figure class="portal">
+          <div class="portal-frame">
+            <section
+              aria-label="Падение в чёрную дыру"
+              class="scene"
+              data-state="compact"
+              id="scene"
+            >
+              <div aria-hidden="true" class="fallback"></div>
+              <canvas aria-hidden="true" id="hole"></canvas>
+              <button
+                aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — ближе к центру. Скролл вверх, сведение пальцев или минус — дальше от центра. Скролл меняет только расстояние; время всегда идёт вперёд. Пробел — начать или приостановить движение камеры. P — физика. M — звуковая атмосфера. F — полный экран. Escape — свернуть сцену."
+                id="observer"
+                type="button"
+              ></button>
+              <div class="scene-bar">
+                <p class="scene-title">Падение в чёрную дыру</p>
+                <button
+                  aria-keyshortcuts="Escape"
+                  class="scene-close"
+                  id="scene-close"
+                  type="button"
+                >
+                  Свернуть <span aria-hidden="true" class="close-mark">×</span>
+                </button>
+              </div>
+              <footer class="flight-info">
+                <div class="flight-state">
+                  <div class="flight-heading">
+                    <span aria-hidden="true" class="stage-mark"></span>
+                    <span aria-live="polite" id="flight-status"
+                      >На краю тишины</span
+                    >
+                  </div>
+                  <p id="flight-note">Один путь. Всё ближе к горизонту.</p>
+                </div>
+                <p aria-hidden="true" id="hint">
+                  <span class="scroll-mark"></span>
+                  <span
+                    ><span class="hint-desktop"
+                      >Потяните — обзор<span class="hint-divider">/</span>Скролл
+                      ↓ — ближе · ↑ — дальше</span
+                    ><span class="hint-touch"
+                      >Коснитесь — волны · Потяните — обзор · Щипок —
+                      расстояние</span
+                    ></span
+                  >
+                </p>
+                <div class="flight-toolbar">
+                  <button
+                    aria-keyshortcuts="Space"
+                    class="travel-control"
+                    id="travel-toggle"
+                    type="button"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="travel-icon"
+                      viewBox="0 0 16 16"
+                    >
+                      <path class="play-shape" d="M5 3.5 12 8l-7 4.5Z"></path>
+                      <path class="pause-shape" d="M5 4v8m6-8v8"></path>
+                    </svg>
+                    <span id="travel-label">Начать падение</span>
+                  </button>
+                  <fieldset
+                    aria-label="Атмосфера и обзор"
+                    class="scene-controls"
+                  >
+                    <button
+                      aria-controls="physics-panel"
+                      aria-expanded="false"
+                      aria-keyshortcuts="P"
+                      aria-label="Физика света"
+                      class="scene-control"
+                      id="physics-toggle"
+                      title="Физика света · P"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="6.5"></circle>
+                        <path d="M10 9v5m0-8v.5"></path>
+                      </svg>
+                      <span>Физика</span>
+                    </button>
+                    <button
+                      aria-label="Взгляд в центр"
+                      aria-pressed="true"
+                      class="scene-control"
+                      id="gaze-toggle"
+                      title="Взгляд в центр. Потяните сцену для свободного обзора."
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="6.5"></circle>
+                        <path d="m12.5 7.5-1.3 3.7-3.7 1.3 1.3-3.7Z"></path>
+                      </svg>
+                      <span>Взгляд</span>
+                    </button>
+                    <button
+                      aria-keyshortcuts="M"
+                      aria-label="Звуковая атмосфера"
+                      aria-pressed="false"
+                      class="scene-control"
+                      id="sound-toggle"
+                      title="Включить звуковую атмосферу · M"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <path d="M3 8h3l4-3v10l-4-3H3Z"></path>
+                        <path
+                          class="sound-waves"
+                          d="M13 7c1.5 1.6 1.5 4.4 0 6m2.5-9c3 3.3 3 8.7 0 12"
+                        ></path>
+                        <path class="sound-off" d="m13.5 8 4 4m0-4-4 4"></path>
+                      </svg>
+                      <span>Звук</span>
+                    </button>
+                    <button
+                      aria-keyshortcuts="F"
+                      aria-label="Полный экран"
+                      aria-pressed="false"
+                      class="scene-control"
+                      id="fullscreen-toggle"
+                      title="Полный экран · F"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4"></path>
+                      </svg>
+                      <span>Экран</span>
+                    </button>
+                  </fieldset>
+                </div>
+                <div aria-hidden="true" class="journey-position">
+                  <div>
+                    <span id="journey-radius">12.50</span
+                    ><span class="radius-unit" id="journey-unit">rₛ</span>
+                  </div>
+                  <span
+                    class="journey-signal"
+                    hidden
+                    id="journey-signal"
+                  ></span>
+                </div>
+                <div aria-hidden="true" class="journey-track">
+                  <span id="journey-progress"></span
+                  ><i class="horizon-tick" title="Горизонт событий"></i>
+                </div>
+              </footer>
+              <aside
+                aria-labelledby="physics-title"
+                class="physics-panel"
+                hidden
+                id="physics-panel"
+              >
+                <div class="physics-heading">
+                  <div>
+                    <p class="physics-eyebrow">Наблюдение света</p>
+                    <h2 id="physics-title">В искривлённом пространстве</h2>
+                  </div>
+                  <button
+                    aria-label="Закрыть физику"
+                    class="physics-close"
+                    id="physics-close"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p class="physics-intro">
+                  Скролл выбирает расстояние. Время источников идёт вперёд;
+                  каждый луч приносит свет из своего момента прошлого.
+                </p>
+                <div id="physics-measurements">
+                  <dl class="physics-metrics">
+                    <div>
+                      <dt>Радиус от центра</dt>
+                      <dd id="physics-radius">12.50 rₛ</dd>
+                    </div>
+                    <div>
+                      <dt>Часы сцены · T<sub>PG</sub></dt>
+                      <dd id="physics-time">0.0 rₛ/c</dd>
+                    </div>
+                    <div>
+                      <dt>Падение · v/c</dt>
+                      <dd id="physics-speed">0.283</dd>
+                    </div>
+                    <div>
+                      <dt>Статические часы · dτ/dt</dt>
+                      <dd id="physics-lapse">0.959</dd>
+                    </div>
+                    <div>
+                      <dt>Приливной градиент</dt>
+                      <dd id="physics-tides">1×</dd>
+                    </div>
+                    <div>
+                      <dt>Видимый диаметр тени</dt>
+                      <dd id="physics-shadow">—</dd>
+                    </div>
+                  </dl>
+                  <p class="physics-fine" id="physics-frame-note">
+                    Скорость — относительно местного статического наблюдателя.
+                    Его часы — относительно времени на бесконечности. Приливной
+                    градиент сравнивается с начальной глубиной.
+                  </p>
+                  <div class="physics-spectrum">
+                    <button
+                      aria-describedby="physics-spectrum-note"
+                      aria-pressed="false"
+                      class="spectral-switch"
+                      id="spectral-toggle"
+                      type="button"
+                    >
+                      <span>Карта частот</span
+                      ><span aria-hidden="true" class="switch-track"></span>
+                    </button>
+                    <p class="physics-fine" id="physics-spectrum-note">
+                      Условные цвета показывают g = νнабл / νист: красный —
+                      частота ниже, голубой — выше. Это суммарный гравитационный
+                      и доплеровский сдвиг каждого источника. Яркость карты
+                      условная, чтобы оставались видны сильно смещённые
+                      источники.
+                    </p>
+                    <div class="spectrum-legend" hidden id="spectrum-legend">
+                      <span>¼×</span><span>½×</span><span>1×</span
+                      ><span>2×</span><span>4×</span>
+                    </div>
+                  </div>
+                  <div class="physics-sky">
+                    <h3>Свет и видимый ход часов</h3>
+                    <p class="physics-fine">
+                      Более частые сигналы синеют, более редкие — краснеют. Темп
+                      зависит от направления: всё небо не ускоряется
+                      одновременно.
+                    </p>
+                    <dl class="sky-shifts">
+                      <div>
+                        <dt>По центру обзора</dt>
+                        <dd id="physics-forward">Тень</dd>
+                      </div>
+                      <div>
+                        <dt>Поперёк падения · 90°</dt>
+                        <dd id="physics-side">1×</dd>
+                      </div>
+                      <div>
+                        <dt>Против падения · 180°</dt>
+                        <dd id="physics-rear">—</dd>
+                      </div>
+                    </dl>
+                    <div class="light-clocks" id="light-clocks">
+                      <p class="clock-heading">Локальное сравнение сигналов</p>
+                      <div class="light-clock" data-clock="local">
+                        <span>Ваш эталон</span><output>1×</output>
+                        <div aria-hidden="true" class="clock-path">
+                          <i></i><b></b>
+                        </div>
+                      </div>
+                      <div class="light-clock" data-clock="rim">
+                        <span>За краем тени · 2°</span><output>—</output>
+                        <div aria-hidden="true" class="clock-path">
+                          <i></i><b></b>
+                        </div>
+                      </div>
+                      <div class="light-clock" data-clock="forward">
+                        <span>По центру обзора</span><output>—</output>
+                        <div aria-hidden="true" class="clock-path">
+                          <i></i><b></b>
+                        </div>
+                      </div>
+                      <div class="light-clock" data-clock="rear">
+                        <span>Сзади · 180°</span><output>—</output>
+                        <div aria-hidden="true" class="clock-path">
+                          <i></i><b></b>
+                        </div>
+                      </div>
+                      <p class="physics-fine">
+                        Движущиеся точки сравнивают мгновенный приём одинаковых
+                        сигналов в выбранном падающем кадре. Это локальная
+                        иллюстрация отношения частот, а не отдельные часы сцены.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="physics-explanation">
+                  <details open>
+                    <summary>Почему свет меняется</summary>
+                    <p>
+                      Искривление лучей создаёт несколько изображений диска и
+                      звёзд. Лучи, проходящие у сферы фотонов на 1.5 rₛ, могут
+                      сделать дополнительные обороты — отсюда тонкие световые
+                      кольца.
+                    </p>
+                    <p>
+                      Движение плазмы усиливает свет приближающейся стороны и
+                      ослабляет удаляющуюся. Гравитация и скорость камеры вместе
+                      меняют частоту, цвет и яркость. Для теплового света
+                      рассчитывается спектр при температуре gT.
+                    </p>
+                    <p>
+                      На горизонте, r = 1 rₛ, у свободно падающего наблюдателя
+                      нет вспышки или поверхности. Внешний свет продолжает
+                      приходить. Глубже его изображение всё сильнее собирается у
+                      краёв обзора, пока направление падения остаётся в центре.
+                    </p>
+                    <p>
+                      Несколько переменных источников снаружи посылают
+                      узнаваемые световые импульсы. Каждый повторный образ
+                      приносит тот же источник из другого момента прошлого.
+                      Вспышка в диске тоже возвращается в задержанных
+                      изображениях.
+                    </p>
+                    <p>
+                      При скользящем прохождении через плазму луч пересекает
+                      больше вещества. Ближние потоки сильнее заслоняют дальний
+                      свет; сквозь промежутки остаются видны более старые
+                      изображения того же диска.
+                    </p>
+                  </details>
+                  <details>
+                    <summary>Часы, задержки и расстояние</summary>
+                    <p>
+                      Общие часы сцены никогда не перематываются. Расстояние
+                      меняет время пути конкретного луча: Tисп = Tнабл − ΔT.
+                      Поэтому прямое изображение и свет, обогнувший дыру,
+                      показывают один источник в разные моменты.
+                    </p>
+                    <p>
+                      Камера использует локальную систему свободного падения из
+                      состояния покоя на бесконечности. В регулярном времени
+                      Пенлеве — Гулльстранда вдоль этой траектории dT/dτ = 1.
+                      Поэтому к общему ходу времени не добавляется ещё один
+                      произвольный коэффициент замедления.
+                    </p>
+                    <p>
+                      Скролл исследует локальные кадры на разных радиусах. Он не
+                      моделирует физическое зависание или выход из горизонта:
+                      внутри все будущие пути ведут к меньшему радиусу.
+                    </p>
+                    <p>
+                      При удержании глубины картинка показывает
+                      последовательность выбранных локальных кадров. Частота
+                      получаемых сигналов для реального падающего наблюдателя
+                      сравнивается отдельно выше.
+                    </p>
+                  </details>
+                  <details>
+                    <summary>Приливы и границы модели</summary>
+                    <p>
+                      Радиальное растяжение растёт как 1/r³; поперечные
+                      направления сжимаются. В панели показана относительная
+                      сила этого градиента, а не искусственная деформация всей
+                      картинки.
+                    </p>
+                    <p>
+                      Модель описывает невращающуюся чёрную дыру Шварцшильда.
+                      Радиусы даны в rₛ = 2GM/c², время — в rₛ/c. Масса не
+                      задана, поэтому секунды, километры и сила на тело не
+                      подменяются произвольными числами. Расчёт заканчивается на
+                      0.02 rₛ. Сингулярность и дальнейший путь здесь не
+                      изображаются.
+                    </p>
+                  </details>
+                </div>
+                <p class="physics-sources">
+                  Основание модели:
+                  <a
+                    href="https://jila.colorado.edu/~ajsh/insidebh/schw.html"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    >A. Hamilton ↗</a
+                  >
+                  ·
+                  <a
+                    href="https://arxiv.org/abs/0903.4717"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    >Hamilton &amp; Polhemus ↗</a
+                  >
+                </p>
+              </aside>
+              <button
+                aria-controls="scene"
+                aria-expanded="false"
+                class="scene-open"
+                id="scene-open"
+                type="button"
+              >
+                <span class="scene-open-label"
+                  >Погрузиться <span aria-hidden="true">↗</span></span
+                >
+              </button>
+            </section>
+          </div>
+          <figcaption>
+            Падение в чёрную дыру Шварцшильда: трассировка лучей на WebGL прямо
+            в браузере. Нажмите, чтобы развернуть сцену.
+          </figcaption>
+        </figure>
+      </section>
+      <section aria-labelledby="latest-title" class="block">
+        <div class="block-head">
+          <h2 id="latest-title">Свежее в блоге</h2>
+          <a href="/blog/ru/">Все посты <span aria-hidden="true">→</span></a>
         </div>
-        <p class="physics-sources">
-          Основание модели:
-          <a
-            href="https://jila.colorado.edu/~ajsh/insidebh/schw.html"
-            rel="noopener noreferrer"
-            target="_blank"
-            >A. Hamilton ↗</a
+        <!-- home:posts -->
+      </section>
+      <section aria-labelledby="projects-title" class="block">
+        <div class="block-head">
+          <h2 id="projects-title">Проекты</h2>
+          <a href="/cv/ru/"
+            >Подробнее в резюме <span aria-hidden="true">→</span></a
           >
-          ·
-          <a
-            href="https://arxiv.org/abs/0903.4717"
-            rel="noopener noreferrer"
-            target="_blank"
-            >Hamilton &amp; Polhemus ↗</a
-          >
-        </p>
-      </aside>
+        </div>
+        <!-- home:projects -->
+      </section>
     </main>
+    <footer class="site-foot">
+      <p>Михаил Бальхаев · Москва</p>
+      <p>
+        <a
+          href="https://t.me/balkhaev"
+          rel="noopener noreferrer"
+          target="_blank"
+          >t.me/balkhaev</a
+        >
+        <a href="mailto:m.balkhaev@gmail.com">m.balkhaev@gmail.com</a>
+        <a href="/blog/">Blog in English</a>
+      </p>
+    </footer>
     <script src="/app.js" type="module"></script>
   </body>
 </html>
