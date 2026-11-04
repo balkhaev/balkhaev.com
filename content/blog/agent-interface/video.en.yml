@@ -1,0 +1,65 @@
+context: Company AI agent · 8/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 8
+    title: "The interface: *web chat and a Slack bot*"
+    subtitle: Taking the agent out of the terminal, with SSO login.
+
+  - type: list
+    label: Requirements
+    heading: What the interface must do
+    items:
+      - "*Know who is asking*: corporate SSO login"
+      - "*Keep access all day*: a refresh token, stored carefully"
+      - "*Show the answer as it is written*"
+      - "*Remember conversations* across sessions"
+      - "*Confirm dangerous actions* with a button"
+
+  - type: diagram
+    label: The scheme
+    heading: One core, two interfaces
+    nodes:
+      - { id: browser, label: Browser, sub: web chat, col: 0, row: 0, w: 3, step: 0 }
+      - { id: slack, label: Slack, sub: direct messages, col: 0, row: 3, w: 3, step: 0 }
+      - { id: web, label: Web server, sub: "login, sessions, SSE", col: 4, row: 1, w: 3, step: 1 }
+      - { id: core, label: Agent core, sub: "loop, cache, limits", col: 8, row: 1, w: 4, step: 2, accent: true }
+      - { id: store, label: Storage, sub: "accounts, conversations", col: 8, row: 4, w: 4, step: 3 }
+    edges:
+      - { from: browser, to: web }
+      - { from: slack, to: web, label: events }
+      - { from: web, to: core }
+      - { from: core, to: store }
+    say: The core knows nothing about interfaces and reports progress through callbacks. One agent per employee, one turn at a time, rollback on failure.
+
+  - type: statement
+    label: Login
+    text: Authorization code with *PKCE*. state stops login forgery, the verifier stops code theft.
+    say: The refresh token is single-use and stored encrypted. Two concurrent refreshes must not cancel each other.
+
+  - type: list
+    label: Web security
+    heading: Small things that matter
+    items:
+      - "Cookie *HttpOnly, SameSite, Secure*"
+      - "*JSON only* in POST, a foreign form can't get through"
+      - "*Someone else's conversation returns 404*, not 403"
+      - "Model output via *textContent*, never innerHTML"
+
+  - type: list
+    label: Slack
+    heading: A bot in the messenger
+    items:
+      - "*Verify the signature* of every event"
+      - "*Reply within three seconds*, work in the background"
+      - "*Link the account* via SSO login with an email check"
+      - "*Direct messages only*: the answer uses the asker's rights"
+      - "*Stream by editing* one message"
+
+  - type: statement
+    label: Verified
+    text: Igor sees *only his own deals*, on the web and in Slack. Other people's conversations are off limits.
+    say: After a server restart the bot answers without a new login, the token is refreshed from the database.
+
+  - type: end
+    text: The interface is ready. One step left, *production*.
+    url: balkhaev.com/blog/agent-interface

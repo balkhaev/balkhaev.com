@@ -1,0 +1,70 @@
+context: Коммерческие автоматизации · 2/8
+scenes:
+  - type: title
+    kicker: Коммерческие автоматизации · часть 2
+    title: "Фундамент: сервер, база и *деплой по пушу*"
+    subtitle: VPS, Postgres с миграциями, HTTPS и GitHub Actions.
+
+  - type: diagram
+    label: Что получится
+    heading: От пуша до работающего сервиса
+    nodes:
+      - { id: push, label: Push в main, col: 0, row: 0, w: 3, step: 0 }
+      - { id: ci, label: GitHub Actions, sub: "типы, образ, ghcr.io", col: 4, row: 0, w: 4, step: 1 }
+      - { id: caddy, label: caddy, sub: "HTTPS, :443", col: 0, row: 3, w: 3, step: 2 }
+      - { id: app, label: app, sub: "Bun, :3000", col: 4, row: 3, w: 4, step: 2, accent: true }
+      - { id: db, label: db, sub: "Postgres, том pgdata", col: 9, row: 3, w: 3, step: 2 }
+    edges:
+      - { from: push, to: ci }
+      - { from: ci, to: app, label: ssh + deploy.sh }
+      - { from: caddy, to: app }
+      - { from: app, to: db }
+    say: Один VPS и Docker Compose с тремя контейнерами. Образ собирается в CI, сервер только скачивает и перезапускает.
+
+  - type: list
+    label: Сервер
+    heading: Базовая настройка VPS
+    items:
+      - Ubuntu, два ядра, 2–4 ГБ памяти, несколько евро в месяц
+      - "*Вход только по ключу*, пароль запрещён"
+      - "Наружу открыты *только SSH и веб*"
+      - "Порты базы *не публикуем*: Docker обходит ufw"
+      - Домен с A-записью, Caddy сам получит сертификат
+
+  - type: list
+    label: Сервис
+    heading: Минимальный сервис на Bun
+    items:
+      - "*Конфигурация только из окружения*, падаем без нужной переменной"
+      - "*Миграции* это SQL-файлы с номером, применённые не правим"
+      - "*/health* проверяет, что сервис видит базу"
+      - "*/hooks/:source* сначала сохраняет событие, потом всё остальное"
+
+  - type: list
+    label: Compose
+    heading: Что важно в compose-файле
+    items:
+      - "*image, а не build*: на сервере ничего не собираем"
+      - "*Тег это хеш коммита*: откат это деплой старого хеша"
+      - "*service_healthy*: сервис стартует, когда база готова"
+      - "*Именованные тома*: данные переживают пересоздание"
+      - "*Версия Postgres зафиксирована*"
+
+  - type: list
+    label: Деплой
+    heading: Четыре шага на каждый пуш
+    numbered: true
+    items:
+      - Проверить типы
+      - Собрать образ и положить в реестр
+      - Скачать образ, прогнать миграции, перезапустить
+      - Проверить /health
+
+  - type: statement
+    label: Бэкап
+    text: С первого дня, как в базе *настоящие данные*, нужен хотя бы ночной дамп.
+    say: Полноценные бэкапы с копией в другом месте разберём в части про эксплуатацию.
+
+  - type: end
+    text: "Фундамент готов. Дальше *сердце системы*: очередь и повторы."
+    url: balkhaev.com/blog/ru/automations-foundation
