@@ -54,7 +54,7 @@ const AIGF_SITES = ["luv.club", "adorely.co", "sinly.io"];
 export const RESUMES: Record<Lang, Resume> = {
   en: {
     description:
-      "Mikhail Balkhaev, ML engineer working on generative AI: image and video diffusion, speech, LLM agents and GPU infrastructure.",
+      "Mikhail Balkhaev, ML engineer working on generative AI: image and video diffusion, speech, LLM agents, vector search and GPU infrastructure.",
     details:
       "Full-time, part-time or project work; remote, hybrid or on-site; open to business travel and relocation within Russia.",
     earlier: [
@@ -168,64 +168,30 @@ export const RESUMES: Record<Lang, Resume> = {
         ],
       },
       {
-        label: "Data products",
+        label: "Client projects",
+        projects: [
+          {
+            name: "ZemStroy CRM",
+            text: "Sales CRM for a land development company, designed and built from scratch: leads from amoCRM, Avito and CIAN in one pipeline on Redis/BullMQ queues; every call transcribed with Whisper and scored by an LLM; a first-response bot with versioned prompts; semantic search on embeddings in Qdrant; Telegram alerts on new leads and SLA breaches.",
+          },
+          {
+            name: "Altai Land",
+            text: "Sales website for a land development project in Altai with an interactive 3D valley on Three.js: scene packages streamed to mobile devices (first load cut from 7.2 to 3.7 MB), a chunked forest of 79,125 trees (5.9M to 1.2M triangles), a 568-plot masterplan shared by the 2D and 3D views, and 31 indexable pages for search traffic.",
+            url: "https://алтайземля.рф/",
+          },
+        ],
+      },
+      {
+        label: "Data and search products",
         projects: [
           {
             name: "ggpick.club",
-            text: "Game discovery in Russian, English and Chinese: Steam and community data in PostgreSQL, hybrid search on multilingual-e5 embeddings in Qdrant with cross-encoder reranking and a fallback when models are down, transliteration and keyboard-layout correction. 200+ unique visitors a day.",
+            text: "Multilingual game discovery service in Russian, English and Chinese: Steam and community data in PostgreSQL, hybrid search on multilingual-e5 embeddings in Qdrant with cross-encoder reranking and graceful degradation when models are unavailable, transliteration and keyboard-layout correction for queries. 200+ unique visitors a day.",
             url: "https://ggpick.club/",
           },
           {
             name: "Polywin",
-            text: "Polymarket research: typed market-data clients with WebSocket order-book reconciliation, an opportunity scanner that accounts for depth and fees, LLM news-to-market reasoning with validated quotes, and forecasts scored by Brier score and calibration. A signal needs 30+ resolved markets and a statistically positive edge.",
-          },
-          {
-            name: "AI News",
-            text: "Radar of new models and AI tools from 44 sources (GitHub, Hugging Face, arXiv, Reddit, X): grounded Russian summaries with quote checks, hybrid semantic search with a CPU cross-encoder, growth signals from stars and commits. Moving blocking work off the event loop cut p99 pauses from 585 to 62 ms.",
-          },
-          {
-            name: "FastNews",
-            text: "RSS and X news desk: safe article extraction, URL and text deduplication, LLM enrichment (entities, topics, claims, forecasts) with schema and quote validation, and a versioned API that feeds Polywin.",
-          },
-          {
-            name: "Soclogin",
-            text: "Service for my own Instagram, X and Avito accounts: an AES-256-GCM credential vault, idempotent browser operations on Playwright, tenant-scoped feeds for the news products and MCP diagnostics.",
-          },
-        ],
-      },
-      {
-        label: "Sites and client work",
-        projects: [
-          {
-            name: "ZemStroy CRM",
-            text: "Sales CRM for a land development company: amoCRM, Avito and CIAN integrations on Redis/BullMQ, call transcription with Whisper and LLM call scoring, a first-response bot with versioned prompts, Telegram alerts for new leads and SLA breaches.",
-          },
-          {
-            name: "Altai Land",
-            text: "Land-development site with an interactive 3D valley on Three.js: streamed scene packages for mobile (first load from 7.2 to 3.7 MB), a chunked forest of 79,125 trees (5.9M to 1.2M triangles), a 568-plot masterplan shared by 2D and 3D, 31 indexable pages.",
-            url: "https://алтайземля.рф/",
-          },
-          {
-            name: "balkhaev.com",
-            text: "Falling into a Schwarzschild black hole in the browser: WebGL ray tracing in Painlevé–Gullstrand coordinates, a lensed star catalogue with Doppler and gravitational shifts, and tests against independent numerical quadrature.",
-            url: "https://balkhaev.com/",
-          },
-        ],
-      },
-      {
-        label: "Tools and games",
-        projects: [
-          {
-            name: "DevHub",
-            text: "Development platform for me and my AI agents: dependency-aware process supervision, a worktree and release workflow gated by checks, Canvas and Kanban project knowledge served over MCP, and Coolify deployment monitoring.",
-          },
-          {
-            name: "Gamza",
-            text: "Isometric extraction autobattler on Unreal Engine 5.8 and C++: a deterministic headless simulation with hash-verified replays, tactical squad AI (hearing, flanking, suppression), a persistent living world, maps built from geodata and an automatic cinematic camera.",
-          },
-          {
-            name: "Habar",
-            text: "Pixel-art idle strategy game in TypeScript: a DOM-independent simulation, seeded shot-by-shot combat, factions, convoys and an economy, and procedural terrain painted in Web Workers.",
+            text: "Research platform for Polymarket prediction markets: typed market-data clients with WebSocket order-book reconciliation, an opportunity scanner that accounts for book depth and fees, semantic retrieval on embeddings in Qdrant and LLM analysis of news with validated quotes, forecasts scored by Brier score and calibration. A strategy emits signals only after 30+ resolved markets with a statistically significant edge.",
           },
         ],
       },
@@ -247,8 +213,13 @@ export const RESUMES: Record<Lang, Resume> = {
           "ComfyUI, vLLM, ONNX Runtime, RunPod, GPU scheduling, Redis/BullMQ",
       },
       {
+        group: "Search and RAG",
+        items:
+          "Embeddings (OpenAI, multilingual-e5, CLIP, AuraFace), Qdrant, pgvector, hybrid search, cross-encoder reranking, RAG, LLM memory",
+      },
+      {
         group: "LLM and agents",
-        items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
+        items: "Tool use, MCP, Claude, GPT, Grok, Qwen",
       },
       {
         group: "Backend and data",
@@ -257,12 +228,11 @@ export const RESUMES: Record<Lang, Resume> = {
       },
       {
         group: "Frontend and 3D",
-        items:
-          "React, Next.js, Three.js, WebGL, Unreal Engine 5 (C++), Blender, Playwright",
+        items: "React, Next.js, Three.js, WebGL, Blender, Playwright",
       },
     ],
     summary:
-      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents and the GPU infrastructure that runs them. I build products end to end, from the model pipeline and its evaluation to the backend and interface: in 2026 that meant media generation services, data platforms, a CRM and an Unreal Engine game. Before 2024 I spent 13 years in web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
+      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents, search and the GPU infrastructure behind them. I take products from the model pipeline and quality evaluation to the backend, the interface and production. Embeddings and vector search (Qdrant, pgvector) with hybrid retrieval and reranking run through most of my projects: companion memory at AIGF, RAG at Funcorp, game search on ggpick.club, the Polywin research platform and a sales CRM. Before that, 13 years of web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
     title: "Mikhail Balkhaev — CV",
     web: [
       {
@@ -308,7 +278,7 @@ export const RESUMES: Record<Lang, Resume> = {
   },
   ru: {
     description:
-      "Михаил Бальхаев, ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура.",
+      "Михаил Бальхаев, ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты, векторный поиск и GPU-инфраструктура.",
     details:
       "Полная или частичная занятость, проекты; удалённо, гибрид или офис; готов к переезду по России.",
     earlier: [
@@ -422,64 +392,30 @@ export const RESUMES: Record<Lang, Resume> = {
         ],
       },
       {
-        label: "Продукты на данных",
+        label: "Коммерческие проекты",
+        projects: [
+          {
+            name: "CRM Земстрой",
+            text: "CRM отдела продаж компании по продаже земли, спроектирована и сделана с нуля: лиды из amoCRM, Avito и ЦИАН в одной воронке на очередях Redis/BullMQ; каждый звонок транскрибируется Whisper и оценивается LLM; бот первого ответа с версиями промптов; семантический поиск на эмбеддингах в Qdrant; уведомления в Telegram о новых лидах и нарушениях SLA.",
+          },
+          {
+            name: "Алтай — живая земля",
+            text: "Продающий сайт посёлка на Алтае с интерактивной 3D-долиной на Three.js: потоковая загрузка сцен на мобильных (первая загрузка с 7,2 до 3,7 МБ), лес из 79 125 деревьев по чанкам (с 5,9 до 1,2 млн треугольников), генплан на 568 участков, общий для 2D и 3D, 31 индексируемая страница под поисковый трафик.",
+            url: "https://алтайземля.рф/",
+          },
+        ],
+      },
+      {
+        label: "Продукты на данных и поиске",
         projects: [
           {
             name: "ggpick.club",
-            text: "Поиск игр на русском, английском и китайском: данные Steam и сообществ в PostgreSQL, гибридный поиск на эмбеддингах multilingual-e5 в Qdrant с переранжированием cross-encoder и запасным путём при отказе моделей, транслитерация и исправление раскладки. 200+ уникальных посетителей в день.",
+            text: "Поиск игр на русском, английском и китайском: данные Steam и сообществ в PostgreSQL, гибридный поиск на эмбеддингах multilingual-e5 в Qdrant с переранжированием cross-encoder и деградацией без отказа, если модели недоступны, транслитерация и исправление раскладки в запросах. 200+ уникальных посетителей в день.",
             url: "https://ggpick.club/",
           },
           {
             name: "Polywin",
-            text: "Исследование Polymarket: типизированные клиенты рыночных данных со сверкой стакана по WebSocket, сканер возможностей с учётом глубины и комиссий, разбор новостей LLM с проверкой цитат и прогнозы с оценкой по Brier score и калибровке. Сигнал требует 30+ закрытых рынков и статистически значимого преимущества.",
-          },
-          {
-            name: "AI News",
-            text: "Радар новых моделей и AI-инструментов из 44 источников (GitHub, Hugging Face, arXiv, Reddit, X): пересказы на русском с проверкой цитат, гибридный семантический поиск с cross-encoder на CPU, сигналы роста по звёздам и коммитам. Вынос блокирующей работы из event loop снизил p99-паузы с 585 до 62 мс.",
-          },
-          {
-            name: "FastNews",
-            text: "Новостная лента из RSS и X: безопасное извлечение статей, дедупликация по URL и тексту, обогащение LLM (сущности, темы, утверждения, прогнозы) с проверкой схемы и цитат, версионированный API для Polywin.",
-          },
-          {
-            name: "Soclogin",
-            text: "Сервис для собственных аккаунтов Instagram, X и Avito: хранилище учётных данных с AES-256-GCM, идемпотентные браузерные операции на Playwright, ленты для новостных продуктов и диагностика по MCP.",
-          },
-        ],
-      },
-      {
-        label: "Сайты и заказы",
-        projects: [
-          {
-            name: "CRM Земстрой",
-            text: "CRM продаж для компании по продаже земли: интеграции с amoCRM, Avito и ЦИАН на Redis/BullMQ, транскрибация звонков Whisper и их оценка LLM, бот первого ответа с версиями промптов, уведомления в Telegram о новых лидах и нарушениях SLA.",
-          },
-          {
-            name: "Алтай — живая земля",
-            text: "Сайт посёлка с интерактивной 3D-долиной на Three.js: потоковая загрузка сцен на мобильных (первая загрузка с 7,2 до 3,7 МБ), лес из 79 125 деревьев по чанкам (с 5,9 до 1,2 млн треугольников), генплан на 568 участков общий для 2D и 3D, 31 индексируемая страница.",
-            url: "https://алтайземля.рф/",
-          },
-          {
-            name: "balkhaev.com",
-            text: "Падение в чёрную дыру Шварцшильда в браузере: трассировка лучей на WebGL в координатах Пенлеве–Гульстранда, линзированный каталог звёзд с доплеровским и гравитационным сдвигом, тесты против независимого численного интегрирования.",
-            url: "https://balkhaev.com/",
-          },
-        ],
-      },
-      {
-        label: "Инструменты и игры",
-        projects: [
-          {
-            name: "DevHub",
-            text: "Платформа разработки для меня и моих AI-агентов: управление процессами с учётом зависимостей, процесс worktree и релизов с проверками, знания о проектах (Canvas и Kanban) через MCP, мониторинг деплоев Coolify.",
-          },
-          {
-            name: "Gamza",
-            text: "Изометрический экстракшен-автобаттлер на Unreal Engine 5.8 и C++: детерминированная headless-симуляция с проверяемыми реплеями, тактический ИИ отряда (слух, фланги, подавление), живой мир между рейдами, карты по геоданным и автоматическая кинематографичная камера.",
-          },
-          {
-            name: "Habar",
-            text: "Пиксельная idle-стратегия на TypeScript: симуляция без DOM, бой выстрел за выстрелом с фиксированным сидом, фракции, конвои и экономика, процедурный ландшафт, который рисуется в Web Workers.",
+            text: "Исследовательская платформа для рынков предсказаний Polymarket: типизированные клиенты рыночных данных со сверкой стакана по WebSocket, сканер возможностей с учётом глубины стакана и комиссий, семантический поиск на эмбеддингах в Qdrant и разбор новостей LLM с проверкой цитат, оценка прогнозов по Brier score и калибровке. Стратегия выдаёт сигналы только после 30+ закрытых рынков со статистически значимым преимуществом.",
           },
         ],
       },
@@ -501,8 +437,13 @@ export const RESUMES: Record<Lang, Resume> = {
           "ComfyUI, vLLM, ONNX Runtime, RunPod, планирование GPU, Redis/BullMQ",
       },
       {
+        group: "Поиск и RAG",
+        items:
+          "Эмбеддинги (OpenAI, multilingual-e5, CLIP, AuraFace), Qdrant, pgvector, гибридный поиск, переранжирование cross-encoder, RAG, память для LLM",
+      },
+      {
         group: "LLM и агенты",
-        items: "Tool use, MCP, Claude, GPT, Grok, Qwen, pgvector, Qdrant",
+        items: "Tool use, MCP, Claude, GPT, Grok, Qwen",
       },
       {
         group: "Бэкенд и данные",
@@ -511,12 +452,11 @@ export const RESUMES: Record<Lang, Resume> = {
       },
       {
         group: "Фронтенд и 3D",
-        items:
-          "React, Next.js, Three.js, WebGL, Unreal Engine 5 (C++), Blender, Playwright",
+        items: "React, Next.js, Three.js, WebGL, Blender, Playwright",
       },
     ],
     summary:
-      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Делаю продукты целиком, от пайплайна моделей и оценки качества до бэкенда и интерфейса: в 2026 году это сервисы генерации медиа, продукты на данных, CRM и игра на Unreal Engine. До 2024 года 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
+      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты, поиск и GPU-инфраструктура под них. Довожу продукты от пайплайна моделей и оценки качества до бэкенда, интерфейса и продакшена. Эмбеддинги и векторный поиск (Qdrant, pgvector) с гибридным поиском и переранжированием есть в большинстве моих проектов: память компаньонов в AIGF, RAG в Funcorp, поиск игр на ggpick.club, исследовательская платформа Polywin и CRM отдела продаж. До этого 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
     title: "Михаил Бальхаев — резюме",
     web: [
       {
