@@ -44,27 +44,32 @@ So there are three rules here:
 
 ## How it works
 
-```text
- /invoice in chat -> order (pending) -> email with link /pay/<id>
-                                              |
-          client clicks the link              v
-          GET /pay/<id> -----> live YooKassa payment? -> redirect to it
-                               none or canceled? -> create one (Idempotence-Key)
-                                              |
-                                              v
-                                    client pays in YooKassa
-                                              |
-   YooKassa notification ----+                |
-   hourly reconciliation ----+--> payment.check: GET /payments/<id>
-   client back on /pay ------+                |
-                                              v
-                 markPaid: update ... where status = 'pending'
-                                              |  (first time only)
-                                              v
-                                       order.fulfill
-                          +-------------------+-------------------+
-                          v                                       v
-                  access email                             "💰" in chat
+```mermaid
+flowchart TD
+  invoice(["/invoice in chat"])
+  order["Order (pending)<br/>email with link /pay/&lt;id&gt;"]
+  pay["<b>GET /pay/&lt;id&gt;</b><br/>live YooKassa payment? redirect to it<br/>none or canceled? create one (Idempotence-Key)"]
+  client["Client pays in YooKassa"]
+  notify[YooKassa notification]
+  hourly[Hourly reconciliation]
+  back[Client back on /pay]
+  check["<b>payment.check</b><br/>GET /payments/&lt;id&gt;"]
+  mark["<b>markPaid</b><br/>update … where status = 'pending'"]
+  fulfill[order.fulfill]
+  mail[Access email]
+  chat["“💰” in chat"]
+  invoice --> order
+  order -- client clicks the link --> pay
+  pay --> client
+  client --> notify
+  client --> back
+  notify --> check
+  hourly --> check
+  back --> check
+  check --> mark
+  mark -- first time only --> fulfill
+  fulfill --> mail
+  fulfill --> chat
 ```
 
 ## Step 1. The tables

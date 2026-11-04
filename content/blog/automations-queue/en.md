@@ -26,28 +26,34 @@ Before writing code, let's list what we are protecting against. All of it happen
 
 ## How it fits together
 
-```text
-  POST /hooks/:source
-         |
-         v
-  check signature ---- bad ----> 401
-         |
-         v
-  +-------------- one transaction ------------------+
-  |  events: store (duplicate -> do nothing)        |
-  |  jobs:   enqueue jobs                           |
-  +-------------------------------------------------+
-         |
-         v
-       202
-                     worker (separate container)
-                     +-------------------------------+
-                     |  claim: take a job            |
-                     |  handler: run it              |
-                     |  ok      -> done              |
-                     |  failure -> pending, later    |
-                     |  give up -> failed + alert    |
-                     +-------------------------------+
+```mermaid
+flowchart TD
+  subgraph tx [One transaction]
+    ev["events: store<br/>(duplicate — do nothing)"]
+    jobs["jobs: enqueue jobs"]
+    ev --> jobs
+  end
+  subgraph worker [Worker, separate container]
+    claim["claim: take a job"]
+    handler["handler: run it"]
+    done[done]
+    pending["pending, retry later"]
+    failed["failed + alert"]
+    claim --> handler
+    handler -- ok --> done
+    handler -- failure --> pending
+    pending -.-> claim
+    handler -- give up --> failed
+  end
+  hook["POST /hooks/:source"]
+  sig["Check the signature"]
+  e401[401]
+  ok202[202]
+  hook --> sig
+  sig -- bad --> e401
+  sig -- ok --> ev
+  jobs --> ok202
+  jobs -. picks up .-> claim
 ```
 
 The key idea: the HTTP handler does nothing but write to the database. It is fast and almost never fails, so the sender always gets an answer, and all the slow, unreliable work moves into the worker, where it can be retried.

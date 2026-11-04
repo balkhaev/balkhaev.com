@@ -215,3 +215,20 @@ test("every committed series is valid", async () => {
   const posts = await loadPosts("content/blog", true);
   checkSeries(posts, await loadSeries("content/series"));
 }, 60_000);
+
+test("renders mermaid diagrams to inline SVG with prefixed ids", async () => {
+  const { html } = await renderMarkdown(
+    "```mermaid\nflowchart TD\n  db[(Postgres)] --> w[Worker]\n```\n\n```mermaid\nflowchart LR\n  a --> b\n```\n\n<b>raw</b>"
+  );
+  expect(html).toContain('<figure class="diagram"><svg');
+  expect(html).toContain('id="d1-db"');
+  expect(html).toContain('id="d2-arrowhead"');
+  expect(html).not.toContain("fonts.googleapis");
+  expect(html).not.toContain("<b>raw</b>");
+});
+
+test("a broken diagram fails the build", async () => {
+  await expect(
+    renderMarkdown("```mermaid\nflowchrt TD\n  a --> b\n```")
+  ).rejects.toThrow();
+});

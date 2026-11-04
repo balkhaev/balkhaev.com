@@ -25,26 +25,19 @@ tags: [agents, security, oauth, mcp, postgres]
 
 ## Схема
 
-```text
- сотрудник --вход--> SSO (Keycloak, Entra ID, Okta...)
-                      |
-                      |  токен: sub=igor, groups=[sales], aud=company-agent
-                      v
-               +-------------+   token exchange   +-----+
-               |  агент      | -----------------> | SSO |
-               |  (harness)  | <----------------- |     |
-               +------+------+   aud=wiki, 5 мин  +-----+
-                      |
-          +-----------+------------+
-          | aud=wiki               | aud=db
-          v                        v
-   +-------------+          +-------------+
-   | MCP вики    |          | MCP база    |
-   | проверяет   |          | проверяет   |
-   | токен,      |          | токен,      |
-   | фильтрует   |          | Postgres    |
-   | по группам  |          | роли и RLS  |
-   +-------------+          +-------------+
+```mermaid
+flowchart TD
+  emp([Сотрудник])
+  sso["<b>SSO</b><br/>Keycloak, Entra ID, Okta…"]
+  agent["<b>Агент</b><br/>harness"]
+  wiki["<b>MCP вики</b><br/>проверяет токен,<br/>фильтрует по группам"]
+  db["<b>MCP база</b><br/>проверяет токен,<br/>Postgres роли и RLS"]
+  emp -- вход --> sso
+  sso -- "токен<br/>sub=igor, groups=[sales]<br/>aud=company-agent" --> agent
+  agent -- "token exchange" --> sso
+  sso -. "aud=wiki, 5 мин" .-> agent
+  agent -- aud=wiki --> wiki
+  agent -- aud=db --> db
 ```
 
 1. Сотрудник входит через корпоративный SSO. Агент получает токен, в котором написано, кто это и в каких он группах.

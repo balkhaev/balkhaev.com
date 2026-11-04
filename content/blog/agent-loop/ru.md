@@ -45,8 +45,16 @@ tags: [agents, practice, claude]
 
 Модель читает результат и решает, что дальше: вызвать ещё инструмент или ответить. Это и есть агентный цикл. Всё остальное в агентах, от Claude Code до Cursor, надстройки над этой петлёй.
 
-```text
-пользователь → модель → tool_use → ваш код → tool_result → модель → … → end_turn
+```mermaid
+flowchart LR
+  user([Пользователь])
+  model[Модель]
+  code[Ваш код]
+  done([Ответ])
+  user --> model
+  model -- tool_use --> code
+  code -- tool_result --> model
+  model -- end_turn --> done
 ```
 
 ## Шаг 1. Инструменты

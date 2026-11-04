@@ -13,6 +13,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { visit } from "unist-util-visit";
+import { rehypeDiagrams } from "./diagram";
 
 export interface Heading {
   depth: 2 | 3;
@@ -111,7 +112,8 @@ function rehypeCollect(lang: string, found: Collected) {
 
 /**
  * Markdown body of a post to HTML: GFM (tables, footnotes), $math$ via KaTeX,
- * code via Shiki in light and dark themes, callouts. Raw HTML is dropped.
+ * code via Shiki in light and dark themes, ```mermaid diagrams as inline SVG,
+ * callouts. Raw HTML in the source is dropped.
  */
 export async function renderMarkdown(
   source: string,
@@ -128,6 +130,7 @@ export async function renderMarkdown(
       footnoteLabel: lang === "ru" ? "Примечания" : "Footnotes",
     })
     .use(rehypeKatex)
+    .use(rehypeDiagrams)
     .use(rehypeShiki, {
       defaultColor: false,
       fallbackLanguage: "text",
@@ -136,7 +139,9 @@ export async function renderMarkdown(
     })
     .use(rehypeSlug)
     .use(rehypeCollect(lang, found))
-    .use(rehypeStringify)
+    // Only the build-time diagram SVG is raw here: Markdown HTML was dropped
+    // by remark-rehype above.
+    .use(rehypeStringify, { allowDangerousHtml: true })
     .process(source);
   if (found.errors.length) {
     throw new Error(`Invalid formula: ${found.errors.join("; ")}`);

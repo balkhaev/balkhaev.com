@@ -32,29 +32,22 @@ tags: [automation, sales, telegram, claude, crm]
 
 ## Как это устроено
 
-```text
-  форма на сайте
-       |  POST /forms/lead
-       v
-  приёмник -> events -> задача site.form
-                              |
-                              v
-          +------------ site.form ---------------+
-          |  сохранить лид, запланировать:       |
-          |  lead.notify   сейчас                |
-          |  lead.qualify  сейчас                |
-          |  lead.crm      через 2 минуты        |
-          |  lead.remind   через 15 минут        |
-          +--------------------------------------+
-                |              |            |
-                v              v            v
-          карточка в       Claude:      Bitrix24
-          Telegram         суть, бюджет,
-                           температура
-                |              |
-                +--> карточка обновляется
-                       |
-          кнопка «Беру» -> telegram.callback -> лид за менеджером
+```mermaid
+flowchart TD
+  form(["Форма на сайте"])
+  intake["Приёмник → events → задача site.form"]
+  job["<b>site.form</b><br/>сохранить лид и запланировать:<br/>lead.notify — сейчас<br/>lead.qualify — сейчас<br/>lead.crm — через 2 минуты<br/>lead.remind — через 15 минут"]
+  card["Карточка в Telegram"]
+  claude["<b>Claude</b><br/>суть, бюджет, температура"]
+  bitrix[Bitrix24]
+  take["Кнопка «Беру» → telegram.callback"]
+  owner([Лид за менеджером])
+  form -- "POST /forms/lead" --> intake --> job
+  job -- lead.notify --> card
+  job -- lead.qualify --> claude
+  job -- lead.crm --> bitrix
+  claude -- обновляет --> card
+  card --> take --> owner
 ```
 
 Важное решение: **карточка уходит до модели**. Модель отвечает за несколько секунд, но может и не ответить: API перегружен, лимиты, сеть. Если ждать её, сбой у провайдера модели означает, что менеджер не узнает о заявке. Поэтому сначала карточка с сырым текстом, потом её дополняет модель. Каждый шаг это отдельная задача в очереди со своими повторами, и падение одного не мешает остальным.
