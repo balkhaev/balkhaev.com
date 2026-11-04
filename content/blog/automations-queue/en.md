@@ -757,14 +757,15 @@ services:
     stop_grace_period: 60s
 
   db:
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: app
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Since Postgres 18 the image keeps data in /var/lib/postgresql/18/docker
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 5s
@@ -799,7 +800,7 @@ jobs:
     environment: production
     services:
       postgres:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: test
         ports:
@@ -809,7 +810,7 @@ jobs:
           --health-interval 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check

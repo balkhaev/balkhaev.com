@@ -129,7 +129,7 @@ services:
 
   # Дверь 1: входящие запросы. Сотрудники открывают чат, Slack шлёт события
   ingress:
-    image: nginx:1.29-alpine
+    image: nginx:1.30-alpine
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -706,7 +706,7 @@ describe("HR", () => {
 afterAll(() => Promise.all(Object.values(pools).map((p) => p.close())));
 ```
 
-Для этого `pools` в `pg.ts` теперь экспортируется, чтобы тест мог закрыть соединения в конце. Тесты гоняются в CI на каждый пуш против чистого Postgres 16 с той же схемой:
+Для этого `pools` в `pg.ts` теперь экспортируется, чтобы тест мог закрыть соединения в конце. Тесты гоняются в CI на каждый пуш против чистого Postgres 18 с той же схемой:
 
 ```yaml
 # .github/workflows/agent-tests.yml
@@ -718,7 +718,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -728,7 +728,7 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - name: База как в проде, но с тестовыми данными
@@ -757,7 +757,7 @@ GRANT hr_reader TO agent WITH INHERIT FALSE;
  1 fail
 ```
 
-Мы прогнали этот workflow локально на чистом контейнере `postgres:16`: роли, схема и данные создаются с нуля, все 11 тестов проходят.
+Мы прогнали этот workflow локально на чистом контейнере `postgres:18`: роли, схема и данные создаются с нуля, все 11 тестов проходят.
 
 ## Мониторинг
 

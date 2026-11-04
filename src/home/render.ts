@@ -1,6 +1,7 @@
 import type { Post } from "../blog/content";
 import { blogPath } from "../blog/render";
 import { type Job, type Project, RESUMES } from "../cv/content";
+import { siteFooter, siteHeader } from "../site/chrome";
 
 const LATEST = 3;
 const EXPERIENCE = 4;
@@ -133,6 +134,14 @@ const renderExperience = (jobs: Job[]) =>
 export function renderHome(template: string, posts: Post[]) {
   const { jobs, web } = RESUMES.ru;
   return template
+    .replace("<!-- home:header -->", siteHeader("ru", "home"))
+    .replace(
+      "<!-- home:footer -->",
+      siteFooter(
+        "ru",
+        '<a href="/blog/" hreflang="en" lang="en">Blog in English</a>'
+      )
+    )
     .replace("<!-- home:posts -->", renderPosts(latestPosts(posts)))
     .replace("<!-- home:projects -->", renderProjects(HOME_PROJECTS))
     .replace(

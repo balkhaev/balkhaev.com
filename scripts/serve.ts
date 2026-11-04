@@ -1,4 +1,4 @@
-import { normalize } from "node:path";
+import { posix } from "node:path";
 import { file as readFile, serve } from "bun";
 
 const ROOT = `${process.cwd()}/dist`;
@@ -6,7 +6,9 @@ const ROOT = `${process.cwd()}/dist`;
 serve({
   async fetch(request) {
     const { pathname } = new URL(request.url);
-    const path = normalize(decodeURIComponent(pathname));
+    const path = posix.normalize(
+      decodeURIComponent(pathname).replaceAll("\\", "/")
+    );
     if (path.includes("..")) {
       return new Response("Not found", { status: 404 });
     }

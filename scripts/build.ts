@@ -20,6 +20,7 @@ import {
 import { LANGS } from "../src/cv/content";
 import { CV_PATHS, renderCv } from "../src/cv/render";
 import { renderHome } from "../src/home/render";
+import { renderNews } from "../src/news/render";
 
 const ORIGIN = "https://balkhaev.com";
 const LEGACY_FONT = /\.(?:ttf|woff)$/;
@@ -45,6 +46,7 @@ if (!result.success) {
 await cp("public", "dist", { recursive: true });
 
 const pages = new Map<string, string>();
+pages.set("/news/", renderNews());
 for (const lang of LANGS) {
   pages.set(CV_PATHS[lang], renderCv(lang));
 }
@@ -80,7 +82,12 @@ await cp("node_modules/katex/dist/fonts", `${katex}fonts`, {
   recursive: true,
 });
 
-const urls = ["/", ...Object.values(CV_PATHS), ...blogUrls(posts, series)];
+const urls = [
+  "/",
+  "/news/",
+  ...Object.values(CV_PATHS),
+  ...blogUrls(posts, series),
+];
 await writeFile(
   "dist/sitemap.xml",
   `<?xml version="1.0" encoding="UTF-8"?>

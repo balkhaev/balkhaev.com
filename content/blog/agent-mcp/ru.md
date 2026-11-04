@@ -23,6 +23,8 @@ MCP это стандартный способ дать агенту инстр�
 - **MCP-клиент** живёт внутри агента. Он подключается к серверам, забирает списки инструментов, показывает их модели и пересылает вызовы.
 - **Транспорт** бывает двух видов: `stdio`, когда клиент запускает сервер как дочерний процесс и общается через stdin/stdout, и HTTP, когда сервер работает отдельно и к нему ходят по сети. Сегодня используем `stdio`, а HTTP понадобится в части про права доступа.
 
+Используем текущую ревизию протокола [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) и вторую версию TypeScript SDK. В ней SDK разделён на пакеты `@modelcontextprotocol/server` и `@modelcontextprotocol/client`, а сам протокол стал работать без состояния: каждый запрос несёт версию протокола и данные клиента, поэтому сервер можно масштабировать как обычный HTTP-сервис. Клиент договаривается о версии сам и умеет говорить и со старыми серверами 2025 года.
+
 Кроме инструментов сервер может отдавать ресурсы (документы для чтения) и готовые промпты, но для агента главное именно инструменты.
 
 Что это даёт нам:
@@ -102,7 +104,7 @@ console.log("company.db готова");
 ```
 
 ```bash
-bun add @modelcontextprotocol/sdk zod
+bun add @modelcontextprotocol/server @modelcontextprotocol/client zod
 bun seed.ts
 ```
 
@@ -112,8 +114,8 @@ bun seed.ts
 
 ```ts
 // db-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
 
@@ -132,44 +134,49 @@ deals — сделки: id, client_id → clients.id, owner_id → employees.id 
 
 Диалект SQLite. Месяц из даты: strftime('%Y-%m', closed_at).`;
 
-const server = new McpServer({ name: "company-db", version: "1.0.0" });
+function buildServer() {
+  const server = new McpServer({ name: "company-db", version: "1.0.0" });
 
-server.registerTool(
-  "describe_schema",
-  {
-    description: "Описание таблиц и колонок базы компании. Вызывай перед первым запросом.",
-    annotations: { readOnlyHint: true },
-  },
-  async () => ({ content: [{ type: "text", text: DOCS }] }),
-);
+  server.registerTool(
+    "describe_schema",
+    {
+      description: "Описание таблиц и колонок базы компании. Вызывай перед первым запросом.",
+      annotations: { readOnlyHint: true },
+    },
+    async () => ({ content: [{ type: "text", text: DOCS }] }),
+  );
 
-server.registerTool(
-  "query",
-  {
-    description: `Выполнить один SELECT к базе компании (SQLite, только чтение). Вернёт до ${MAX_ROWS} строк в JSON.`,
-    inputSchema: { sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") },
-    annotations: { readOnlyHint: true },
-  },
-  async ({ sql }) => {
-    const text = sql.trim().replace(/;$/, "");
-    if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
-      return {
-        isError: true,
-        content: [{ type: "text", text: "Разрешён только один запрос SELECT" }],
-      };
-    }
-    try {
-      const rows = db.query(text).all();
-      const shown = rows.slice(0, MAX_ROWS);
-      const note = rows.length > MAX_ROWS ? `\n(показано ${MAX_ROWS} из ${rows.length})` : "";
-      return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-    } catch (err) {
-      return { isError: true, content: [{ type: "text", text: String(err) }] };
-    }
-  },
-);
+  server.registerTool(
+    "query",
+    {
+      description: `Выполнить один SELECT к базе компании (SQLite, только чтение). Вернёт до ${MAX_ROWS} строк в JSON.`,
+      inputSchema: z.object({ sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ sql }) => {
+      const text = sql.trim().replace(/;$/, "");
+      if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Разрешён только один запрос SELECT" }],
+        };
+      }
+      try {
+        const rows = db.query(text).all();
+        const shown = rows.slice(0, MAX_ROWS);
+        const note = rows.length > MAX_ROWS ? `\n(показано ${MAX_ROWS} из ${rows.length})` : "";
+        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
+      } catch (err) {
+        return { isError: true, content: [{ type: "text", text: String(err) }] };
+      }
+    },
+  );
 
-await server.connect(new StdioServerTransport());
+  return server;
+}
+
+// Фабрика сервера: serveStdio вызывает её на каждое подключение агента
+serveStdio(buildServer);
 ```
 
 Почему именно так.
@@ -181,6 +188,8 @@ await server.connect(new StdioServerTransport());
 **Лимит строк.** Модели не нужно сто тысяч строк, ей нужны агрегаты. Лимит защищает контекст и кошелёк, а пометка «показано 200 из 5000» подсказывает модели переписать запрос с `GROUP BY`.
 
 **Ошибки возвращаются, а не бросаются.** `isError: true` вместе с текстом ошибки SQLite позволяет модели прочитать, что не так с запросом, и исправить его. На практике модель часто ошибается в названии колонки с первого раза и чинит запрос со второго.
+
+**Фабрика, а не один сервер.** `serveStdio` получает функцию, которая собирает сервер, и вызывает её на каждое подключение. Так же устроен HTTP-вариант в [части 6](/blog/ru/agent-auth/): там сервер собирается на каждый запрос под конкретного сотрудника.
 
 **`readOnlyHint`.** Аннотация подсказывает клиенту, что инструмент ничего не меняет. Наш агент будет спрашивать подтверждение только у инструментов без этой пометки.
 
@@ -209,8 +218,8 @@ npx @modelcontextprotocol/inspector bun db-server.ts
 ```ts
 // mcp.ts
 import type Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
 import type { Tool } from "./tools";
 
@@ -223,7 +232,11 @@ export async function connectMcp(config: Record<string, ServerConfig>) {
   const clients: Client[] = [];
 
   for (const [serverName, params] of Object.entries(config)) {
-    const client = new Client({ name: "company-agent", version: "1.0.0" });
+    // auto: говорим по ревизии 2026-07-28, а со старыми серверами по протоколу 2025 года
+    const client = new Client(
+      { name: "company-agent", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
     await client.connect(new StdioClientTransport({ ...params, stderr: "inherit" }));
     clients.push(client);
 

@@ -129,7 +129,7 @@ services:
 
   # Door 1: incoming requests. Employees open the chat, Slack sends events
   ingress:
-    image: nginx:1.29-alpine
+    image: nginx:1.30-alpine
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/etc/nginx/certs:ro
@@ -706,7 +706,7 @@ describe("HR", () => {
 afterAll(() => Promise.all(Object.values(pools).map((p) => p.close())));
 ```
 
-For this, `pools` in `pg.ts` is now exported so the test can close the connections at the end. The tests run in CI on every push against a clean Postgres 16 with the same schema:
+For this, `pools` in `pg.ts` is now exported so the test can close the connections at the end. The tests run in CI on every push against a clean Postgres 18 with the same schema:
 
 ```yaml
 # .github/workflows/agent-tests.yml
@@ -718,7 +718,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -728,7 +728,7 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - name: Database as in production, but with test data
@@ -757,7 +757,7 @@ GRANT hr_reader TO agent WITH INHERIT FALSE;
  1 fail
 ```
 
-We ran this workflow locally against a clean `postgres:16` container: roles, schema and data are created from scratch, and all 11 tests pass.
+We ran this workflow locally against a clean `postgres:18` container: roles, schema and data are created from scratch, and all 11 tests pass.
 
 ## Monitoring
 

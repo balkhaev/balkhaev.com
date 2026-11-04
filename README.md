@@ -4,6 +4,16 @@ A black hole and two ways to get in touch. Static HTML, CSS and TypeScript; no b
 
 The renderer originated in the owner's Montage site at commit `184f50fc547d`. The page renders disk and stars in one Schwarzschild scene, framed by a quiet wordmark and two native contact links. Typography stays sharp and accessible above the canvas, independent of gravitational lensing. Disk interactions are sampled in the scene's material coordinates through the same curved rays as the image.
 
+## AI news
+
+The Russian AI digest lives at `/news/`. Its first edition contains the four stories
+selected on 4 November 2026. The production container checks the public
+`@bestburyat` channel every 15 minutes for published «AI за два дня» issues,
+including edits. It renders the recent issues and their original source links to static
+HTML and replaces the file atomically. The built edition is available at startup.
+An empty response or temporary outage leaves the current page in place. For a one-time
+refresh of a local build run `bun scripts/refresh-news.ts dist/news`.
+
 ## Scene and interaction
 
 The initial observer frame is 12.5 horizon radii from the centre, six degrees above the accretion disk plane. The rectilinear lens keeps a 64-degree field of view on the shorter screen dimension at radii 3 and above. Below radius 3, its field of view is solved from the actual shadow angle so the shadow's projected radius increases smoothly from about 0.719 towards 0.95 of the shorter screen half-extent. The projection blends towards stereographic between radii 3 and 0.6; the resulting field of view is about 89.69 degrees at the horizon and 169.70 degrees at radius 0.02. CPU picking and GPU rendering use identical unit sightlines. This presentation lens changes the projection while preserving the calculated ray geometry.

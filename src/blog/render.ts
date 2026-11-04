@@ -1,3 +1,4 @@
+import { siteFooter, siteHeader } from "../site/chrome";
 import { BLOG_LANGS, type BlogLang, type Post, type Series } from "./content";
 
 const ORIGIN = "https://balkhaev.com";
@@ -7,10 +8,8 @@ const LABELS: Record<
   {
     blog: string;
     contents: string;
-    cv: string;
     description: string;
     feed: string;
-    kicker: string;
     empty: string;
     minutes: (count: number) => string;
     next: string;
@@ -22,19 +21,16 @@ const LABELS: Record<
     seriesOne: string;
     soon: string;
     switcher: string;
-    top: string;
     writings: string;
   }
 > = {
   en: {
     blog: "Blog",
     contents: "Contents",
-    cv: "Resume",
     description:
       "Practical series on AI agents and automations, each taken from the idea to working code in production.",
     empty: "No posts yet.",
     feed: "RSS",
-    kicker: "AI agents and automations",
     minutes: (count) => `${count} min read`,
     next: "Next",
     part: (part, total) => `part ${part} of ${total}`,
@@ -45,18 +41,15 @@ const LABELS: Record<
     seriesOne: "Series",
     soon: "coming soon",
     switcher: "Language",
-    top: "Back to top",
     writings: "All posts",
   },
   ru: {
     blog: "Блог",
     contents: "Содержание",
-    cv: "Резюме",
     description:
       "Практические циклы статей про AI-агентов и автоматизации: каждая идея от концепции до рабочего кода в проде.",
     empty: "Постов пока нет.",
     feed: "RSS",
-    kicker: "AI-агенты и автоматизации",
     minutes: (count) => `${count} мин чтения`,
     next: "Дальше",
     part: (part, total) => `часть ${part} из ${total}`,
@@ -67,7 +60,6 @@ const LABELS: Record<
     seriesOne: "Серия",
     soon: "скоро",
     switcher: "Язык",
-    top: "Наверх",
     writings: "Все записи",
   },
 };
@@ -102,13 +94,6 @@ const shortDate = (date: string) => date.split("-").reverse().join(".");
 
 /** 3 → "03". */
 const pad = (count: number) => String(count).padStart(2, "0");
-
-const CV_PATHS: Record<BlogLang, string> = { en: "/cv/", ru: "/cv/ru/" };
-const TELEGRAM = "https://t.me/balkhaev";
-const NAMES: Record<BlogLang, string> = {
-  en: "Mikhail Balkhaev",
-  ru: "Михаил Бальхаев",
-};
 
 interface Page {
   body: string;
@@ -152,29 +137,17 @@ function layout({ body, description, lang, math, paths, title, type }: Page) {
     <link href="${feedPath(lang)}" rel="alternate" title="${label.blog} · balkhaev" type="application/atom+xml">
     <meta content="#efece6" name="theme-color">
     <link as="font" crossorigin href="/cv/fonts/plex-cyrillic.woff2" rel="preload" type="font/woff2">
+    <link href="/site.css" rel="stylesheet">
     <link href="/blog/blog.css" rel="stylesheet">${math ? `\n    <link href="${KATEX_PATH}katex.min.css" rel="stylesheet">` : ""}
     <title>${html(title)}</title>
   </head>
   <body id="top">
     <div class="page">
-      <header class="topbar">
-        <a class="topbar-site" href="/">balkhaev.com</a>
-        <a class="topbar-role" href="${blogPath(lang)}">${label.blog} · ${label.kicker}</a>
-        <nav aria-label="${label.blog}" class="topbar-nav">
-          <a href="${blogPath(lang)}">${label.blog}</a>
-          <a href="${CV_PATHS[lang]}">${label.cv}</a>
-          <a href="${TELEGRAM}" rel="noopener noreferrer" target="_blank">Telegram</a>
-          <span aria-label="${label.switcher}" class="langs" role="group">${switcher}</span>
-        </nav>
-      </header>
+      ${siteHeader(lang, "blog", `<span aria-label="${label.switcher}" class="langs" role="group">${switcher}</span>`)}
       <main>
 ${body}
       </main>
-      <footer class="site-foot">
-        <span>© 2026 ${NAMES[lang]}</span>
-        <a href="${feedPath(lang)}">${label.feed}</a>
-        <a href="#top">${label.top} <span aria-hidden="true">↑</span></a>
-      </footer>
+      ${siteFooter(lang, `<a href="${feedPath(lang)}">${label.feed}</a>`)}
     </div>
   </body>
 </html>

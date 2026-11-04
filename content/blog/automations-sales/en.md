@@ -527,7 +527,7 @@ Things to note:
 - **Fallback.** If the model declines for safety reasons, the API reruns the request on a fallback model by itself (`fallbacks: "default"`). If that one declines too, the job fails as permanent: retrying is pointless, and the manager already has the card.
 - **Errors.** A 400 means our request is wrong and retrying won't help. 429 and 5xx go back to the queue. The SDK makes a couple of quick retries itself, and our queue adds slow ones spanning tens of minutes.
 
-Put the API key into `.env` on the server as `ANTHROPIC_API_KEY`; the SDK reads it by itself. Cost-wise, one qualification is about a thousand input tokens and a couple hundred output tokens, a fraction of a cent. Even a hundred leads a day cost about a cup of coffee a month.
+Put the API key into `.env` on the server as `ANTHROPIC_API_KEY`; the SDK reads it by itself. Cost-wise, one qualification is a few hundred input tokens and a couple hundred output tokens, which at Claude Opus 5.5 prices (4 and 20 dollars per million) is under a cent. A hundred leads a day comes to about 20 dollars a month, and with Claude Haiku 5.5, which handles this kind of sorting too, a few dozen times less. The [operations part](/blog/automations-ops/) shows how to measure the real spend.
 
 ## Step 6. The CRM
 
