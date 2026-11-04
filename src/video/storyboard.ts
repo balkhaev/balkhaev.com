@@ -265,10 +265,7 @@ export function sceneText(scene: Scene): string {
     default:
       break;
   }
-  return parts
-    .filter(Boolean)
-    .join(" ")
-    .replace(ACCENT, "$1");
+  return parts.filter(Boolean).join(" ").replace(ACCENT, "$1");
 }
 
 /** Reading speed for on-screen text, in characters per second. */

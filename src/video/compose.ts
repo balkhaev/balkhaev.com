@@ -54,7 +54,7 @@ export function inline(value: string) {
  */
 export function words(value: string) {
   // Each word is a list of pieces, so "*источники*." stays one word.
-  const list: { accent: boolean; text: string }[][] = [];
+  const groups: { accent: boolean; text: string }[][] = [];
   let glue = false;
   const push = (text: string, accent: boolean) => {
     const parts = text.split(SPACE);
@@ -63,11 +63,11 @@ export function words(value: string) {
         glue = false;
       }
       if (part) {
-        const prev = list.at(-1);
+        const prev = groups.at(-1);
         if (glue && prev) {
           prev.push({ accent, text: part });
         } else {
-          list.push([{ accent, text: part }]);
+          groups.push([{ accent, text: part }]);
         }
         glue = true;
       }
@@ -80,7 +80,7 @@ export function words(value: string) {
     last = (match.index ?? 0) + match[0].length;
   }
   push(value.slice(last), false);
-  return list
+  return groups
     .map(
       (pieces) =>
         `<span class="w"><span class="wi">${pieces
@@ -99,15 +99,21 @@ class Motion {
   readonly lines: string[] = [];
 
   from(selector: string, vars: string, at: number) {
-    this.lines.push(`tl.from(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`);
+    this.lines.push(
+      `tl.from(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`
+    );
   }
 
   to(selector: string, vars: string, at: number) {
-    this.lines.push(`tl.to(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`);
+    this.lines.push(
+      `tl.to(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`
+    );
   }
 
   set(selector: string, vars: string, at: number) {
-    this.lines.push(`tl.set(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`);
+    this.lines.push(
+      `tl.set(${JSON.stringify(selector)}, ${vars}, ${at.toFixed(2)});`
+    );
   }
 
   /** Words of a text block rise into view one after another. */
@@ -142,7 +148,10 @@ class Motion {
 function beats(count: number, start: number, duration: number, from = 0.7) {
   const span = Math.max(0.5, duration * 0.6 - from);
   const step = count > 1 ? span / (count - 1) : 0;
-  return Array.from({ length: count }, (_, index) => start + from + index * step);
+  return Array.from(
+    { length: count },
+    (_, index) => start + from + index * step
+  );
 }
 
 interface Part {
@@ -265,8 +274,10 @@ export function nodeBox(node: DiagramNode): Box {
 function exitPoint(box: Box, dx: number, dy: number, pad: number) {
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
-  const sx = dx === 0 ? Number.POSITIVE_INFINITY : (box.w / 2 + pad) / Math.abs(dx);
-  const sy = dy === 0 ? Number.POSITIVE_INFINITY : (box.h / 2 + pad) / Math.abs(dy);
+  const sx =
+    dx === 0 ? Number.POSITIVE_INFINITY : (box.w / 2 + pad) / Math.abs(dx);
+  const sy =
+    dy === 0 ? Number.POSITIVE_INFINITY : (box.h / 2 + pad) / Math.abs(dy);
   const s = Math.min(sx, sy);
   return { x: cx + dx * s, y: cy + dy * s };
 }
@@ -466,7 +477,7 @@ export function compose(board: Storyboard, lang: string): string {
     if (index < timed.length - 1) {
       motion.to(
         `#${id}`,
-        "{ opacity: 0, duration: 0.25, ease: \"power1.in\" }",
+        '{ opacity: 0, duration: 0.25, ease: "power1.in" }',
         item.start + item.duration - 0.25
       );
     }

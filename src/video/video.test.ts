@@ -30,7 +30,7 @@ describe("storyboard", () => {
     const timed = timeline(board);
     expect(timed).toHaveLength(4);
     expect(timed[0]?.start).toBe(0);
-    for (let index = 1; index < timed.length; index++) {
+    for (let index = 1; index < timed.length; index += 1) {
       const prev = timed[index - 1];
       expect(timed[index]?.start).toBeCloseTo(
         (prev?.start ?? 0) + (prev?.duration ?? 0),
@@ -93,13 +93,24 @@ describe("compose", () => {
 
 test("every storyboard in content/blog is valid", async () => {
   const root = "content/blog";
-  for (const slug of await readdir(root)) {
-    // biome-ignore lint/performance/noAwaitInLoops: a handful of folders
-    const files = await readdir(join(root, slug));
-    for (const name of files.filter((file) => file.startsWith("video."))) {
-      const file = join(root, slug, name);
-      const board = parseStoryboard(file, await readFile(file, "utf8"));
-      expect(board.scenes.length).toBeGreaterThan(0);
-    }
+  const slugs = await readdir(root);
+  const files = (
+    await Promise.all(
+      slugs.map(async (slug) =>
+        (
+          await readdir(join(root, slug))
+        )
+          .filter((name) => name.startsWith("video."))
+          .map((name) => join(root, slug, name))
+      )
+    )
+  ).flat();
+  const boards = await Promise.all(
+    files.map(async (file) =>
+      parseStoryboard(file, await readFile(file, "utf8"))
+    )
+  );
+  for (const board of boards) {
+    expect(board.scenes.length).toBeGreaterThan(0);
   }
 });
