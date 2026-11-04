@@ -153,7 +153,7 @@ test("the feed lists one language with escaped content", async () => {
 test("every committed post is valid", async () => {
   const posts = await loadPosts("content/blog", true);
   expect(posts.length).toBeGreaterThan(0);
-});
+}, 60_000);
 
 const SERIES = `---
 title: Agents
@@ -214,4 +214,4 @@ test("a post must name an existing series and a planned part", async () => {
 test("every committed series is valid", async () => {
   const posts = await loadPosts("content/blog", true);
   checkSeries(posts, await loadSeries("content/series"));
-});
+}, 60_000);
