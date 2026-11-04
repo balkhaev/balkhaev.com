@@ -80,7 +80,7 @@ flowchart TD
 
 ## What happens to data at the model provider
 
-A commercial model over an API means that questions and the document fragments found for them go to the provider. Your security team will ask about this first, and it is worth having the answer ready. By default the commercial APIs of the major providers do not train models on customer requests, but read the retention and processing terms in the contract. If data must not leave a region, the models are available through clouds such as Amazon Bedrock or Google Vertex AI, where you choose the region. We will come back to this in the production part.
+A commercial model over an API means that questions and the document fragments found for them go to the provider. Your security team will ask about this first, and it is worth having the answer ready. By default the commercial APIs of the major providers do not train models on customer requests, but read the retention and processing terms in the contract. If data must not leave a region, the models are available through clouds such as Amazon Bedrock or Google Vertex AI, where you choose the region. We will come back to this in the [production part](/blog/agent-prod/#where-the-model-runs).
 
 ## The plan
 
@@ -94,6 +94,6 @@ The order of the parts follows the order in which it makes sense to build such a
 6. **[Permissions](/blog/agent-auth/).** SSO, OAuth and an agent that acts on behalf of an employee.
 7. **[Context and money](/blog/agent-cost/).** Caching, compacting history, limits.
 8. **[The interface](/blog/agent-interface/).** A chat bot and a web chat.
-9. **Production.** Deploying inside the perimeter, audit, quality checks and prompt-injection defence.
+9. **[Production](/blog/agent-prod/).** Deploying inside the perimeter, audit, quality checks and prompt-injection defence.
 
 The next two parts look like a teaching agent that works with files. That is deliberate: the loop is easier to see on a simple example, and from part 4 the same code starts calling the company's systems.
