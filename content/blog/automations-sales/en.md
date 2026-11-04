@@ -898,4 +898,4 @@ A run with every external service stubbed, in the order a manager would see it:
 - A forgotten lead gets a reminder, and then the head of sales hears about it.
 - The automation is about 400 lines on top of the core from the previous part.
 
-Next in the plan is "Replacing the accountant": we accept payment provider webhooks, grant access exactly once, reconcile payments and set up a chain of reminders to clients who owe, which stops by itself once they pay.
+Next is ["Replacing the accountant"](/blog/automations-billing/): we accept payment provider webhooks, grant access exactly once, reconcile payments and set up a chain of reminders to clients who owe, which stops by itself once they pay.
