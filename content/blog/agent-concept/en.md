@@ -91,7 +91,7 @@ The order of the parts follows the order in which it makes sense to build such a
 4. **[MCP](/blog/agent-mcp/).** Moving tools into separate servers and writing our own server for the database.
 5. **[Company knowledge](/blog/agent-search/).** Indexing documents and teaching the agent to search them.
 6. **[Permissions](/blog/agent-auth/).** SSO, OAuth and an agent that acts on behalf of an employee.
-7. **Context and money.** Caching, compacting history, limits.
+7. **[Context and money](/blog/agent-cost/).** Caching, compacting history, limits.
 8. **The interface.** A chat bot and a web chat.
 9. **Production.** Deploying inside the perimeter, audit, quality checks and prompt-injection defence.
 
