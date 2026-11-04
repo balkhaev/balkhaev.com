@@ -1,6 +1,9 @@
 import type { Post } from "../blog/content";
 import { blogPath } from "../blog/render";
 import { type Job, type Project, RESUMES } from "../cv/content";
+import type { Issue } from "../news/content";
+import { mergeIssues } from "../news/feed";
+import { latestBody } from "../news/latest";
 import { siteFooter, siteHeader } from "../site/chrome";
 
 const LATEST = 3;
@@ -131,7 +134,11 @@ const renderExperience = (jobs: Job[]) =>
             </ol>`;
 
 /** Fills the homepage template's placeholders with posts, projects and jobs. */
-export function renderHome(template: string, posts: Post[]) {
+export function renderHome(
+  template: string,
+  posts: Post[],
+  issues: Issue[] = mergeIssues([])
+) {
   const { jobs, web } = RESUMES.ru;
   return template
     .replace("<!-- home:header -->", siteHeader("ru", "home"))
@@ -142,6 +149,7 @@ export function renderHome(template: string, posts: Post[]) {
         '<a href="/blog/" hreflang="en" lang="en">Blog in English</a>'
       )
     )
+    .replace("<!-- home:news -->", latestBody(issues))
     .replace("<!-- home:posts -->", renderPosts(latestPosts(posts)))
     .replace("<!-- home:projects -->", renderProjects(HOME_PROJECTS))
     .replace(

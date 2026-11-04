@@ -1,4 +1,5 @@
 import type { Issue } from "./content";
+import { latestBody } from "./latest";
 import { pickStories, type TopicId, type TopicLang } from "./topics";
 import { FEED_PATH, parseLimit, parseTopics, widgetBody } from "./widget";
 
@@ -6,7 +7,9 @@ import { FEED_PATH, parseLimit, parseTopics, widgetBody } from "./widget";
 // widget, and this swaps them for the editions the server has collected.
 async function refresh() {
   const widgets = document.querySelectorAll<HTMLElement>(".news-widget");
-  if (widgets.length === 0) {
+  // The homepage sidebar: the newest stories, whatever their topic.
+  const latest = document.querySelectorAll<HTMLElement>(".news-latest");
+  if (widgets.length === 0 && latest.length === 0) {
     return;
   }
   const response = await fetch(FEED_PATH, { cache: "no-cache" });
@@ -16,6 +19,12 @@ async function refresh() {
   const issues = (await response.json()) as Issue[];
   if (!Array.isArray(issues) || issues.length === 0) {
     return;
+  }
+  for (const list of latest) {
+    list.innerHTML = latestBody(
+      issues,
+      Number(list.dataset.limit) || undefined
+    );
   }
   for (const widget of widgets) {
     try {

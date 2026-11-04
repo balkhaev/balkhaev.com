@@ -454,36 +454,51 @@
             >
           </p>
         </section>
-        <div class="columns">
-          <section aria-labelledby="blog-title" class="column">
-            <h2 id="blog-title">
-              <span>01 Блог</span
-              ><a class="column-link" href="/blog/ru/"
+        <div class="home-grid">
+          <div class="columns">
+            <section aria-labelledby="blog-title" class="column">
+              <h2 id="blog-title">
+                <span>01 Блог</span
+                ><a class="column-link" href="/blog/ru/"
+                  >Все <span aria-hidden="true">→</span></a
+                >
+              </h2>
+              <!-- home:posts -->
+            </section>
+            <section aria-labelledby="projects-title" class="column">
+              <h2 id="projects-title"><span>02 Проекты</span><span>5</span></h2>
+              <!-- home:projects -->
+            </section>
+            <section aria-labelledby="experience-title" class="column">
+              <h2 id="experience-title">
+                <span>03 Опыт</span
+                ><a class="column-link" href="/cv/ru/"
+                  >Резюме <span aria-hidden="true">→</span></a
+                >
+              </h2>
+              <!-- home:experience -->
+            </section>
+          </div>
+          <aside aria-labelledby="news-title" class="news-side">
+            <h2 id="news-title">
+              <span
+                ><span aria-hidden="true" class="news-side-dot"></span>04
+                Новости</span
+              ><a class="column-link" href="/news/"
                 >Все <span aria-hidden="true">→</span></a
               >
             </h2>
-            <!-- home:posts -->
-          </section>
-          <section aria-labelledby="projects-title" class="column">
-            <h2 id="projects-title"><span>02 Проекты</span><span>5</span></h2>
-            <!-- home:projects -->
-          </section>
-          <section aria-labelledby="experience-title" class="column">
-            <h2 id="experience-title">
-              <span>03 Опыт</span
-              ><a class="column-link" href="/cv/ru/"
-                >Резюме <span aria-hidden="true">→</span></a
-              >
-            </h2>
-            <!-- home:experience -->
-          </section>
+            <div class="news-latest" data-limit="5">
+              <!-- home:news -->
+            </div>
+          </aside>
         </div>
         <section
           aria-labelledby="contacts-title"
           class="contacts"
           id="contacts"
         >
-          <h2 id="contacts-title">04 Связаться</h2>
+          <h2 id="contacts-title">05 Связаться</h2>
           <ul class="contact-list">
             <li>
               <a
@@ -515,6 +530,7 @@
       </main>
       <!-- home:footer -->
     </div>
+    <script defer src="/blog/news.js"></script>
     <script src="/app.js" type="module"></script>
   </body>
 </html>
