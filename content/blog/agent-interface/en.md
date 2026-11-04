@@ -856,7 +856,7 @@ There is a trap here. Without the email check, an attacker could message the bot
 
 **Direct messages only.** The answer is built on the permissions of whoever asked. If the HR director asks about salaries in a public channel, everyone sees the answer. So to a mention in a channel the bot replies with a message visible only to the asker, asking them to write in a DM. A thread in the DM is one conversation: as long as you reply in the same thread, the agent remembers the context.
 
-**Streaming by editing.** The bot immediately writes "Thinking…" and then edits that message as the answer arrives. Slack has rate limits on API calls, and an edit per text fragment would hit them quickly, so the accumulated text is sent every second and a half.
+**Streaming by editing.** The bot immediately writes "Thinking…" and then edits that message as the answer arrives. Slack has rate limits on API calls, and an edit per text fragment would hit them quickly, so the accumulated text is sent every second and a half. Slack also has dedicated methods for streaming AI app replies: `chat.startStream`, `chat.appendStream` and `chat.stopStream`. Editing a message works in any workspace and shows the idea without extra dependencies. If your app is set up as a Slack AI assistant, the streaming methods give smoother output.
 
 **No confirmations.** Slack buttons need a separate interactivity handler. To keep things simple, dangerous tools are always declined from the bot, and the model says the action is available in the web chat. All the tools from our parts only read, so nothing changes for them.
 

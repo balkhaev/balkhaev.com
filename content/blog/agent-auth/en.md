@@ -51,7 +51,7 @@ Next we write each piece. The code continues [part 4](/blog/agent-mcp/): the sam
 Your company already has a sign-in provider: Keycloak, Microsoft Entra ID, Okta, Google Workspace. They all speak OAuth 2.0 and OpenID Connect and issue tokens as JWTs. To make the example run without them, we write a tiny 70-line provider with the [jose](https://github.com/panva/jose) library. It does three things: publishes the key for checking signatures, issues a token by user name, and exchanges tokens.
 
 ```bash
-bun add jose @modelcontextprotocol/sdk zod @anthropic-ai/sdk
+bun add jose @modelcontextprotocol/server @modelcontextprotocol/client zod @anthropic-ai/sdk
 ```
 
 ```ts
@@ -185,10 +185,10 @@ function tokenFor(userToken: string, audience: string) {
 }
 ```
 
-The second picks the transport. For HTTP servers we pass our own `fetch` that puts a fresh token into the header before every request:
+The second picks the transport. For HTTP servers we pass an `authProvider`: the transport calls it before every request and puts the token into the `Authorization` header:
 
 ```ts
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 type StdioConfig = { command: string; args?: string[]; env?: Record<string, string> };
 type HttpConfig = { url: string; audience: string };
@@ -197,14 +197,8 @@ type ServerConfig = StdioConfig | HttpConfig;
 function transportFor(params: ServerConfig, userToken: string) {
   if ("command" in params) return new StdioClientTransport({ ...params, stderr: "inherit" });
   const getToken = tokenFor(userToken, params.audience);
-  return new StreamableHTTPClientTransport(new URL(params.url), {
-    // A fresh token on every request, even if the agent session lasts for hours
-    fetch: async (url, init) => {
-      const headers = new Headers(init?.headers);
-      headers.set("Authorization", `Bearer ${await getToken()}`);
-      return fetch(url, { ...init, headers });
-    },
-  });
+  // The transport asks for a token before every request, so it stays fresh even if the agent session lasts for hours
+  return new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: getToken } });
 }
 ```
 
@@ -214,7 +208,11 @@ function transportFor(params: ServerConfig, userToken: string) {
 export async function connectMcp(config: Record<string, ServerConfig>, userToken: string) {
   // ...
   for (const [serverName, params] of Object.entries(config)) {
-    const client = new Client({ name: "company-agent", version: "1.0.0" });
+    // auto: speak the 2026-07-28 revision, fall back to the 2025 protocol for older servers
+    const client = new Client(
+      { name: "company-agent", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
     await client.connect(transportFor(params, userToken));
     // ... the rest as before: listTools and wrappers for the model
   }
@@ -229,6 +227,7 @@ Both servers need the same thing: take the token from the header and check the s
 
 ```ts
 // auth.ts
+import { type AuthInfo, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
@@ -236,29 +235,42 @@ const jwks = createRemoteJWKSet(new URL(`${ISSUER}/jwks`));
 
 export type User = { id: string; groups: string[] };
 
-// Checks signature, issuer, expiry and, most importantly, audience: the token was issued to this service
-export async function authenticate(req: Request, audience: string): Promise<User | null> {
-  const token = req.headers.get("authorization")?.replace(/^Bearer /, "");
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
-    return { id: payload.sub as string, groups: (payload.groups as string[]) ?? [] };
-  } catch {
-    return null;
-  }
+// Protects an MCP server as an OAuth resource: token check and resource metadata (RFC 9728)
+export function protectedResource(origin: string, audience: string) {
+  const resource = `${origin}/mcp`;
+  const metadataPath = "/.well-known/oauth-protected-resource/mcp";
+
+  // Checks the signature, issuer, expiry and, above all, the audience: the token was issued for this service
+  const gate = requireBearerAuth({
+    resourceMetadataUrl: `${origin}${metadataPath}`,
+    verifier: {
+      async verifyAccessToken(token): Promise<AuthInfo> {
+        try {
+          const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
+          return {
+            token,
+            clientId: payload.sub as string,
+            scopes: [],
+            expiresAt: payload.exp,
+            extra: { groups: (payload.groups as string[]) ?? [] },
+          };
+        } catch {
+          throw new OAuthError(OAuthErrorCode.InvalidToken, "the token is not valid for this service");
+        }
+      },
+    },
+  });
+
+  return {
+    gate,
+    metadataPath,
+    metadata: () => Response.json({ resource, authorization_servers: [ISSUER] }),
+  };
 }
 
-// Protected resource metadata (RFC 9728) and a 401 response that points to it
-export function protectedResource(origin: string) {
-  const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
-  return {
-    metadata: () => Response.json({ resource: `${origin}/mcp`, authorization_servers: [ISSUER] }),
-    unauthorized: () =>
-      new Response("unauthorized", {
-        status: 401,
-        headers: { "WWW-Authenticate": `Bearer resource_metadata="${metadataUrl}"` },
-      }),
-  };
+export function userOf(auth: AuthInfo | undefined): User {
+  if (!auth) throw new Error("request without a verified token");
+  return { id: auth.clientId, groups: (auth.extra?.groups as string[]) ?? [] };
 }
 
 export function auditLog(user: User, tool: string, args: unknown) {
@@ -268,7 +280,9 @@ export function auditLog(user: User, tool: string, args: unknown) {
 
 `createRemoteJWKSet` downloads and caches the provider's keys by itself, so rotating keys in the SSO does not require restarting the servers.
 
-The second function is there for automatic connection. Under the MCP specification, a server receiving no token responds with 401 and uses the `WWW-Authenticate` header to say where its metadata lives. From the metadata the client learns which provider to ask for a token. This is how off-the-shelf MCP clients such as Claude Desktop or Claude Code open a sign-in window on their own when you add a protected server. Our agent knows the provider in advance, but it is worth making the server compatible with everyone.
+We write the token check ourselves, and `requireBearerAuth` from the SDK handles the rest. It takes the token from the header and calls our `verifyAccessToken`. A missing or foreign token gets a 401 with the correct `WWW-Authenticate` header. A token with no `expiresAt` also gets a 401, so we always pass the expiry from the JWT.
+
+The metadata is there for automatic connection. Under the MCP specification, a server receiving no token responds with 401 and uses the `WWW-Authenticate` header to say where its metadata lives, at `/.well-known/oauth-protected-resource/mcp`. From the metadata the client learns which provider to ask for a token. This is how off-the-shelf MCP clients such as Claude Desktop or Claude Code open a sign-in window on their own when you add a protected server. Our agent knows the provider in advance, but it is worth making the server compatible with everyone.
 
 ## The wiki: filtering by group
 
@@ -276,15 +290,14 @@ The wiki server from [part 5](/blog/agent-search/) already stores an `access` fi
 
 ```ts
 // wiki-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
-import { type User, auditLog, authenticate, protectedResource } from "./auth";
+import { type User, auditLog, protectedResource, userOf } from "./auth";
 
 const PORT = 3001;
 const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-const resource = protectedResource(`http://localhost:${PORT}`);
+const resource = protectedResource(`http://localhost:${PORT}`, "wiki");
 
 // A document is visible if at least one of its access groups belongs to the user
 const VISIBLE = `EXISTS (SELECT 1 FROM json_each(docs.access)
@@ -332,22 +345,20 @@ function buildServer(user: User) {
   return server;
 }
 
+// The server is built per request from whoever came with the token
+const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
-    if (url.pathname === "/.well-known/oauth-protected-resource") return resource.metadata();
+    if (url.pathname === resource.metadataPath) return resource.metadata();
     if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
 
-    const user = await authenticate(req, "wiki");
-    if (!user) return resource.unauthorized();
-
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // no sessions: every request carries its own token
-      enableJsonResponse: true,
-    });
-    await buildServer(user).connect(transport);
-    return transport.handleRequest(req);
+    // No valid token: 401 with a link to the metadata, where the client learns where to get one
+    const auth = await resource.gate(req);
+    if (auth instanceof Response) return auth;
+    return handler.fetch(req, { authInfo: auth });
   },
 });
 console.error(`wiki MCP at http://localhost:${PORT}/mcp`);
@@ -493,15 +504,14 @@ The database server is built like the wiki: HTTP, a token check with audience `d
 
 ```ts
 // db-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { type User, auditLog, authenticate, protectedResource } from "./auth";
+import { type User, auditLog, protectedResource, userOf } from "./auth";
 import { queryAs } from "./pg";
 
 const PORT = 3002;
 const MAX_ROWS = 200;
-const resource = protectedResource(`http://localhost:${PORT}`);
+const resource = protectedResource(`http://localhost:${PORT}`, "db");
 
 const DOCS = `Company database tables (PostgreSQL):
 
@@ -529,7 +539,7 @@ function buildServer(user: User) {
     "query",
     {
       description: `Run one SELECT against the company database with the current employee's permissions. Returns up to ${MAX_ROWS} rows as JSON.`,
-      inputSchema: { sql: z.string().describe("One SELECT or WITH ... SELECT query") },
+      inputSchema: z.object({ sql: z.string().describe("One SELECT or WITH ... SELECT query") }),
       annotations: { readOnlyHint: true },
     },
     async ({ sql }) => {
@@ -548,22 +558,20 @@ function buildServer(user: User) {
   return server;
 }
 
+// The server is built per request from whoever came with the token
+const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
-    if (url.pathname === "/.well-known/oauth-protected-resource") return resource.metadata();
+    if (url.pathname === resource.metadataPath) return resource.metadata();
     if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
 
-    const user = await authenticate(req, "db");
-    if (!user) return resource.unauthorized();
-
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
-    await buildServer(user).connect(transport);
-    return transport.handleRequest(req);
+    // No valid token: 401 with a link to the metadata, where the client learns where to get one
+    const auth = await resource.gate(req);
+    if (auth instanceof Response) return auth;
+    return handler.fetch(req, { authInfo: auth });
   },
 });
 console.error(`db MCP at http://localhost:${PORT}/mcp`);
@@ -657,7 +665,7 @@ Checking that the servers keep strangers out:
 ```bash
 # No token: 401 and a link to the metadata
 curl -si -X POST localhost:3002/mcp | grep WWW-Authenticate
-# WWW-Authenticate: Bearer resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource"
+# WWW-Authenticate: Bearer error="invalid_token", error_description="Missing Authorization header", resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource/mcp"
 
 # The agent token instead of a database token: also 401, the audience does not match
 curl -s -o /dev/null -w "%{http_code}\n" -X POST \
@@ -671,6 +679,7 @@ The teaching provider is replaced by the corporate one, and almost all the code 
 
 - **Sign-in.** The agent is registered in the SSO as an OAuth client. The employee signs in through the company's usual sign-in page (authorization code flow with PKCE), and the agent gets an access token and a refresh token. The refresh token is stored encrypted on the server and never reaches the browser or the model.
 - **Groups.** The provider is configured to put groups into the token. It is better to include not every group from the directory but only those that mean something to the agent, otherwise the token grows to kilobytes.
+- **A standard exchange for MCP.** MCP standardises our token exchange as the Enterprise-Managed Authorization extension (SEP-990, also called Cross App Access). First the provider turns the employee's token into a JWT grant for the target server (RFC 8693). Then that MCP server's authorization server turns the grant into an access token (RFC 7523). If your provider supports it, the v2 SDK client needs only `CrossAppAccessProvider` instead of the hand-written `tokenFor`, and the employee sees no extra consent screens.
 - **Your own systems.** Your own MCP servers check the token exactly as here: against the provider's JWKS, with an audience check.
 - **Third-party SaaS.** Google Drive, Jira or Salesforce have their own OAuth providers, and exchanging the corporate token for theirs is usually impossible. Then the employee authorises the agent once to access their account in that system, and the agent stores the issued token and uses it. The system itself still checks permissions, exactly as it would for the person.
 - **The database.** Instead of two roles you usually end up with several, one per directory group. RLS policies are written once and work for every database client, not just the agent. It is also a good excuse to tidy up permissions.

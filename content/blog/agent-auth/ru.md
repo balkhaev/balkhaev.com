@@ -51,7 +51,7 @@ flowchart TD
 В компании уже есть провайдер входа: Keycloak, Microsoft Entra ID, Okta, Google Workspace. Все они говорят на OAuth 2.0 и OpenID Connect и выдают токены в формате JWT. Чтобы пример запускался без них, напишем маленький провайдер на 70 строк с библиотекой [jose](https://github.com/panva/jose). Он умеет три вещи: публиковать ключ для проверки подписи, выдавать токен по имени пользователя и обменивать токены.
 
 ```bash
-bun add jose @modelcontextprotocol/sdk zod @anthropic-ai/sdk
+bun add jose @modelcontextprotocol/server @modelcontextprotocol/client zod @anthropic-ai/sdk
 ```
 
 ```ts
@@ -185,10 +185,10 @@ function tokenFor(userToken: string, audience: string) {
 }
 ```
 
-Вторая выбирает транспорт. Для HTTP-серверов подставляем свой `fetch`, который перед каждым запросом кладёт свежий токен в заголовок:
+Вторая выбирает транспорт. Для HTTP-серверов передаём `authProvider`: транспорт вызывает его перед каждым запросом и кладёт токен в заголовок `Authorization`:
 
 ```ts
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 type StdioConfig = { command: string; args?: string[]; env?: Record<string, string> };
 type HttpConfig = { url: string; audience: string };
@@ -197,14 +197,8 @@ type ServerConfig = StdioConfig | HttpConfig;
 function transportFor(params: ServerConfig, userToken: string) {
   if ("command" in params) return new StdioClientTransport({ ...params, stderr: "inherit" });
   const getToken = tokenFor(userToken, params.audience);
-  return new StreamableHTTPClientTransport(new URL(params.url), {
-    // Свежий токен на каждый запрос, даже если сессия агента длится часами
-    fetch: async (url, init) => {
-      const headers = new Headers(init?.headers);
-      headers.set("Authorization", `Bearer ${await getToken()}`);
-      return fetch(url, { ...init, headers });
-    },
-  });
+  // Транспорт спрашивает токен перед каждым запросом: он свежий, даже если сессия агента длится часами
+  return new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: getToken } });
 }
 ```
 
@@ -214,7 +208,11 @@ function transportFor(params: ServerConfig, userToken: string) {
 export async function connectMcp(config: Record<string, ServerConfig>, userToken: string) {
   // ...
   for (const [serverName, params] of Object.entries(config)) {
-    const client = new Client({ name: "company-agent", version: "1.0.0" });
+    // auto: говорим по ревизии 2026-07-28, а со старыми серверами по протоколу 2025 года
+    const client = new Client(
+      { name: "company-agent", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
     await client.connect(transportFor(params, userToken));
     // ... дальше как раньше: listTools и обёртки для модели
   }
@@ -229,6 +227,7 @@ Stdio-серверы остаются для локальных инструме
 
 ```ts
 // auth.ts
+import { type AuthInfo, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
@@ -236,29 +235,42 @@ const jwks = createRemoteJWKSet(new URL(`${ISSUER}/jwks`));
 
 export type User = { id: string; groups: string[] };
 
-// Проверяет подпись, издателя, срок и, главное, audience: токен выдан именно этому сервису
-export async function authenticate(req: Request, audience: string): Promise<User | null> {
-  const token = req.headers.get("authorization")?.replace(/^Bearer /, "");
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
-    return { id: payload.sub as string, groups: (payload.groups as string[]) ?? [] };
-  } catch {
-    return null;
-  }
+// Защита MCP-сервера как ресурса OAuth: проверка токена и метаданные ресурса (RFC 9728)
+export function protectedResource(origin: string, audience: string) {
+  const resource = `${origin}/mcp`;
+  const metadataPath = "/.well-known/oauth-protected-resource/mcp";
+
+  // Проверяет подпись, издателя, срок и, главное, audience: токен выдан именно этому сервису
+  const gate = requireBearerAuth({
+    resourceMetadataUrl: `${origin}${metadataPath}`,
+    verifier: {
+      async verifyAccessToken(token): Promise<AuthInfo> {
+        try {
+          const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
+          return {
+            token,
+            clientId: payload.sub as string,
+            scopes: [],
+            expiresAt: payload.exp,
+            extra: { groups: (payload.groups as string[]) ?? [] },
+          };
+        } catch {
+          throw new OAuthError(OAuthErrorCode.InvalidToken, "токен не подходит этому сервису");
+        }
+      },
+    },
+  });
+
+  return {
+    gate,
+    metadataPath,
+    metadata: () => Response.json({ resource, authorization_servers: [ISSUER] }),
+  };
 }
 
-// Метаданные защищённого ресурса (RFC 9728) и ответ 401, который на них указывает
-export function protectedResource(origin: string) {
-  const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
-  return {
-    metadata: () => Response.json({ resource: `${origin}/mcp`, authorization_servers: [ISSUER] }),
-    unauthorized: () =>
-      new Response("unauthorized", {
-        status: 401,
-        headers: { "WWW-Authenticate": `Bearer resource_metadata="${metadataUrl}"` },
-      }),
-  };
+export function userOf(auth: AuthInfo | undefined): User {
+  if (!auth) throw new Error("запрос без проверенного токена");
+  return { id: auth.clientId, groups: (auth.extra?.groups as string[]) ?? [] };
 }
 
 export function auditLog(user: User, tool: string, args: unknown) {
@@ -268,7 +280,9 @@ export function auditLog(user: User, tool: string, args: unknown) {
 
 `createRemoteJWKSet` сам скачивает и кеширует ключи провайдера, поэтому смена ключей в SSO не требует перезапуска серверов.
 
-Вторая функция нужна для автоматического подключения. По спецификации MCP сервер без токена отвечает 401 и в заголовке `WWW-Authenticate` указывает, где лежат его метаданные. Из метаданных клиент узнаёт, у какого провайдера просить токен. Так готовые MCP-клиенты, например Claude Desktop или Claude Code, сами открывают окно входа, когда вы добавляете защищённый сервер. Наш агент знает провайдера заранее, но сервер полезно сделать совместимым со всеми.
+Проверку токена мы пишем сами, а всё остальное берёт на себя `requireBearerAuth` из SDK. Он достаёт токен из заголовка и вызывает наш `verifyAccessToken`. На отсутствующий или чужой токен он отвечает 401 с правильным заголовком `WWW-Authenticate`. Если токен истёк, а поле `expiresAt` не заполнено, он тоже отвечает 401, поэтому срок из JWT передаём всегда.
+
+Метаданные нужны для автоматического подключения. По спецификации MCP сервер без токена отвечает 401 и в заголовке `WWW-Authenticate` указывает, где лежат его метаданные, по адресу `/.well-known/oauth-protected-resource/mcp`. Из метаданных клиент узнаёт, у какого провайдера просить токен. Так готовые MCP-клиенты, например Claude Desktop или Claude Code, сами открывают окно входа, когда вы добавляете защищённый сервер. Наш агент знает провайдера заранее, но сервер полезно сделать совместимым со всеми.
 
 ## Вики: фильтр по группам
 
@@ -276,15 +290,14 @@ export function auditLog(user: User, tool: string, args: unknown) {
 
 ```ts
 // wiki-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
-import { type User, auditLog, authenticate, protectedResource } from "./auth";
+import { type User, auditLog, protectedResource, userOf } from "./auth";
 
 const PORT = 3001;
 const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-const resource = protectedResource(`http://localhost:${PORT}`);
+const resource = protectedResource(`http://localhost:${PORT}`, "wiki");
 
 // Документ виден, если хотя бы одна его группа доступа есть у пользователя
 const VISIBLE = `EXISTS (SELECT 1 FROM json_each(docs.access)
@@ -332,22 +345,20 @@ function buildServer(user: User) {
   return server;
 }
 
+// Сервер собирается на каждый запрос из того, кто пришёл с токеном
+const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
-    if (url.pathname === "/.well-known/oauth-protected-resource") return resource.metadata();
+    if (url.pathname === resource.metadataPath) return resource.metadata();
     if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
 
-    const user = await authenticate(req, "wiki");
-    if (!user) return resource.unauthorized();
-
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // без сессий: каждый запрос сам несёт токен
-      enableJsonResponse: true,
-    });
-    await buildServer(user).connect(transport);
-    return transport.handleRequest(req);
+    // Без подходящего токена: 401 со ссылкой на метаданные, откуда клиент узнает, где взять токен
+    const auth = await resource.gate(req);
+    if (auth instanceof Response) return auth;
+    return handler.fetch(req, { authInfo: auth });
   },
 });
 console.error(`wiki MCP на http://localhost:${PORT}/mcp`);
@@ -493,15 +504,14 @@ SELECT set_config('role', 'hr_reader', true),
 
 ```ts
 // db-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { type User, auditLog, authenticate, protectedResource } from "./auth";
+import { type User, auditLog, protectedResource, userOf } from "./auth";
 import { queryAs } from "./pg";
 
 const PORT = 3002;
 const MAX_ROWS = 200;
-const resource = protectedResource(`http://localhost:${PORT}`);
+const resource = protectedResource(`http://localhost:${PORT}`, "db");
 
 const DOCS = `Таблицы базы компании (PostgreSQL):
 
@@ -529,7 +539,7 @@ function buildServer(user: User) {
     "query",
     {
       description: `Выполнить один SELECT к базе компании с правами текущего сотрудника. Вернёт до ${MAX_ROWS} строк в JSON.`,
-      inputSchema: { sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") },
+      inputSchema: z.object({ sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") }),
       annotations: { readOnlyHint: true },
     },
     async ({ sql }) => {
@@ -548,22 +558,20 @@ function buildServer(user: User) {
   return server;
 }
 
+// Сервер собирается на каждый запрос из того, кто пришёл с токеном
+const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
-    if (url.pathname === "/.well-known/oauth-protected-resource") return resource.metadata();
+    if (url.pathname === resource.metadataPath) return resource.metadata();
     if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
 
-    const user = await authenticate(req, "db");
-    if (!user) return resource.unauthorized();
-
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
-    await buildServer(user).connect(transport);
-    return transport.handleRequest(req);
+    // Без подходящего токена: 401 со ссылкой на метаданные, откуда клиент узнает, где взять токен
+    const auth = await resource.gate(req);
+    if (auth instanceof Response) return auth;
+    return handler.fetch(req, { authInfo: auth });
   },
 });
 console.error(`db MCP на http://localhost:${PORT}/mcp`);
@@ -657,7 +665,7 @@ USER_TOKEN=$(curl -s "localhost:4000/dev-login?user=igor") bun agent.ts
 ```bash
 # Без токена: 401 и ссылка на метаданные
 curl -si -X POST localhost:3002/mcp | grep WWW-Authenticate
-# WWW-Authenticate: Bearer resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource"
+# WWW-Authenticate: Bearer error="invalid_token", error_description="Missing Authorization header", resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource/mcp"
 
 # С токеном агента вместо токена базы: тоже 401, адресат не совпадает
 curl -s -o /dev/null -w "%{http_code}\n" -X POST \
@@ -672,6 +680,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST \
 - **Вход.** Агент регистрируется в SSO как OAuth-клиент. Сотрудник входит через обычное окно входа компании (authorization code flow с PKCE), агент получает access token и refresh token. Refresh token хранится на сервере зашифрованным, в браузер и в модель не попадает никогда.
 - **Группы.** В настройках провайдера включается выдача групп в токене. Лучше выдавать не все группы из каталога, а только те, что значат что-то для агента, иначе токен разрастается до килобайт.
 - **Свои системы.** Свои MCP-серверы проверяют токен так же, как здесь: по JWKS провайдера, с проверкой адресата.
+- **Стандартный обмен для MCP.** Наш обмен токенов в MCP оформлен как расширение Enterprise-Managed Authorization (SEP-990, его ещё называют Cross App Access). Сначала провайдер меняет токен сотрудника на JWT-грант для нужного сервера (RFC 8693). Затем сервер авторизации этого MCP-сервера меняет грант на токен доступа (RFC 7523). Если ваш провайдер это поддерживает, в клиенте SDK v2 вместо самописного `tokenFor` достаточно `CrossAppAccessProvider`, а сотрудник не видит лишних окон согласия.
 - **Чужие SaaS.** У Google Drive, Jira или Salesforce свои OAuth-провайдеры, и обмен корпоративного токена на их токен обычно невозможен. Тогда сотрудник один раз разрешает агенту доступ к своему аккаунту в этой системе, а агент хранит выданный токен и ходит с ним. Права при этом всё равно проверяет сама система, ровно как у человека.
 - **База.** Вместо двух ролей обычно получается несколько, по группам каталога. Политики RLS пишутся один раз и работают для любого клиента базы, не только для агента. Это ещё и хороший повод навести порядок в правах.
 
