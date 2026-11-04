@@ -84,15 +84,18 @@ button:focus-visible {
   flex: none;
   width: clamp(64px, 12.8vw, 206px);
   aspect-ratio: 1;
-  margin-bottom: clamp(4px, 1.2vw, 20px);
+  /* The full stop sits on the baseline of the name. */
+  margin-bottom: max(-0.42vw, -7px);
   transition: transform 0.5s var(--ease);
 }
 .hole-anchor:hover {
-  transform: scale(1.04) rotate(-4deg);
+  transform: scale(1.05);
 }
-.scene-expanded .hole-anchor {
+.scene-expanded .hole-anchor,
+.scene-diving .hole-anchor {
   z-index: 200;
   transform: none;
+  transition: none;
 }
 
 /* Lead: one sentence and two actions */
@@ -318,7 +321,7 @@ a.row:hover::before {
   }
   .hole-anchor {
     width: 16vw;
-    margin-bottom: 1vw;
+    margin-bottom: 0;
   }
 }
 
@@ -331,9 +334,7 @@ a.row:hover::before {
   font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   background: #000;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--line);
   isolation: isolate;
-  view-transition-name: scene;
 }
 .scene[data-state="expanded"] {
   position: fixed;
@@ -342,12 +343,20 @@ a.row:hover::before {
   height: 100svh;
   min-height: 320px;
   border-radius: 0;
-  box-shadow: none;
 }
-/* biome-ignore lint/correctness/noUnknownTypeSelector: view transition pseudo-element */
-::view-transition-group(scene) {
-  animation-duration: 0.6s;
-  animation-timing-function: cubic-bezier(0.6, 0, 0.1, 1);
+/* The dive (src/lib/scene-dive.ts): the scene is clipped and scaled by script. */
+.scene-diving .scene {
+  border-radius: 0;
+  will-change: transform, clip-path;
+}
+.scene-diving
+  :is(.topbar, .masthead h1, .lead, .columns, .contacts, .site-foot) {
+  will-change: transform, opacity;
+}
+html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
+  visibility: hidden;
+  opacity: 0;
+  transition: none;
 }
 .scene-open {
   position: absolute;
