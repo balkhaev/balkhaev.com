@@ -25,11 +25,14 @@ Blog posts embed digest stories on their topic with a line of its own:
 ```
 
 Topics are listed in `src/news/topics.ts` (`agents`, `automation`, `coding`, `cost`,
-`inference`, `llm-api`, `mcp`, `open-models`, `search`, `security`); `limit` is 1–6,
-3 by default. The build writes the matching stories into the page, and
-`/blog/news.js` swaps them for the current feed in the browser. With no match the
-widget shows the newest stories instead. When the archive covers a post's date,
-the widget prefers matches within 60 days of it. An unknown topic fails the build.
+`gpu`, `inference`, `llm-api`, `mcp`, `media`, `open-models`, `search`, `security`,
+`voice`); `limit` is 1–6, 3 by default. Archive stories carry hand-set `topics` and
+match only on them; new channel stories match when a topic word is in their title.
+With no match the widget stays hidden. The build writes the matching stories into
+the page, and `/blog/news.js` swaps them for the current feed in the browser. When
+the archive covers a post's date, the widget prefers matches within 60 days of it;
+otherwise the post slug picks one of the top slices, so posts on one topic differ.
+An unknown topic fails the build.
 
 ## Scene and interaction
 

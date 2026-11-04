@@ -51,7 +51,7 @@ flowchart TD
   uptime -- не отвечает --> tg
 ```
 
-::news{topic="cost automation"}
+::news{topic="cost"}
 
 ## Шаг 1. Внешний мониторинг
 

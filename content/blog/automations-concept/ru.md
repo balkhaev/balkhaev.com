@@ -26,7 +26,7 @@ tags: [automation, architecture]
 
 Это может быть онлайн-школа, студия, SaaS или агентство. Конкретная отрасль неважна, процессы у всех похожи.
 
-::news{topic="automation agents"}
+::news{topic="automation"}
 
 ## Где бизнес теряет деньги
 

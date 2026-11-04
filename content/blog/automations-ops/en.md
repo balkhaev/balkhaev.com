@@ -51,7 +51,7 @@ flowchart TD
   uptime -- no answer --> tg
 ```
 
-::news{topic="cost automation"}
+::news{topic="cost"}
 
 ## Step 1. Outside monitoring
 

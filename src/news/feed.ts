@@ -16,6 +16,9 @@ const valid = (issue: Partial<Issue> | null) =>
       typeof story.text === "string" &&
       typeof story.source === "string" &&
       typeof story.url === "string" &&
+      (story.topics === undefined ||
+        (Array.isArray(story.topics) &&
+          story.topics.every((topic) => typeof topic === "string"))) &&
       story.url.startsWith("https://")
   );
 

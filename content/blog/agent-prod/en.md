@@ -176,7 +176,7 @@ The perimeter closes everything except one thing: employees' questions and tool 
 - The provider's data retention terms and the region where processing happens.
 - Whether you can reach the model through a cloud provider the company already has a contract with. Claude is available on several clouds, and then squid allows that cloud's address instead of `api.anthropic.com`.
 
-::news{topic="security agents"}
+::news{topic="security"}
 
 ## The audit log
 

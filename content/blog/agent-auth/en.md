@@ -24,7 +24,7 @@ The simplest path is to give the agent an account with access to every system an
 
 So permissions are checked neither in the model nor in the prompt, but where the data lives. The model may ask for anything, and the system returns only what a specific person is allowed to see.
 
-::news{topic="security mcp"}
+::news{topic="mcp"}
 
 ## The design
 

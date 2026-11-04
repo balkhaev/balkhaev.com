@@ -31,11 +31,18 @@ async function refresh() {
       const topics: TopicId[] = parseTopics(widget.dataset.topics ?? "");
       const limit = parseLimit(widget.dataset.limit);
       const lang: TopicLang = widget.dataset.lang === "en" ? "en" : "ru";
-      widget.innerHTML = widgetBody(
-        pickStories(issues, topics, limit, widget.dataset.near),
+      const picked = pickStories(
+        issues,
         topics,
-        lang
+        limit,
+        widget.dataset.near,
+        widget.dataset.seed
       );
+      // Nothing on the topic: hide the block rather than show stray news.
+      widget.hidden = !picked.matched;
+      if (picked.matched) {
+        widget.innerHTML = widgetBody(picked, topics, lang);
+      }
     } catch {
       // Keep what the build wrote.
     }

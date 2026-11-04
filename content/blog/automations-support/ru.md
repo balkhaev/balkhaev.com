@@ -29,7 +29,7 @@ tags: [automation, support, claude, prompt-caching, telegram]
 
 Решение и последнее слово остаются за человеком. Система убирает всё, что происходит до того, как он начинает думать.
 
-::news{topic="automation agents"}
+::news{topic="automation voice"}
 
 ## Почему черновик, а не автоответ
 

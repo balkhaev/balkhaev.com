@@ -27,7 +27,7 @@ tags: [automation, analytics, alerts, claude, postgres]
 | заметить, что поддержка не успевает | тревога, когда пять обращений ждут больше 4 часов |
 | понять, что проблема ушла | сообщение «✅ всё в норме» с длительностью |
 
-::news{topic="automation llm-api"}
+::news{topic="automation"}
 
 ## Главное правило: цифры считает SQL
 

@@ -47,13 +47,60 @@ test("matches Russian stems only at the start of a word", () => {
   expect(pickStories(off, ["agents"], 3).matched).toBe(false);
 });
 
-test("falls back to the newest stories when nothing matches", () => {
+test("shows nothing, and the widget hides, when nothing matches", () => {
   const picked = pickStories(issues, ["security"], 2);
-  expect(picked.matched).toBe(false);
-  expect(picked.stories.map((item) => item.date)).toEqual([
-    "2026-11-08",
-    "2026-11-08",
-  ]);
+  expect(picked).toEqual({ matched: false, stories: [] });
+  const html = renderWidget(["security"], 2, "ru", undefined, issues);
+  expect(html).toContain(" hidden>");
+  expect(html).not.toContain("news-item");
+});
+
+test("a word only in the text is not enough for an untagged story", () => {
+  const text = [
+    {
+      date: "2026-11-08",
+      post: 1,
+      stories: [story("Новый чип", "Для агентов тоже")],
+    },
+  ] as Issue[];
+  expect(pickStories(text, ["agents"], 3).matched).toBe(false);
+});
+
+test("hand-set topics decide for archive stories", () => {
+  const tagged = [
+    {
+      date: "2026-11-08",
+      post: null,
+      stories: [
+        { ...story("Агент с MCP"), topics: ["media"] },
+        { ...story("Новая видеомодель"), topics: ["agents"] },
+      ],
+    },
+  ] as Issue[];
+  expect(
+    pickStories(tagged, ["agents"], 3).stories.map((item) => item.story.title)
+  ).toEqual(["Новая видеомодель"]);
+});
+
+test("the seed spreads posts on one topic over different stories", () => {
+  const many = [
+    {
+      date: "2026-11-08",
+      post: null,
+      stories: Array.from({ length: 9 }, (_, i) => ({
+        ...story(`Агент ${i}`),
+        topics: ["agents"],
+      })),
+    },
+  ] as Issue[];
+  const seen = new Set(
+    ["a", "b", "c", "d", "e", "f"].map((seed) =>
+      pickStories(many, ["agents"], 3, undefined, seed)
+        .stories.map((item) => item.story.title)
+        .join()
+    )
+  );
+  expect(seen.size).toBeGreaterThan(1);
 });
 
 test("rejects unknown topics", () => {

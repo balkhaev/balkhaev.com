@@ -108,11 +108,12 @@ export function renderWidget(
   limit: number,
   lang: TopicLang,
   near: string | undefined,
-  issues: Issue[]
+  issues: Issue[],
+  seed?: string
 ) {
-  const picked = pickStories(issues, topics, limit, near);
+  const picked = pickStories(issues, topics, limit, near, seed);
   const name = topics.map((id) => TOPICS[id].label[lang]).join(", ");
-  return `<aside aria-label="${html(`${LABELS[lang].kicker}: ${name}`)}" class="news-widget" data-lang="${lang}" data-limit="${limit}"${near ? ` data-near="${near}"` : ""} data-topics="${topics.join(" ")}">
-${widgetBody(picked, topics, lang)}
+  return `<aside aria-label="${html(`${LABELS[lang].kicker}: ${name}`)}" class="news-widget" data-lang="${lang}" data-limit="${limit}"${near ? ` data-near="${near}"` : ""}${seed ? ` data-seed="${html(seed)}"` : ""} data-topics="${topics.join(" ")}"${picked.matched ? "" : " hidden"}>
+${picked.matched ? widgetBody(picked, topics, lang) : ""}
 </aside>`;
 }

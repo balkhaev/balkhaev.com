@@ -22,7 +22,7 @@ A model's answer is made of two stages, and they have different bottlenecks.
 
 In chats and agents most of the time goes to decode, so the key GPU property for inference is **memory bandwidth**, not the teraflops in marketing tables.
 
-::news{topic="inference"}
+::news{topic="gpu"}
 
 ## How much memory you need
 
