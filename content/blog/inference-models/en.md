@@ -126,4 +126,4 @@ A few engine features worth knowing in advance:
 
 ## What's next
 
-The model is chosen, and so is the engine. In the next part we go and get a GPU: we compare RunPod and Vast.ai and look at rental types, persistent disks and how not to pay for idle time.
+The model is chosen, and so is the engine. In the [next part](/blog/inference-clouds/) we go and get a GPU: we compare RunPod and Vast.ai and look at rental types, persistent disks and how not to pay for idle time.
