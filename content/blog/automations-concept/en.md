@@ -62,15 +62,15 @@ Lay our five processes out against these questions and you get the order of this
 
 ## What we will build
 
-One automation per part, all on a shared foundation.
+One automation per part, all on a shared foundation. Each one takes the routine off one role in the company.
 
-**Leads in a minute.** A form submission goes straight into the system. The model pulls out of the free text what the person needs, estimates how hot the lead is, and within a minute a manager gets a Telegram card with "I'll take it" and "spam" buttons, while a deal appears in the CRM. If nobody takes the lead within 15 minutes, the bot sends a reminder.
+**Replacing the salesperson.** A form submission goes straight into the system. The model pulls out of the free text what the person needs, estimates how hot the lead is, and within a minute a manager gets a Telegram card with "I'll take it" and "spam" buttons, while a deal appears in the CRM. If nobody takes the lead within 15 minutes, the bot sends a reminder.
 
-**Money.** The payment provider sends a payment event and the system grants access and sends the receipt by itself, exactly once, even if the event arrives three times. Failed payments and unpaid invoices get a chain of polite reminders that stops as soon as the client pays.
+**Replacing the accountant.** The payment provider sends a payment event and the system grants access and sends the receipt by itself, exactly once, even if the event arrives three times. Failed payments and unpaid invoices get a chain of polite reminders that stops as soon as the client pays.
 
-**Support.** Incoming emails and messages are sorted by type. For repeated questions the model drafts a reply from the knowledge base, and an operator edits it and sends it with one button. The model never sends anything to a client on its own.
+**Replacing support.** Incoming emails and messages are sorted by type. For repeated questions the model drafts a reply from the knowledge base, and an operator edits it and sends it with one button. The model never sends anything to a client on its own.
 
-**Reports and alerts.** Every morning a digest arrives in the team chat: leads, payments, revenue, a comparison with last week. If something drops sharply, for example zero leads from the website in a day, the alert arrives right away rather than on Monday.
+**Replacing the analyst.** Every morning a digest arrives in the team chat: leads, payments, revenue, a comparison with last week. If something drops sharply, for example zero leads from the website in a day, the alert arrives right away rather than on Monday.
 
 ## Ready-made service or your own code
 
