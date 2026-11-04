@@ -21,6 +21,8 @@ A model's answer is made of two stages, and they have different bottlenecks.
 
 In chats and agents most of the time goes to decode, so the key GPU property for inference is **memory bandwidth**, not the teraflops in marketing tables.
 
+::news{topic="inference"}
+
 ## How much memory you need
 
 GPU memory splits into three parts.
@@ -151,4 +153,4 @@ Two adjustments to the diagram. If response speed for a single user matters, go 
 
 ## What's next
 
-We can now estimate which GPU a model needs. In the next part we choose the model itself: which open models are worth running now for different tasks and budgets, and which engine to serve them with: vLLM, SGLang, llama.cpp or Ollama.
+We can now estimate which GPU a model needs. In the [next part](/blog/inference-models/) we choose the model itself: which open models are worth running now for different tasks and budgets, and which engine to serve them with: vLLM, SGLang, llama.cpp or Ollama.
