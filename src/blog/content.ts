@@ -26,6 +26,8 @@ export interface Post {
   tags: string[];
   title: string;
   toc: Heading[];
+  /** Day the post was last revised, when later than `date`. */
+  updated?: string;
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
@@ -89,6 +91,18 @@ export async function parsePost(
   if (!(DATE.test(date) && !Number.isNaN(Date.parse(date)))) {
     fail(file, `"date" must look like 2026-11-04, got "${date}"`);
   }
+  const updated =
+    fields.updated === undefined ? undefined : text(file, fields, "updated");
+  if (
+    updated !== undefined &&
+    !(
+      DATE.test(updated) &&
+      !Number.isNaN(Date.parse(updated)) &&
+      updated >= date
+    )
+  ) {
+    fail(file, `"updated" must look like 2026-11-04 and not be before "date"`);
+  }
   const tags = fields.tags ?? [];
   if (!(Array.isArray(tags) && tags.every((tag) => typeof tag === "string"))) {
     fail(file, `"tags" must be a list of strings`);
@@ -114,6 +128,7 @@ export async function parsePost(
     tags,
     title: text(file, fields, "title"),
     toc,
+    ...(updated && updated !== date ? { updated } : {}),
   };
 }
 

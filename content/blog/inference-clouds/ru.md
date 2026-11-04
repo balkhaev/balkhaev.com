@@ -1,7 +1,8 @@
 ---
 title: "RunPod и Vast.ai: где арендовать и как не переплатить"
 description: Чем отличаются RunPod и Vast.ai, какие бывают типы аренды, где хранить веса, чтобы не скачивать их каждый раз, и как не платить за простой.
-date: 2026-11-04
+date: 2026-06-02
+updated: 2026-11-04
 series: inference
 part: 4
 tags: [inference, gpu, cloud]

@@ -1,7 +1,8 @@
 ---
 title: "Images and video: ComfyUI on a rented GPU"
 description: Which open image and video models to use now, how much memory they need, how to bring up ComfyUI on RunPod or Vast.ai and turn a pipeline into an API for your product.
-date: 2026-11-04
+date: 2026-08-25
+updated: 2026-11-04
 series: inference
 part: 6
 tags: [inference, gpu, images, video]

@@ -1,7 +1,8 @@
 ---
 title: "Your own endpoint: vLLM, measuring speed and key-based access"
 description: We run vLLM with an open model on a rented GPU, go through the settings that actually matter, measure speed under load and close the endpoint with a key.
-date: 2026-11-04
+date: 2026-07-14
+updated: 2026-11-04
 series: inference
 part: 5
 tags: [inference, vllm, gpu]

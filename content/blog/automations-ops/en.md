@@ -1,7 +1,8 @@
 ---
 title: "Operations: monitoring, backups, secrets and cost"
 description: The last part of the series. Outside monitoring that notices when the whole system dies, log rotation, encrypted backups with another provider and a restore check, handling secrets, tracking what Claude costs, and updates, including the move to Postgres 18.
-date: 2026-11-04
+date: 2024-11-26
+updated: 2026-11-04
 series: automations
 part: 8
 tags: [automation, operations, backups, monitoring, postgres]

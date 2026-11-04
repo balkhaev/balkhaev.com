@@ -1,7 +1,8 @@
 ---
 title: "What to run now: models and engines"
 description: Which open models are worth running on a rented GPU in late 2026, how to choose for a task and budget, test before renting, and which engine to serve them with.
-date: 2026-11-04
+date: 2026-04-28
+updated: 2026-11-04
 series: inference
 part: 3
 tags: [inference, open-source, llm]

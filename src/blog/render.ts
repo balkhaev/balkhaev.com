@@ -12,6 +12,7 @@ const LABELS: Record<
     feed: string;
     empty: string;
     minutes: (count: number) => string;
+    updated: string;
     next: string;
     part: (part: number, total: number) => string;
     parts: string;
@@ -41,6 +42,7 @@ const LABELS: Record<
     seriesOne: "Series",
     soon: "coming soon",
     switcher: "Language",
+    updated: "updated",
     writings: "All posts",
   },
   ru: {
@@ -60,6 +62,7 @@ const LABELS: Record<
     seriesOne: "Серия",
     soon: "скоро",
     switcher: "Язык",
+    updated: "обновлено",
     writings: "Все записи",
   },
 };
@@ -173,7 +176,7 @@ const seriesOf = (post: Post, series: Series[]) =>
 
 /** Mono line under a title: date, reading time and tags. */
 const meta = (post: Post) =>
-  `<p class="meta"><time datetime="${post.date}">${formatDate(post.date, post.lang)}</time><span>${LABELS[post.lang].minutes(post.minutes)}</span>${post.tags.map((tag) => `<span class="tag">${html(tag)}</span>`).join("")}</p>`;
+  `<p class="meta"><time datetime="${post.date}">${formatDate(post.date, post.lang)}</time>${post.updated ? `<span>${LABELS[post.lang].updated} <time datetime="${post.updated}">${formatDate(post.updated, post.lang)}</time></span>` : ""}<span>${LABELS[post.lang].minutes(post.minutes)}</span>${post.tags.map((tag) => `<span class="tag">${html(tag)}</span>`).join("")}</p>`;
 
 /** Published posts of a series in one language, by part. */
 const partsOf = (series: Series, posts: Post[]) =>
@@ -410,12 +413,13 @@ export const blogUrls = (posts: Post[], series: Series[] = []) => [
 ];
 
 const xml = html;
+const lastChange = (post: Post) => post.updated ?? post.date;
 const FEED_SIZE = 20;
 
 /** Atom feed of the newest posts in one language, with full content. */
 export function renderFeed(lang: BlogLang, posts: Post[]) {
   const own = posts.filter((post) => post.lang === lang).slice(0, FEED_SIZE);
-  const updated = own[0]?.date ?? "2026-11-04";
+  const updated = own.map(lastChange).sort().at(-1) ?? "2026-11-04";
   const entries = own
     .map((post) => {
       const url = `${ORIGIN}${blogPath(lang, post.slug)}`;
@@ -425,7 +429,7 @@ export function renderFeed(lang: BlogLang, posts: Post[]) {
     <link href="${url}"/>
     <id>${url}</id>
     <published>${post.date}T00:00:00Z</published>
-    <updated>${post.date}T00:00:00Z</updated>
+    <updated>${lastChange(post)}T00:00:00Z</updated>
     <summary>${xml(post.description)}</summary>
     <content type="html">${xml(post.html)}</content>
 ${post.tags.map((tag) => `    <category term="${xml(tag)}"/>`).join("\n")}

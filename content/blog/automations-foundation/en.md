@@ -1,7 +1,8 @@
 ---
 title: "The foundation: a server, a database and deploy on push"
 description: Rent a VPS, set it up, write the first Bun service with Postgres and migrations, package it with Docker Compose and Caddy, and deploy it with GitHub Actions.
-date: 2026-11-04
+date: 2024-03-05
+updated: 2026-11-04
 series: automations
 part: 2
 tags: [automation, devops, docker, postgres]

@@ -1,7 +1,8 @@
 ---
 title: "Replacing the accountant: payments, access and reminders to clients who owe"
 description: An invoice from one Telegram command, payment through YooKassa, a pay link that never expires, access granted exactly once, payment reconciliation and polite reminders to clients who owe that stop by themselves.
-date: 2026-11-04
+date: 2024-06-25
+updated: 2026-11-04
 series: automations
 part: 5
 tags: [automation, payments, yookassa, idempotency]

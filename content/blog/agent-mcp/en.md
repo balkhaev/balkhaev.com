@@ -1,7 +1,8 @@
 ---
 title: "MCP: connecting internal systems"
 description: Move the agent's tools into separate MCP servers, write our own server for the company database, and teach the agent to connect to any server from a config.
-date: 2026-11-04
+date: 2025-04-22
+updated: 2026-11-04
 series: company-agent
 part: 4
 tags: [agents, mcp, practice]

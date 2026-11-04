@@ -1,7 +1,8 @@
 ---
 title: "Concept: which automations pay off"
 description: How to find the processes where a business loses money, work out whether automating them is worth it, and what the system we build them on will look like.
-date: 2026-11-04
+date: 2024-02-13
+updated: 2026-11-04
 series: automations
 part: 1
 tags: [automation, architecture]
