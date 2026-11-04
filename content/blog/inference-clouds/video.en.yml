@@ -1,0 +1,64 @@
+context: Your own inference · 4/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 4
+    title: "RunPod and Vast.ai: *where to rent*"
+    subtitle: How the platforms differ and how not to overpay.
+
+  - type: compare
+    label: Platforms
+    heading: A cloud or a marketplace
+    columns:
+      - title: RunPod
+        pick: true
+        points:
+          - Fixed prices
+          - Network volumes for weights
+          - HTTPS proxy and serverless
+      - title: Vast.ai
+        points:
+          - Market prices, 1.5–2× cheaper
+          - Thousands of hosts, mixed quality
+          - Disk tied to the machine
+
+  - type: list
+    label: Rental types
+    heading: How you pay
+    items:
+      - "*On-demand*: the GPU is yours until you release it"
+      - "*Interruptible*: 30–60% cheaper, can be taken away"
+      - "*Serverless*: pay only for processing"
+      - "*Long-term*: a discount, only for constant load"
+
+  - type: statement
+    label: The main trap
+    text: The costliest part isn't the GPU hour, it's *downloading weights again*.
+    say: Hundreds of gigabytes on every start. Keep weights on a persistent disk.
+
+  - type: list
+    label: Idle time
+    heading: How not to pay for nothing
+    items:
+      - "*Stop pods* you don't need"
+      - "*Spending limit*: work from a prepaid balance"
+      - "*Auto-stop* after an hour with no requests"
+      - "*Batch jobs* delete the machine when done"
+
+  - type: diagram
+    label: Decision
+    heading: What to pick
+    nodes:
+      - { id: q1, label: "A service with steady load?", col: 0, row: 0, w: 4, step: 0 }
+      - { id: secure, label: RunPod Secure, sub: network volume, col: 8, row: 0, w: 4, step: 1, accent: true }
+      - { id: q2, label: "Batch processing?", col: 0, row: 3, w: 4, step: 1 }
+      - { id: vast, label: Vast.ai, sub: verified host, col: 8, row: 3, w: 4, step: 2 }
+      - { id: sls, label: RunPod Serverless, sub: uneven load, col: 0, row: 5, w: 4, step: 3 }
+    edges:
+      - { from: q1, to: secure, label: "yes" }
+      - { from: q1, to: q2, label: "no" }
+      - { from: q2, to: vast, label: "yes" }
+      - { from: q2, to: sls, label: "no" }
+
+  - type: end
+    text: GPU rented. Next, *running vLLM*.
+    url: balkhaev.com/blog/inference-clouds

@@ -1,0 +1,61 @@
+context: Commercial automations · 7/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 7
+    title: "Replacing the analyst: *digest and alerts*"
+    subtitle: Yesterday's numbers every morning, and silent breakages seen in hours, not a week.
+
+  - type: list
+    label: What we replace
+    heading: The owner's morning
+    items:
+      - "Gather numbers from three places: *a digest at 9:00*"
+      - "Compare with a normal week: *averages and arrows*"
+      - "See what people write about: *up to three observations from the model*"
+      - "Notice a broken form: *a silence alert*"
+      - "Notice support falling behind: *a queue alert*"
+
+  - type: statement
+    label: The key rule
+    text: All numbers *are computed by SQL*. The model gets finished numbers and only hints where to look.
+    say: Language models are good at spotting patterns and bad at arithmetic. If the model is down, the digest still goes out.
+
+  - type: diagram
+    label: How it works
+    heading: Digest and alerts from one database
+    nodes:
+      - { id: db, label: Database, sub: "leads, orders, tickets", col: 0, row: 1, w: 3, step: 0 }
+      - { id: metrics, label: Metrics, sub: yesterday and week, col: 4, row: 0, w: 3, step: 1 }
+      - { id: claude, label: Claude, sub: observations, col: 8, row: 0, w: 4, step: 2 }
+      - { id: digest, label: Digest, sub: at 9:00, col: 8, row: 2, w: 4, step: 2, accent: true }
+      - { id: checks, label: Checks, sub: every 15 minutes, col: 4, row: 4, w: 3, step: 3 }
+      - { id: alert, label: Alerts chat, sub: started and ended, col: 8, row: 4, w: 4, step: 4 }
+    edges:
+      - { from: db, to: metrics }
+      - { from: metrics, to: claude, label: numbers }
+      - { from: metrics, to: digest }
+      - { from: db, to: checks }
+      - { from: checks, to: alert }
+
+  - type: list
+    label: Metrics
+    heading: Decisions in the numbers
+    items:
+      - "*Median, not mean*: one forgotten lead doesn't skew the picture"
+      - "*Day boundaries* in the business time zone"
+      - "*Compare with the 7-day average*, not the day before"
+      - "*An arrow* only for a difference over 30%"
+      - "*Only aggregates to the model*, no names or contacts"
+
+  - type: list
+    label: Alerts
+    heading: What we catch
+    items:
+      - "*Silence* in leads and payments for longer than usual"
+      - "*Support falling behind*: five tickets waiting over 4 hours"
+      - "*Worker lagging*: jobs overdue"
+    say: An alert is a state, not a message. One message when a problem starts and one when it ends, no spam every 15 minutes.
+
+  - type: end
+    text: Sales, payments, support and analytics *run by themselves*.
+    url: balkhaev.com/blog/automations-analytics

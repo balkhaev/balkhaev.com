@@ -1,0 +1,74 @@
+context: Your own inference · 2/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 2
+    title: "Choosing a GPU: *memory and speed*"
+    subtitle: Why memory size and bandwidth matter, not teraflops.
+
+  - type: compare
+    label: Two stages
+    heading: How a model generates an answer
+    columns:
+      - title: Prefill
+        points:
+          - Reads the whole prompt at once
+          - Compute-bound
+          - Fast even on long input
+      - title: Decode
+        pick: true
+        points:
+          - One token at a time
+          - Reads all weights every time
+          - Bound by memory bandwidth
+
+  - type: list
+    label: Memory
+    heading: What has to fit
+    items:
+      - "*Weights*: parameters × bytes per parameter"
+      - "*Context cache*: grows with length and request count"
+      - "*Overhead*: activations, CUDA, the engine"
+    say: For MoE models count total parameters, not active ones. All experts sit in memory.
+
+  - type: list
+    label: Formats
+    heading: A 27-billion-parameter model
+    items:
+      - "*BF16*, 2 bytes: 54 GB"
+      - "*FP8*, 1 byte: 27 GB"
+      - "*FP4 or INT4*, half a byte: about 15 GB"
+    say: Rule of thumb, the weights in your format plus 20–50 percent for cache and overhead.
+
+  - type: statement
+    label: Speed
+    text: Speed ceiling ≈ *memory bandwidth / size of active weights*.
+    say: A dense 27B in FP8 on an H100 tops out around a hundred tokens a second. An MoE with three billion active is several times faster.
+
+  - type: list
+    label: What you can rent
+    heading: GPUs and hourly prices
+    items:
+      - "*RTX 4090*, 24 GB: about 0.9 dollars"
+      - "*RTX 5090*, 32 GB: about 1.2 dollars"
+      - "*RTX PRO 6000*, 96 GB: about 2.5, best price per gigabyte"
+      - "*H100*, 80 GB: 3–4 dollars, the inference standard"
+      - "*H200*, 141 GB: about 5.3 dollars"
+
+  - type: statement
+    label: Several GPUs
+    text: One big GPU *beats two small ones*.
+    say: Server GPUs are linked by NVLink and act almost as one. Consumer cards over PCIe lose time on exchange.
+
+  - type: list
+    label: In five minutes
+    heading: Choose by FP8 weights plus 30%
+    items:
+      - "Up to 24 GB: *RTX 4090*"
+      - "Up to 32 GB: *RTX 5090*"
+      - "Up to 96 GB: *RTX PRO 6000*, or H100 for speed"
+      - "Up to 141 GB: *H200*"
+      - "More: *several GPUs, FP4 or a provider*"
+
+  - type: end
+    text: GPU sized. Next, *the model and the engine*.
+    url: balkhaev.com/blog/inference-gpu

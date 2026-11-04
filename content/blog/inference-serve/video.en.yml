@@ -1,0 +1,60 @@
+context: Your own inference · 5/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 5
+    title: "Your own endpoint: *vLLM*"
+    subtitle: Launch, measure speed, lock it with a key.
+
+  - type: diagram
+    label: Layout
+    heading: What we run
+    nodes:
+      - { id: app, label: Product, sub: OpenAI client, col: 0, row: 1, w: 3, step: 0 }
+      - { id: key, label: Key and HTTPS, col: 4, row: 1, w: 3, step: 1 }
+      - { id: vllm, label: vLLM, sub: model in FP8, col: 8, row: 1, w: 4, step: 2, accent: true }
+      - { id: vol, label: Persistent disk, sub: model weights, col: 8, row: 4, w: 4, step: 3 }
+    edges:
+      - { from: app, to: key }
+      - { from: key, to: vllm }
+      - { from: vol, to: vllm }
+
+  - type: list
+    label: Launch
+    heading: One command
+    numbered: true
+    items:
+      - "*Official vLLM image* with a pinned version"
+      - "*A volume* with weights, so they aren't downloaded again"
+      - "*A context limit* that fits your task"
+      - "*FP8 cache*: twice the tokens in memory"
+
+  - type: statement
+    label: What matters
+    text: Launching is easy. What matters is *measuring speed* under load.
+    say: Run a test with one, four, sixteen and sixty-four parallel requests.
+
+  - type: list
+    label: Benchmark
+    heading: Three numbers
+    items:
+      - "*Time to first token* grows with the queue"
+      - "*Per-request speed* drops, but slowly"
+      - "*Total throughput* grows until the GPU saturates"
+    say: Find the point where latency is still fine, and price a million tokens from there.
+
+  - type: list
+    label: Access
+    heading: Don't leave the endpoint open
+    items:
+      - "*A long random key* kept in secrets"
+      - "*HTTPS only*"
+      - "*A proxy with limits* for several clients"
+      - "*Metrics*: queue, cache, tokens"
+
+  - type: statement
+    label: Integration
+    text: For the product it's a plain OpenAI API. Only *the address and key* change.
+
+  - type: end
+    text: Text works. Next, *images and video*.
+    url: balkhaev.com/blog/inference-serve

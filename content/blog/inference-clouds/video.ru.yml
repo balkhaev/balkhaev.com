@@ -1,0 +1,64 @@
+context: Свой инференс · 4/7
+scenes:
+  - type: title
+    kicker: Свой инференс · часть 4
+    title: "RunPod и Vast.ai: *где арендовать*"
+    subtitle: Чем отличаются площадки и как не переплатить.
+
+  - type: compare
+    label: Площадки
+    heading: Облако или биржа
+    columns:
+      - title: RunPod
+        pick: true
+        points:
+          - Фиксированные цены
+          - Сетевые тома с весами
+          - HTTPS-прокси и serverless
+      - title: Vast.ai
+        points:
+          - Рыночные цены, в 1,5–2 раза дешевле
+          - Тысячи хостов, качество разное
+          - Диск привязан к машине
+
+  - type: list
+    label: Типы аренды
+    heading: Как платить
+    items:
+      - "*По требованию*: карта ваша, пока не отпустите"
+      - "*Прерываемая*: дешевле на 30–60%, но могут забрать"
+      - "*Serverless*: платите только за обработку"
+      - "*Долгосрочная*: скидка, только при постоянной нагрузке"
+
+  - type: statement
+    label: Главная ловушка
+    text: Самое дорогое не час видеокарты, а *повторное скачивание весов*.
+    say: Сотни гигабайт при каждом запуске. Храните веса на постоянном диске.
+
+  - type: list
+    label: Простой
+    heading: Как не платить впустую
+    items:
+      - "*Останавливайте поды*, которые не нужны"
+      - "*Лимит расходов*: работа с предоплаченного баланса"
+      - "*Автоостановка*, если час не было запросов"
+      - "*Пакетные задачи* сами удаляют машину в конце"
+
+  - type: diagram
+    label: Решение
+    heading: Что выбрать
+    nodes:
+      - { id: q1, label: "Сервис с постоянной нагрузкой?", col: 0, row: 0, w: 4, step: 0 }
+      - { id: secure, label: RunPod Secure, sub: сетевой том, col: 8, row: 0, w: 4, step: 1, accent: true }
+      - { id: q2, label: "Пакетная обработка?", col: 0, row: 3, w: 4, step: 1 }
+      - { id: vast, label: Vast.ai, sub: проверенный хост, col: 8, row: 3, w: 4, step: 2 }
+      - { id: sls, label: RunPod Serverless, sub: неравномерная нагрузка, col: 0, row: 5, w: 4, step: 3 }
+    edges:
+      - { from: q1, to: secure, label: да }
+      - { from: q1, to: q2, label: нет }
+      - { from: q2, to: vast, label: да }
+      - { from: q2, to: sls, label: нет }
+
+  - type: end
+    text: Видеокарта арендована. Дальше *запускаем vLLM*.
+    url: balkhaev.com/blog/ru/inference-clouds

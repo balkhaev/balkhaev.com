@@ -1,0 +1,63 @@
+context: Your own inference · 6/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 6
+    title: "Images and video: *ComfyUI*"
+    subtitle: Open media models on a rented GPU.
+
+  - type: statement
+    label: What's different
+    text: For images, your own GPU *beats the API more often* than for text.
+    say: A pipeline with your own LoRAs and a chain of models can't be replicated at a provider.
+
+  - type: list
+    label: Images
+    heading: Models with a commercial license
+    items:
+      - "*Qwen-Image*: Apache 2.0, 16–24 GB"
+      - "*Z-Image Turbo*: Apache 2.0, fast"
+      - "*FLUX.2 klein 4B*: Apache 2.0, about 8 GB"
+      - "*FLUX.2 dev*: strong, but needs a BFL license"
+
+  - type: list
+    label: Video
+    heading: Models for clips
+    items:
+      - "*Wan 2.2 5B*: Apache 2.0, from 8 GB, up to 720p"
+      - "*Wan 2.2 A14B*: full quality, 40–48 GB"
+      - "*HunyuanVideo 1.5*: up to 100M users"
+      - "*LTX-2.3*: video with sound, revenue cap"
+
+  - type: statement
+    label: License
+    text: When picking a media model, *the license* comes first. Many strong ones are non-commercial.
+
+  - type: compare
+    label: GPU
+    heading: How much memory
+    columns:
+      - title: Images
+        pick: true
+        points:
+          - RTX 4090 or 5090
+          - 24–32 GB
+      - title: Video up to 720p
+        points:
+          - RTX PRO 6000 or L40S
+          - 48–96 GB
+      - title: Long clips
+        points:
+          - H100, H200
+
+  - type: list
+    label: Pipeline as API
+    heading: ComfyUI in production
+    items:
+      - "*Pipeline JSON in the repo*: that's your model"
+      - "*Pin versions* of ComfyUI and nodes"
+      - "*Your own job queue* when there are many generations"
+      - "*A serverless worker* for uneven load"
+
+  - type: end
+    text: Everything runs. What's left is *the money*.
+    url: balkhaev.com/blog/inference-media
