@@ -11,7 +11,7 @@ tags: [automation, devops, docker, postgres]
 One VPS, Docker Compose with three containers (our service, Postgres, Caddy), an image in GitHub Container Registry and deploy on push to main through GitHub Actions. By the end of this part we have an HTTPS address that accepts events, stores them in the database and updates itself after every commit.
 :::
 
-This is the second part of the series on commercial automations. In the [first one](/blog/automations-concept/) we chose what to automate and drew the architecture. Now we build the foundation every automation in the series will live on. It is worth doing once and doing well: from here on we only add code instead of thinking about how it gets to the server.
+This is the second part of the series on commercial automations. In the [first one](/blog/automations-concept/) we chose what to automate and drew the architecture. Now we build the foundation every automation in the series will live on. It is worth doing once and doing well: from here on we only add code instead of thinking about how it gets to the server. The article shows only the key pieces of code; the full code of the series, tests included, is in the [repository](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## What we end up with
 
@@ -28,23 +28,6 @@ flowchart TD
     db[("<b>db</b><br/>Postgres, pgdata volume")]
     caddy --> app --> db
   end
-```
-
-The repository layout by the end of the part:
-
-```text
-automations/
-  .github/workflows/deploy.yml
-  migrations/001_events.sql
-  src/config.ts
-  src/db.ts
-  src/migrate.ts
-  src/server.ts
-  Caddyfile
-  compose.yml
-  deploy.sh
-  Dockerfile
-  package.json
 ```
 
 ## Step 1. The server
@@ -105,42 +88,9 @@ bun init -y
 bun add -d typescript @types/bun
 ```
 
-We have no runtime dependencies: the HTTP server and the Postgres client are built into Bun. TypeScript is only needed for type checking, and since version 7 its `tsc` compiler is rewritten in Go and runs several times faster than before. Add scripts to `package.json`:
+We have no runtime dependencies: the HTTP server and the Postgres client are built into Bun. TypeScript is only needed for type checking, and since version 7 its `tsc` compiler is rewritten in Go and runs several times faster than before. Add scripts to `package.json`: `dev` (`bun --watch src/server.ts`), `migrate` and `check` (`tsc --noEmit`).
 
-```json
-{
-  "name": "automations",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "bun --watch src/server.ts",
-    "migrate": "bun src/migrate.ts",
-    "check": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^7"
-  }
-}
-```
-
-Configuration comes only from environment variables, and if something is missing the service fails right at startup rather than an hour later on the first event:
-
-```ts
-// src/config.ts
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Environment variable ${name} is not set`);
-  }
-  return value;
-}
-
-export const config = {
-  port: Number(process.env.PORT ?? 3000),
-  databaseUrl: required("DATABASE_URL"),
-};
-```
+Configuration comes only from environment variables. In `config.ts` a `required(name)` function reads a variable and throws if it's missing, so without a needed setting the service fails right at startup rather than an hour later on the first event.
 
 The database connection, one pool for the whole app:
 
@@ -154,40 +104,14 @@ export const sql = new SQL(config.databaseUrl);
 
 ## Step 4. Migrations
 
-We will change the schema in every part, so we set up migrations right away. No library is needed: SQL files in a `migrations` folder, a table with the names of applied ones and twenty lines of code.
+We will change the schema in every part, so we set up migrations right away. No library is needed: SQL files in a `migrations` folder, a `schema_migrations` table with the names of applied ones and twenty lines of code in `migrate.ts`: read the file list, sort it, skip the applied ones, and run each new one like this:
 
 ```ts
-// src/migrate.ts
-import { readdir } from "node:fs/promises";
-import { sql } from "./db";
-
-await sql`
-  create table if not exists schema_migrations (
-    name text primary key,
-    applied_at timestamptz not null default now()
-  )
-`;
-
-const rows: { name: string }[] = await sql`select name from schema_migrations`;
-const applied = new Set(rows.map((row) => row.name));
-const files = (await readdir("migrations"))
-  .filter((file) => file.endsWith(".sql"))
-  .sort();
-
-for (const file of files) {
-  if (applied.has(file)) {
-    continue;
-  }
-  const text = await Bun.file(`migrations/${file}`).text();
-  // The migration and its record in one transaction: both or neither
-  await sql.begin(async (tx) => {
-    await tx.unsafe(text);
-    await tx`insert into schema_migrations (name) values (${file})`;
-  });
-  console.log(`applied ${file}`);
-}
-
-await sql.close();
+// Миграция и запись о ней в одной транзакции: либо обе, либо ни одной
+await sql.begin(async (tx) => {
+  await tx.unsafe(text);
+  await tx`insert into schema_migrations (name) values (${file})`;
+});
 ```
 
 Files are sorted by name, so we prefix them with a number: `001_`, `002_` and so on. An applied migration is never edited; we only add new ones.
@@ -209,55 +133,19 @@ create index events_source_received_at on events (source, received_at desc);
 
 ## Step 5. The HTTP server
 
-Two routes: `/health` to check that the service is alive and can reach the database, and `/hooks/:source` to accept events. The principle from the first part applies: store first, process later. There is nothing to process with yet, so we only store.
+Two routes: `/health` to check that the service is alive and can reach the database, and `/hooks/:source` to accept events. The principle from the first part applies: store first, process later. There is nothing to process with yet, so we only store. `/health` runs `select 1` and answers `{ ok: true }`, and accepting an event is a single insert:
 
 ```ts
-// src/server.ts
-import { config } from "./config";
-import { sql } from "./db";
-
-// Sources we accept events from. Anything else gets a 404.
-const SOURCES = new Set(["site", "payments", "telegram"]);
-
-const server = Bun.serve({
-  port: config.port,
-  maxRequestBodySize: 1024 * 1024, // 1 MB is plenty for a webhook
-  routes: {
-    "/health": async () => {
-      await sql`select 1`;
-      return Response.json({ ok: true });
-    },
-    "/hooks/:source": {
-      POST: async (req) => {
-        const { source } = req.params;
-        if (!SOURCES.has(source)) {
-          return new Response("Unknown source", { status: 404 });
-        }
-        const headers = Object.fromEntries(req.headers);
-        const body = await req.text();
-        const [event] = await sql`
-          insert into events (source, headers, body)
-          values (${source}, ${headers}, ${body})
-          returning id
-        `;
-        return Response.json({ id: event.id }, { status: 202 });
-      },
-    },
-  },
-  fetch: () => new Response("Not found", { status: 404 }),
-});
-
-console.log(`listening on :${server.port}`);
-
-// Docker sends SIGTERM on deploy: finish in-flight requests, then exit
-process.on("SIGTERM", async () => {
-  await server.stop();
-  await sql.close();
-  process.exit(0);
-});
+const body = await req.text();
+const [event] = await sql`
+  insert into events (source, headers, body)
+  values (${source}, ${Object.fromEntries(req.headers)}, ${body})
+  returning id
+`;
+return Response.json({ id: event.id }, { status: 202 });
 ```
 
-A couple of details. Bun turns the `headers` object into `jsonb` by itself, so there is no need to call `JSON.stringify` (if you do, a JSON string ends up in the database instead of an object). The body is stored as text rather than parsed JSON: verifying a webhook signature needs exactly the bytes that arrived.
+An unknown source that isn't in the `SOURCES` list gets 404. On SIGTERM the server waits for current requests and closes the pool, so a deploy never cuts requests off halfway. And a couple of details. Bun turns the `headers` object into `jsonb` by itself, so there is no need to call `JSON.stringify` (if you do, a JSON string ends up in the database instead of an object). The body is stored as text rather than parsed JSON: verifying a webhook signature needs exactly the bytes that arrived.
 
 :::note
 Right now anyone who knows the address can write an event into the database. In the next part every source gets a signature or secret check; until then the `SOURCES` list at least turns away random requests.
@@ -285,11 +173,7 @@ curl -X POST localhost:3000/hooks/site \
 # {"id":"1"}
 ```
 
-The event is in the database:
-
-```bash
-docker exec pg psql -U postgres -c "select id, source, body from events"
-```
+The event is in the `events` table; you can check with `psql` in the `pg` container.
 
 ## Step 6. Docker
 
@@ -312,52 +196,19 @@ Add `node_modules` and `.env` to both `.dockerignore` and `.gitignore`.
 
 ## Step 7. Compose and Caddy
 
-The whole service on the server is described by one file:
+The whole service on the server is described by one `compose.yml` file with three services. Besides the app there is `db` (the `postgres:18` image, a named `pgdata` volume, a health check with `pg_isready`) and `caddy` (the `caddy:2` image, the only one that publishes ports 80 and 443). The app looks like this:
 
 ```yaml
-# compose.yml
-services:
-  app:
-    image: ghcr.io/your-name/automations:${TAG:-latest}
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: postgres:18
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: app
-    volumes:
-      # Since Postgres 18 the image keeps data in /var/lib/postgresql/18/docker
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      retries: 10
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  pgdata:
-  caddy_data:
-  caddy_config:
+# compose.yml, the app service
+app:
+  image: ghcr.io/your-name/automations:${TAG:-latest}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+  depends_on:
+    db:
+      condition: service_healthy
 ```
 
 What matters here:
@@ -446,67 +297,22 @@ In the repository settings create a `production` environment (Settings, Environm
 Environment secrets are available only to jobs that name the environment explicitly, and you can turn on manual approval for it if you ever need to.
 
 ```yaml
-# .github/workflows/deploy.yml
-name: deploy
-
+# .github/workflows/deploy.yml, abridged
 on:
   push:
     branches: [main]
-
-permissions:
-  contents: read
-  packages: write
-
 concurrency: deploy
-
-env:
-  IMAGE: ghcr.io/your-name/automations
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: bun run check
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:latest
-
+      # checkout, bun install, bun run check
+      # docker/login-action and docker/build-push-action: image to ghcr.io
       - name: Ship to the server
-        env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          HOST: ${{ vars.DEPLOY_HOST }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_ed25519
-          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519
           scp compose.yml Caddyfile deploy.sh "deploy@$HOST:/opt/automations/"
           ssh "deploy@$HOST" "/opt/automations/deploy.sh ${{ github.sha }}"
-
-      - name: Smoke test
-        run: |
-          for i in 1 2 3 4 5 6; do
-            curl -fsS https://auto.example.com/health && exit 0
-            sleep 5
-          done
-          exit 1
+      # smoke test: curl /health a few times with a pause
 ```
 
 Step by step:
@@ -520,13 +326,7 @@ Step by step:
 
 ## The first deploy
 
-```bash
-git init
-git add .
-git commit -m "Foundation: service, database, deploy"
-git remote add origin git@github.com:your-name/automations.git
-git push -u origin main
-```
+Create a repository on GitHub, commit everything and push to `main`.
 
 A couple of minutes later the job is green and the service answers from outside:
 

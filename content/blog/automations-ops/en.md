@@ -11,7 +11,7 @@ tags: [automation, operations, backups, monitoring, postgres]
 Every 5 minutes the worker pings Healthchecks through the queue, and a separate service checks `/health` from outside: if anything dies, the alert comes from beyond the server. Docker logs are capped in size. Every night `backup.sh` dumps the database, encrypts it with age and puts it into another provider's object storage with a key that can't delete, and once a month `restore-check.sh` proves the dump restores. Every Claude request is recorded with its cost: the spend shows up in the morning digest, and going over the daily limit raises an alert. Secrets live only in `.env` on the server, and their list is kept in the repository as `.env.example`.
 :::
 
-This is the eighth and last part of the series on commercial automations. In the [previous part](/blog/automations-analytics/) the system learned to notice problems in the business by itself. Now we teach it to notice problems in itself, and take care of what happens when the server burns down one day.
+This is the eighth and last part of the series on commercial automations. In the [previous part](/blog/automations-analytics/) the system learned to notice problems in the business by itself. Now we teach it to notice problems in itself, and take care of what happens when the server burns down one day. The article shows only the key pieces of code; the full code of the series, tests included, is in the [repository](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## What can go wrong
 
@@ -74,7 +74,7 @@ heartbeat: async () => {
 
 ## Step 2. Logs
 
-By default Docker keeps container logs without limits. Half a year later a chatty worker fills the whole disk with them, and the database goes down. We cap every service with one anchor: at most five files of 10 MB per container.
+By default Docker keeps container logs without limits. Half a year later a chatty worker fills the whole disk with them, and the database goes down. We cap every service with one anchor: at most five files of 10 MB per container. The anchor is declared at the top of `compose.yml` and used in the shared `x-app` and in the `db` and `caddy` services:
 
 ```yaml
 # compose.yml
@@ -85,60 +85,8 @@ x-logging: &logging
     max-size: 10m
     max-file: "5"
 
-x-app: &app
-  image: ghcr.io/your-name/automations:${TAG:-latest}
-  restart: unless-stopped
-  logging: *logging
-  env_file: .env
-  environment:
-    DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
-    TZ: Europe/Moscow
-  depends_on:
-    db:
-      condition: service_healthy
-
-services:
-  app:
-    <<: *app
-
-  worker:
-    <<: *app
-    command: ["bun", "src/worker.ts"]
-    stop_grace_period: 60s
-
-  db:
-    image: postgres:18
-    restart: unless-stopped
-    logging: *logging
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: app
-    volumes:
-      # Since Postgres 18 the image keeps data in /var/lib/postgresql/18/docker
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      retries: 10
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    logging: *logging
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  pgdata:
-  caddy_data:
-  caddy_config:
+# and in every service, db and caddy included:
+#   logging: *logging
 ```
 
 A system this size doesn't need a log collection stack. `docker compose logs -f --since 1h worker` and `grep` are enough. Job errors are already visible in the `last_error` field of the `jobs` table, and final failures arrive in the alert chat.
@@ -153,108 +101,26 @@ A Docker volume on the same server isn't a backup. A disk dies, someone deletes 
 2. **It's encrypted.** Dumps are encrypted with [age](https://age-encryption.org) using a public key. The private key isn't on the server; it lives in a password manager. The storage, and anyone who gets access to it, sees only encrypted files.
 3. **It can't be erased from the server.** The storage access key can write but not delete. Old copies are removed by a lifecycle rule on the storage side, say after 30 days. If the server is hacked, the attacker can't destroy the backups. If the storage supports versioning or object lock, turn those on too.
 
-Install age and [rclone](https://rclone.org) on the server: `apt install age rclone`. `backup.sh` itself lives in the repository, and the deploy from the second part copies it to the server along with `compose.yml`: the `scp` step got one more file.
+Install age and [rclone](https://rclone.org) on the server: `apt install age rclone`. `backup.sh` itself lives in the repository, and the deploy from the second part copies it to the server along with `compose.yml`: the `scp` step got one more file. Cron runs the script every night at 03:30. The full version is [in the repository](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/backup.sh), and the gist is six lines:
 
 ```bash
-#!/usr/bin/env bash
-# backup.sh: an encrypted database dump to object storage in another place.
-# Runs from cron on the server, for example every night at 03:30:
-#   30 3 * * * /opt/automations/backup.sh >> /var/log/automations-backup.log 2>&1
-set -euo pipefail # pipefail: a failed pg_dump must fail the script, not upload an empty file
-cd "$(dirname "$0")"
-source ./backup.env
-
-# If anything below fails, tell Healthchecks right away instead of waiting for silence
+# backup.sh, the essentials
+set -euo pipefail # a failed pg_dump must fail the script, not upload an empty file
 trap 'curl -fsS -m 10 --retry 3 "$BACKUP_PING_URL/fail" > /dev/null || true' ERR
 
-name="app-$(date +%Y-%m-%d-%H%M).dump.age"
-file="$(mktemp)"
-trap 'rm -f "$file"' EXIT
-
-# Custom format is compressed, and pg_restore can restore a single table from it.
-# age encrypts with the public key: the private key never lives on this server.
 docker compose exec -T db pg_dump -U app -Fc app | age -r "$BACKUP_RECIPIENT" > "$file"
-
-# Refuse to upload something suspiciously small: a dump of a live database is never 1 KB
-size=$(stat -c %s "$file")
-if [ "$size" -lt 1024 ]; then
-  echo "backup is only $size bytes, not uploading" >&2
-  false
-fi
-
+[ "$(stat -c %s "$file")" -ge 1024 ] # a dump of a live database is never under 1 KB
 rclone copyto "$file" "backup:$BACKUP_BUCKET/automations/$name"
-echo "$(date -Is) uploaded $name ($size bytes)"
-
 curl -fsS -m 10 --retry 3 "$BACKUP_PING_URL" > /dev/null
 ```
 
 `set -o pipefail` matters more than anything else here. Without it, the exit code of `pg_dump | age` comes from the last command. If `pg_dump` fails, age dutifully encrypts nothing, and the script successfully uploads an empty file. With `pipefail` the script stops and pings Healthchecks at `/fail`, and the size check catches more exotic cases.
 
-The settings live next to it, in a separate file with `600` permissions:
-
-```bash
-# backup.env.example: settings for backup.sh. Copy to backup.env, chmod 600.
-
-# age public key (age1...). The private key stays in your password manager.
-BACKUP_RECIPIENT=age1...
-
-# Bucket in S3-compatible storage with another provider than the server
-BACKUP_BUCKET=my-backups
-
-# rclone reads its remote "backup" from these variables, no config file needed
-export RCLONE_CONFIG_BACKUP_TYPE=s3
-export RCLONE_CONFIG_BACKUP_PROVIDER=Other
-export RCLONE_CONFIG_BACKUP_ENDPOINT=https://s3.example-storage.com
-export RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID=
-export RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY=
-# The key can write but not delete; old backups are removed by a lifecycle rule
-export RCLONE_CONFIG_BACKUP_NO_CHECK_BUCKET=true
-
-# Healthchecks check for backups: expect a ping every 24 hours
-BACKUP_PING_URL=https://hc-ping.com/your-uuid
-```
-
-Create a separate Healthchecks check for backups with a one-day period. If the nightly backup failed or cron didn't run at all, an alert arrives in the morning.
+The settings live next to it, in a separate `backup.env` file with `600` permissions: the age public key, the bucket name, storage access for rclone (through `RCLONE_CONFIG_BACKUP_*` variables, no config file) and the Healthchecks ping URL. The template is in the repository as [`backup.env.example`](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/backup.env.example). Create a separate Healthchecks check for backups with a one-day period. If the nightly backup failed or cron didn't run at all, an alert arrives in the morning.
 
 ## Step 4. The restore check
 
-A backup nobody has ever restored is a hope, not a backup. The dump may turn out empty, the key may get lost, the format may not suit a new Postgres version. Finding out on the day of the disaster is too late. So once a month, on your own machine, download a fresh file from storage and run:
-
-```bash
-#!/usr/bin/env bash
-# restore-check.sh <backup file> <age private key file>
-# Restores a backup into a throwaway Postgres and prints row counts.
-# Run it once a month on your own machine: a backup nobody has restored is a hope, not a backup.
-set -euo pipefail
-backup="$1"
-key="$2"
-name="restore-check-$$"
-
-docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=check postgres:18 > /dev/null
-trap 'docker stop "$name" > /dev/null' EXIT
-until docker exec "$name" pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
-
-docker exec "$name" createdb -U postgres app
-age -d -i "$key" "$backup" | docker exec -i "$name" pg_restore -U postgres -d app --no-owner
-
-docker exec "$name" psql -U postgres -d app -c "
-  select 'leads' as table, count(*) as rows, max(created_at) as newest from leads
-  union all select 'orders', count(*), max(created_at) from orders
-  union all select 'tickets', count(*), max(created_at) from tickets
-  union all select 'events', count(*), max(received_at) from events"
-```
-
-The script starts a throwaway Postgres, restores the dump into it and shows the row count and the newest record for the main tables. Here's a local run on a test database:
-
-```text
-  table  | rows |            newest
----------+------+-------------------------------
- leads   |    1 | 2026-11-04 11:36:59.329272+00
- orders  |    1 | 2026-11-04 11:36:59.329272+00
- tickets |    0 |
- events  |    0 |
-(4 rows)
-```
+A backup nobody has ever restored is a hope, not a backup. The dump may turn out empty, the key may get lost, the format may not suit a new Postgres version. Finding out on the day of the disaster is too late. So once a month, on your own machine, download a fresh file from storage and run [`restore-check.sh`](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/restore-check.sh) with the file and the age private key. The script starts a throwaway Postgres in Docker, decrypts the dump, restores it with `pg_restore` and shows the row count and the newest record for leads, orders, tickets and events.
 
 If the numbers look right and the newest record is from yesterday, the backups work. You've also practiced a restore, so on the day of a disaster it won't be your first time.
 
@@ -263,48 +129,7 @@ If the numbers look right and the newest record is from yesterday, the backups w
 The system already has over a dozen secrets: the bot token, the YooKassa, email, Claude and storage keys, the webhook secrets. The rules are simple.
 
 - **Secrets live only in `.env` on the server** with `600` permissions. It isn't in git and doesn't get into the image (it has been in `.dockerignore` since the second part).
-- **The list of secrets lives in the repository** as `.env.example` without values. A new person or a new server sees at once what to fill in, and `required()` in `config.ts` refuses to start without a mandatory one.
-
-```bash
-# .env.example: every setting the service reads. Copy to .env on the server,
-# fill in, chmod 600. The real .env never goes into git.
-
-# Database (compose builds DATABASE_URL from this)
-POSTGRES_PASSWORD=
-
-# Incoming webhooks
-SITE_WEBHOOK_SECRET=
-TELEGRAM_WEBHOOK_SECRET=
-
-# Telegram bot and chats
-TELEGRAM_BOT_TOKEN=
-ALERT_CHAT_ID=
-LEADS_CHAT_ID=
-SUPPORT_CHAT_ID=
-DIGEST_CHAT_ID=
-
-# Leads
-FORM_REDIRECT_URL=https://example.com/thanks
-CRM_WEBHOOK_URL=
-
-# Payments
-YOOKASSA_SHOP_ID=
-YOOKASSA_SECRET_KEY=
-PUBLIC_URL=https://auto.example.com
-ACCESS_URL=https://example.com/access/
-
-# Email
-EMAIL_API_KEY=
-EMAIL_FROM=
-EMAIL_INBOUND_SECRET=
-
-# Claude
-ANTHROPIC_API_KEY=
-LLM_DAILY_LIMIT_USD=5
-
-# Operations
-HEARTBEAT_URL=
-```
+- **The list of secrets lives in the repository** as `.env.example` without values. A new person or a new server sees at once what to fill in, and `required()` in `config.ts` refuses to start without a mandatory one. Our `.env.example` has about twenty lines, grouped by the parts of the series: database, webhooks, Telegram, leads, payments, email, Claude, operations.
 
 - **GitHub gets only what the deploy needs:** the SSH key in Actions secrets and the server address in variables. The image is published with the built-in `GITHUB_TOKEN`, and GitHub never sees any of the app's keys.
 - **Each key has minimal rights.** The Bitrix24 webhook has CRM rights only, the storage key can't delete, Claude gets its own workspace in the Console with its own spend limit. One leaked key doesn't open everything else.
@@ -315,35 +140,9 @@ HEARTBEAT_URL=
 
 **Infrastructure.** One small VPS is enough for everything we've built: 2 vCPU and 2–4 GB of memory. As a rough guide at the time of writing, that's 5–10 euros a month. Backup storage costs pennies, Healthchecks and uptime services have free plans, and email services have free volumes for small loads too. Check the current terms; they change.
 
-**Claude.** Here the cost depends on load, and it should be measured, not guessed. Every request is now recorded in a table together with its cost:
-
-```sql
--- migrations/007_llm_usage.sql
--- One row per model request: what it was for, the tokens and what it cost
-create table llm_usage (
-  id bigint generated always as identity primary key,
-  task text not null,
-  model text not null,
-  input_tokens int not null,
-  cache_read_tokens int not null,
-  cache_write_tokens int not null,
-  output_tokens int not null,
-  cost numeric(12, 6) not null, -- dollars
-  created_at timestamptz not null default now()
-);
-
-create index llm_usage_created on llm_usage (created_at);
-```
+**Claude.** Here the cost depends on load, and it should be measured, not guessed. Every request is now recorded in an `llm_usage` table: the task, the model, input tokens, tokens read from and written to the cache, output tokens and the cost in dollars. `askJson` writes the row right after the model answers and computes the cost from the answer's `usage`:
 
 ```ts
-// src/claude.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { sql } from "./db";
-import { PermanentError } from "./errors";
-
-const client = new Anthropic();
-const MODEL = "claude-opus-5-5";
-
 // Dollars per million tokens. Prices change: check them on the Anthropic site
 const PRICE = { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 };
 
@@ -356,61 +155,6 @@ export function cost(usage: Anthropic.Beta.BetaUsage) {
       usage.output_tokens * PRICE.output) /
     1_000_000
   );
-}
-
-/**
- * One request whose answer must match a JSON Schema. Every automation that
- * asks the model to fill in fields goes through here: leads, tickets and so on.
- */
-export async function askJson<T>(request: {
-  task: string;
-  system: string | Anthropic.Beta.BetaTextBlockParam[];
-  content: string;
-  schema: Record<string, unknown>;
-  effort: "low" | "medium" | "high";
-}): Promise<T> {
-  let response: Anthropic.Beta.BetaMessage;
-  try {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      // If the model declines, the API reruns the request on a fallback model
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: {
-        effort: request.effort,
-        format: { type: "json_schema", schema: request.schema },
-      },
-      system: request.system,
-      messages: [{ role: "user", content: request.content }],
-    });
-  } catch (error) {
-    // 400 means our request is wrong: retrying won't help
-    if (error instanceof Anthropic.BadRequestError) {
-      throw new PermanentError(error.message);
-    }
-    throw error; // 429, 5xx, network: the queue retries
-  }
-
-  // Every request is recorded: the digest shows the spend, an alert guards the limit
-  const usage = response.usage;
-  await sql`
-    insert into llm_usage (task, model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost)
-    values (${request.task}, ${response.model}, ${usage.input_tokens}, ${usage.cache_read_input_tokens ?? 0},
-            ${usage.cache_creation_input_tokens ?? 0}, ${usage.output_tokens}, ${cost(usage)})
-  `;
-  console.log(
-    `claude ${request.task}: in ${usage.input_tokens}, cached ${usage.cache_read_input_tokens ?? 0}, out ${usage.output_tokens}`
-  );
-
-  if (response.stop_reason === "refusal") {
-    throw new PermanentError(`the model declined: ${request.task}`);
-  }
-  const text = response.content.find((block) => block.type === "text");
-  if (!text) {
-    throw new Error(`no text in the answer, stop_reason ${response.stop_reason}`);
-  }
-  return JSON.parse(text.text);
 }
 ```
 
@@ -460,69 +204,7 @@ Leave the old `pgdata` volume alone for a week: if something goes wrong, going b
 
 ## Step 8. Tests
 
-The new tests check the cost calculation with caching, the recording of every model request, a single alert for the limit, and that the heartbeat pings the URL and fails loudly when it can't reach it. Failing is the right behavior here: the queue retries the job, and Healthchecks, missing the ping, raises the alarm.
-
-```ts
-// test/ops.test.ts
-import { beforeEach, expect, test } from "bun:test";
-import { evaluate, runChecks } from "../src/alerts";
-import { askJson, cost } from "../src/claude";
-import { config } from "../src/config";
-import { sql } from "../src/db";
-import { handlers } from "../src/handlers";
-import type { Job } from "../src/queue";
-import { calls, claude, reset } from "./stubs";
-
-beforeEach(async () => {
-  reset();
-  await sql`truncate llm_usage, alerts, jobs restart identity cascade`;
-});
-
-test("the cost counts cached input at the cache price", () => {
-  const usage = {
-    input_tokens: 1_000,
-    cache_read_input_tokens: 10_000,
-    cache_creation_input_tokens: 0,
-    output_tokens: 500,
-  } as any;
-  // 1000 × $4 + 10 000 × $0.20 + 500 × $20, per million tokens
-  expect(cost(usage)).toBeCloseTo(0.016, 6);
-});
-
-test("every model request is recorded with its tokens and cost", async () => {
-  claude.answer = { ok: true };
-  await askJson({ task: "test", system: "s", content: "c", schema: { type: "object" }, effort: "low" });
-  const [row] = await sql`select task, model, input_tokens, output_tokens, cost::float8 from llm_usage`;
-  // The stub answers with 1000 input and 100 output tokens
-  expect(row).toEqual({ task: "test", model: "claude-opus-5-5", input_tokens: 1000, output_tokens: 100, cost: 0.006 });
-});
-
-test("spending over the daily limit raises one alert", async () => {
-  await sql`
-    insert into llm_usage (task, model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost)
-    values ('x', 'm', 0, 0, 0, 0, ${config.llmDailyLimit + 1})
-  `;
-  await evaluate(await runChecks());
-  await evaluate(await runChecks());
-  const alerts = calls.filter((c) => c.method === "sendMessage" && String(c.body.text).includes("Claude has cost"));
-  expect(alerts).toHaveLength(1);
-});
-
-test("the heartbeat pings the monitoring URL and fails loudly if it can't", async () => {
-  config.heartbeatUrl = "http://localhost:3995/ping/abc"; // the email stub records any request
-  await handlers.heartbeat({}, {} as Job);
-  expect(calls.filter((c) => c.api === "email" && c.method === "abc")).toHaveLength(1);
-
-  config.heartbeatUrl = "http://localhost:1/unreachable";
-  await expect(handlers.heartbeat({}, {} as Job)).rejects.toThrow();
-  config.heartbeatUrl = "";
-});
-```
-
-```text
- 34 pass
- 0 fail
-```
+The new tests check the cost calculation with caching, the recording of every model request, a single alert for the limit, and that the heartbeat pings the URL and fails loudly when it can't reach it. Failing is the right behavior here: the queue retries the job, and Healthchecks, missing the ping, raises the alarm. For example, 1,000 input tokens, 10,000 from the cache and 500 output tokens must cost exactly 0.016 dollars.
 
 There are no new required variables: without `HEARTBEAT_URL` the heartbeat simply does nothing, and the spend limit has a default.
 
@@ -552,4 +234,4 @@ Over eight parts we went from an idea to a system that runs on one server and ta
 
 It's about 2,200 lines of code and SQL plus 700 lines of tests, without a single framework, and every line can be read and understood. A few ideas run through the whole system: an event is stored first and processed second, every action has an idempotency key, races are settled by one conditional `update`, the model helps a person but the person decides and sends, and the system reports problems by itself, once and to the point.
 
-All parts of the series are collected on the [series page](/blog/series/automations/).
+All the code with tests is in the [repository](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations), and all parts of the series are collected on the [series page](/blog/series/automations/).
