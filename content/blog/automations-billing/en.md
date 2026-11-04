@@ -827,4 +827,4 @@ A run over HTTP with YooKassa, email and Telegram stubbed:
 - A lost notification is picked up by the hourly reconciliation.
 - Clients who owe get reminders, and when it's time to call, the chat hears about it.
 
-Next is "Replacing support": we sort incoming emails and messages, draft answers to common questions from a knowledge base and leave the last word to a person.
+Next is ["Replacing support"](/blog/automations-support/): we sort incoming emails and messages, draft answers to common questions from a knowledge base and leave the last word to a person.
