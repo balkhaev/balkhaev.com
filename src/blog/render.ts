@@ -407,8 +407,8 @@ export function renderPost(post: Post, posts: Post[], series: Series[] = []) {
           <div class="post-grid">
             ${sidebar(post, own, posts)}
             <div class="post-body">
-              ${seriesBox(post, own, posts)}
               ${video(post)}
+              ${seriesBox(post, own, posts)}
               <div class="prose">
 ${post.html}
               </div>

@@ -23,9 +23,78 @@ jobs:
       - run: bun run test
       - run: bun run build
 
-  deploy:
+  # Post videos: storyboards (content/blog/*/video.*.yml) are rendered with
+  # HyperFrames into /srv/balkhaev-video on the server, only those whose hash
+  # changed, one job per video. scripts/deploy.ts bakes them into the image.
+  video-plan:
     needs: check
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      todo: ${{ steps.plan.outputs.todo }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: scripts/ci-ssh.sh
+      - id: plan
+        run: |
+          ssh -o BatchMode=yes root@49.13.216.63 'mkdir -p /srv/balkhaev-video && cd /srv/balkhaev-video && grep -r . --include=*.hash || true' > have.txt
+          todo=$(bun scripts/video.ts --plan have.txt)
+          echo "todo=$todo" >> "$GITHUB_OUTPUT"
+          echo "$todo"
+
+  video:
+    needs: video-plan
+    if: needs.video-plan.outputs.todo != '[]'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        include: ${{ fromJSON(needs.video-plan.outputs.todo) }}
+    name: video ${{ matrix.slug }} ${{ matrix.lang }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: npx --yes hyperframes@0.9.11 telemetry disable || true
+      - run: bun scripts/video.ts ${{ matrix.slug }} --lang ${{ matrix.lang }}
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: scripts/ci-ssh.sh
+      - name: Upload to the server
+        run: |
+          dir=/srv/balkhaev-video/${{ matrix.slug }}
+          ssh -o BatchMode=yes root@49.13.216.63 "mkdir -p $dir"
+          # The hash goes last, so a half-uploaded video is rendered again.
+          scp -o BatchMode=yes video/${{ matrix.slug }}/${{ matrix.lang }}.mp4 video/${{ matrix.slug }}/${{ matrix.lang }}.jpg root@49.13.216.63:$dir/
+          scp -o BatchMode=yes video/${{ matrix.slug }}/${{ matrix.lang }}.hash root@49.13.216.63:$dir/
+
+  deploy:
+    needs: [check, video]
+    # Runs when there was nothing to render, too; a failed video only leaves
+    # that post without a player.
+    if: >-
+      always() && needs.check.result == 'success' &&
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -42,22 +111,11 @@ jobs:
           SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
           COOLIFY_ACCESS_TOKEN: ${{ secrets.COOLIFY_ACCESS_TOKEN }}
         run: |
-          missing=""
-          [ -n "$SSH_PRIVATE_KEY" ] || missing="$missing DEPLOY_SSH_KEY"
-          [ -n "$COOLIFY_ACCESS_TOKEN" ] || missing="$missing COOLIFY_ACCESS_TOKEN"
-          if [ -n "$missing" ]; then
-            echo "::error::Add repository secrets:$missing (Settings → Secrets and variables → Actions)"
+          if [ -z "$COOLIFY_ACCESS_TOKEN" ]; then
+            echo "::error::Add the COOLIFY_ACCESS_TOKEN secret to the production environment"
             exit 1
           fi
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          printf 'Host 49.13.216.63\n  User root\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n' > ~/.ssh/config
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -T 15 49.13.216.63 > ~/.ssh/known_hosts
-          fi
+          scripts/ci-ssh.sh
       - name: Deploy
         env:
           COOLIFY_ACCESS_TOKEN: ${{ secrets.COOLIFY_ACCESS_TOKEN }}

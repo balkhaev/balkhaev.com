@@ -8,6 +8,10 @@
  *   --force                              re-render even if unchanged
  *   --draft                              fast low-quality render
  *   --compose                            write the compositions, do not render
+ *   --plan <file>                        print, as a JSON list of {slug, lang},
+ *                                        the videos whose hash is not in <file>
+ *                                        (lines "slug/lang.hash:<hash>", as
+ *                                        `grep -r .` prints them); renders nothing
  *
  * A render is skipped when video/<slug>/<lang>.hash matches the hash of the
  * composition, so CI re-renders only what changed.
@@ -45,8 +49,14 @@ const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(`--${name}`);
 const langIndex = args.indexOf("--lang");
 const onlyLang = langIndex >= 0 ? args[langIndex + 1] : undefined;
+const planIndex = args.indexOf("--plan");
+const planFile = planIndex >= 0 ? args[planIndex + 1] : undefined;
 const slugs = args.filter(
-  (arg, index) => !arg.startsWith("--") && args[index - 1] !== "--lang"
+  (arg, index) =>
+    !(
+      arg.startsWith("--") ||
+      ["--lang", "--plan"].includes(args[index - 1] ?? "")
+    )
 );
 
 async function run(argv: string[]) {
@@ -89,9 +99,17 @@ async function jobs(): Promise<Job[]> {
   return listed.flat();
 }
 
-async function prepare(job: Job) {
+async function composition(job: Job) {
   const board = parseStoryboard(job.file, await readFile(job.file, "utf8"));
   const page = compose(board, job.lang);
+  const hash = new CryptoHasher("sha256")
+    .update(`${HYPERFRAMES}\n${flag("draft")}\n${page}`)
+    .digest("hex");
+  return { hash, page };
+}
+
+async function prepare(job: Job) {
+  const { hash, page } = await composition(job);
   const dir = join(WORK, `${job.slug}-${job.lang}`);
   await rm(dir, { force: true, recursive: true });
   await mkdir(join(dir, "fonts"), { recursive: true });
@@ -105,9 +123,6 @@ async function prepare(job: Job) {
       copyFile(source, join(dir, "fonts", name))
     )
   );
-  const hash = new CryptoHasher("sha256")
-    .update(`${HYPERFRAMES}\n${flag("draft")}\n${page}`)
-    .digest("hex");
   return { dir, hash };
 }
 
@@ -162,6 +177,28 @@ async function renderJob(job: Job) {
     join(out, `${job.lang}.jpg`),
   ]);
   await writeFile(hashFile, `${hash}\n`);
+}
+
+async function plan(file: string) {
+  const have = new Set(
+    (await readFile(file, "utf8").catch(() => ""))
+      .split("\n")
+      .map((line) => line.trim().replace(".hash:", ":"))
+  );
+  const needed: { lang: string; slug: string }[] = [];
+  for (const job of await jobs()) {
+    // biome-ignore lint/performance/noAwaitInLoops: cheap, keeps order
+    const { hash } = await composition(job);
+    if (!have.has(`${job.slug}/${job.lang}:${hash}`)) {
+      needed.push({ lang: job.lang, slug: job.slug });
+    }
+  }
+  process.stdout.write(`${JSON.stringify(needed)}\n`);
+}
+
+if (planFile !== undefined) {
+  await plan(planFile);
+  process.exit(0);
 }
 
 const list = await jobs();

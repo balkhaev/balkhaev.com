@@ -1064,6 +1064,8 @@ summary:focus-visible {
   .prose .news-text {
     font-size: 15px;
   }
+}
+
 /* Post video: a 16:9 player above the text */
 .post-video {
   margin: 0 0 clamp(24px, 3vw, 40px);
