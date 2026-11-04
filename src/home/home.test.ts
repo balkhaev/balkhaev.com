@@ -1,6 +1,12 @@
 import { expect, test } from "bun:test";
 import type { Post } from "../blog/content";
-import { featuredProjects, latestPosts, renderHome } from "./render";
+import {
+  featuredProjects,
+  latestPosts,
+  renderHome,
+  summary,
+  years,
+} from "./render";
 
 const post = (slug: string, lang: "en" | "ru", date: string): Post => ({
   date,
@@ -32,10 +38,24 @@ test("features linked projects except this site", () => {
 });
 
 test("fills both placeholders", () => {
-  const page = renderHome("<!-- home:posts --><!-- home:projects -->", [
-    post("a", "ru", "2026-11-03"),
-  ]);
+  const page = renderHome(
+    "<!-- home:posts --><!-- home:projects --><!-- home:experience -->",
+    [post("a", "ru", "2026-11-03")]
+  );
   expect(page).toContain('href="/blog/ru/a/"');
-  expect(page).toContain('class="projects"');
+  expect(page).toContain("project-row");
+  expect(page).toContain("job-row");
   expect(page).not.toContain("home:");
+});
+
+test("shortens job periods to years", () => {
+  expect(years("Март 2026 – сейчас")).toBe("2026 — н. в.");
+  expect(years("Октябрь 2022 – август 2024")).toBe("2022 — 2024");
+  expect(years("2013")).toBe("2013");
+});
+
+test("summarises a project by its first clause", () => {
+  expect(summary("Производство AI-фильмов: агент-продюсер")).toBe(
+    "Производство AI-фильмов"
+  );
 });

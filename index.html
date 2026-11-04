@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
-    <meta content="#000000" name="theme-color">
+    <meta content="#0b0a09" name="theme-color">
     <meta
       content="Михаил Бальхаев, ML-инженер в генеративном AI. Блог о машинном обучении, проекты и резюме."
       name="description"
@@ -23,45 +23,68 @@
       title="Блог · balkhaev"
       type="application/atom+xml"
     >
+    <link
+      as="font"
+      crossorigin
+      href="/fonts/source-serif-4-cyrillic-opsz-normal.woff2"
+      rel="preload"
+      type="font/woff2"
+    >
     <link href="/style.css" rel="stylesheet">
     <title>Михаил Бальхаев · balkhaev</title>
   </head>
-  <body>
+  <body id="top">
     <header class="site-bar">
       <a class="brand" href="/">balkhaev<span aria-hidden="true">.</span></a>
       <nav aria-label="Разделы" class="site-nav">
         <a href="/blog/ru/">Блог</a>
         <a href="/cv/ru/">Резюме</a>
-        <a
-          href="https://t.me/balkhaev"
-          rel="noopener noreferrer"
-          target="_blank"
-          >Telegram <span aria-hidden="true" class="nav-arrow">↗</span></a
-        >
-        <a href="mailto:m.balkhaev@gmail.com"
-          >Почта <span aria-hidden="true" class="nav-arrow">↗</span></a
-        >
+        <a href="#contacts">Контакты</a>
       </nav>
     </header>
     <main class="home">
-      <section class="hero">
+      <section aria-labelledby="hero-title" class="hero">
         <div class="hero-text">
-          <p class="eyebrow">ML-инженер · генеративный AI</p>
-          <h1>Михаил Бальхаев</h1>
-          <p class="lead">
-            Делаю продукты на генеративных моделях целиком: диффузия для фото и
-            видео, синтез речи, LLM-агенты и GPU-инфраструктура под них. Пишу о
-            том, как это устроено на практике.
+          <p class="eyebrow reveal" style="--i: 0">
+            <span>Михаил Бальхаев</span><span>ML-инженер · Москва</span>
           </p>
-          <p class="actions">
+          <h1 class="reveal" id="hero-title" style="--i: 1">
+            Делаю продукты на <em>генеративных</em> моделях&nbsp;—
+            от&nbsp;диффузии до&nbsp;интерфейса
+          </h1>
+          <p class="lead reveal" style="--i: 2">
+            Пайплайны для фото, видео и речи, LLM-агенты и GPU-инфраструктура
+            под них. До этого 13 лет в вебе, в том числе в VK и Яндексе. В блоге
+            пишу, как это устроено на практике.
+          </p>
+          <p class="actions reveal" style="--i: 3">
             <a class="action primary" href="/blog/ru/"
               >Читать блог <span aria-hidden="true">→</span></a
             >
             <a class="action" href="/cv/ru/">Резюме</a>
           </p>
         </div>
-        <figure class="portal">
+        <figure class="portal reveal" style="--i: 2">
           <div class="portal-frame">
+            <svg aria-hidden="true" class="portal-ring" viewBox="0 0 200 200">
+              <defs>
+                <path
+                  d="M100 100m-94 0a94 94 0 1 1 188 0a94 94 0 1 1-188 0"
+                  id="ring-path"
+                ></path>
+              </defs>
+              <text>
+                <textPath
+                  href="#ring-path"
+                  lengthAdjust="spacing"
+                  textLength="588"
+                >
+                  ШВАРЦШИЛЬД · r = 12.5 rₛ · ГЕОДЕЗИЧЕСКИЕ ПЕНЛЕВЕ —
+                  ГУЛЛЬСТРАНДА · ТРАССИРОВКА ЛУЧЕЙ · ДОПЛЕРОВСКИЙ СДВИГ ·
+                  ФОТОННАЯ СФЕРА 1.5 rₛ ·
+                </textPath>
+              </text>
+            </svg>
             <section
               aria-label="Падение в чёрную дыру"
               class="scene"
@@ -448,47 +471,101 @@
                 id="scene-open"
                 type="button"
               >
-                <span class="scene-open-label"
-                  >Погрузиться <span aria-hidden="true">↗</span></span
+                <span class="visually-hidden"
+                  >Открыть сцену: падение в чёрную дыру</span
                 >
               </button>
             </section>
           </div>
           <figcaption>
-            Падение в чёрную дыру Шварцшильда: трассировка лучей на WebGL прямо
-            в браузере. Нажмите, чтобы развернуть сцену.
+            <span class="fig">Рис. 1</span>
+            <span class="fig-text"
+              >Падение в чёрную дыру Шварцшильда. Трассировка лучей в
+              браузере.</span
+            >
+            <button class="fig-open" data-open-scene type="button">
+              Открыть <span aria-hidden="true" class="fig-arrow">↗</span>
+            </button>
           </figcaption>
         </figure>
       </section>
-      <section aria-labelledby="latest-title" class="block">
-        <div class="block-head">
-          <h2 id="latest-title">Свежее в блоге</h2>
-          <a href="/blog/ru/">Все посты <span aria-hidden="true">→</span></a>
+
+      <section aria-labelledby="blog-title" class="block">
+        <header class="block-head">
+          <span class="block-index">01</span>
+          <h2 id="blog-title">Блог</h2>
+          <p class="block-note">
+            Агенты, генеративные модели и инженерия вокруг них
+          </p>
+        </header>
+        <div class="block-body">
+          <!-- home:posts -->
+          <p class="block-more">
+            <a href="/blog/ru/">Все записи <span aria-hidden="true">→</span></a>
+            <a href="/blog/ru/atom.xml">RSS</a>
+            <a href="/blog/" hreflang="en" lang="en">In English</a>
+          </p>
         </div>
-        <!-- home:posts -->
       </section>
+
       <section aria-labelledby="projects-title" class="block">
-        <div class="block-head">
+        <header class="block-head">
+          <span class="block-index">02</span>
           <h2 id="projects-title">Проекты</h2>
-          <a href="/cv/ru/"
-            >Подробнее в резюме <span aria-hidden="true">→</span></a
-          >
+          <p class="block-note">То, что можно открыть и потрогать</p>
+        </header>
+        <div class="block-body">
+          <!-- home:projects -->
         </div>
-        <!-- home:projects -->
+      </section>
+
+      <section aria-labelledby="experience-title" class="block">
+        <header class="block-head">
+          <span class="block-index">03</span>
+          <h2 id="experience-title">Опыт</h2>
+          <p class="block-note">ML с 2024 года, до этого 13 лет в вебе</p>
+        </header>
+        <div class="block-body">
+          <!-- home:experience -->
+          <p class="block-more">
+            <a href="/cv/ru/"
+              >Полное резюме <span aria-hidden="true">→</span></a
+            >
+            <a href="/cv/balkhaev-cv-ru.pdf">PDF</a>
+          </p>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="contacts-title"
+        class="block contacts"
+        id="contacts"
+      >
+        <header class="block-head">
+          <span class="block-index">04</span>
+          <h2 id="contacts-title">Контакты</h2>
+          <p class="block-note">Открыт к работе и проектам</p>
+        </header>
+        <div class="block-body">
+          <a class="contact-big" href="mailto:m.balkhaev@gmail.com"
+            >m.balkhaev@gmail.com</a
+          >
+          <p class="block-more">
+            <a
+              href="https://t.me/balkhaev"
+              rel="noopener noreferrer"
+              target="_blank"
+              >Telegram <span aria-hidden="true">↗</span></a
+            >
+            <a href="/cv/ru/">Резюме</a>
+            <a href="/blog/ru/">Блог</a>
+          </p>
+        </div>
       </section>
     </main>
     <footer class="site-foot">
-      <p>Михаил Бальхаев · Москва</p>
-      <p>
-        <a
-          href="https://t.me/balkhaev"
-          rel="noopener noreferrer"
-          target="_blank"
-          >t.me/balkhaev</a
-        >
-        <a href="mailto:m.balkhaev@gmail.com">m.balkhaev@gmail.com</a>
-        <a href="/blog/">Blog in English</a>
-      </p>
+      <span>© 2026 Михаил Бальхаев</span>
+      <a href="#top">Наверх <span aria-hidden="true">↑</span></a>
     </footer>
     <script src="/app.js" type="module"></script>
   </body>
