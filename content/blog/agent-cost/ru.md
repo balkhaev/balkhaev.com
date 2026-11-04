@@ -49,70 +49,27 @@ flowchart TD
 
 Выход стоит дорого за токен, но в длинном разговоре платят за вход: к десятому вопросу каждый шаг отправляет почти 80 тысяч токенов истории. Поэтому почти всё в этой части про вход.
 
+::news{topic="cost llm-api"}
+
 ## Сначала измерить
 
 Каждый ответ API содержит поле `usage`: сколько токенов ушло на вход, сколько на выход, сколько записано в кэш и сколько прочитано из него. Записываем это для каждого шага вместе с логином сотрудника. Без такого журнала любая оптимизация вслепую, а через месяц бухгалтерия спросит, какой отдел сколько потратил.
 
+Цена шага считается из четырёх полей `usage` и четырёх цен:
+
 ```ts
-// usage.ts
-import type Anthropic from "@anthropic-ai/sdk";
-import { Database } from "bun:sqlite";
+const PRICE = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 }; // доллары за миллион токенов
 
-// Цены Claude Opus 5.5, доллары за миллион токенов. Сверяйте со страницей цен
-const PRICE = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 };
-export const DAILY_LIMIT_USD = Number(process.env.DAILY_LIMIT_USD ?? 5);
-
-type Tokens = {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens?: number | null;
-  cache_read_input_tokens?: number | null;
-};
-
-// Когда сработало сжатие истории, его токены есть только в iterations,
-// поэтому считаем по ним, а верхние поля берём, только если iterations нет
-function parts(usage: Anthropic.Beta.BetaUsage): Tokens[] {
-  return usage.iterations?.length ? usage.iterations : [usage];
-}
-
-export function tally(usage: Anthropic.Beta.BetaUsage) {
-  const sum = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
-  for (const p of parts(usage)) {
-    sum.input += p.input_tokens;
-    sum.output += p.output_tokens;
-    sum.cacheWrite += p.cache_creation_input_tokens ?? 0;
-    sum.cacheRead += p.cache_read_input_tokens ?? 0;
-  }
-  const usd =
-    (sum.input * PRICE.input +
-      sum.output * PRICE.output +
-      sum.cacheWrite * PRICE.cacheWrite +
-      sum.cacheRead * PRICE.cacheRead) /
-    1_000_000;
-  return { ...sum, usd };
-}
-
-const db = new Database(process.env.USAGE_DB ?? "usage.db");
-db.exec(`CREATE TABLE IF NOT EXISTS usage (
-  at TEXT DEFAULT CURRENT_TIMESTAMP, user TEXT,
-  input INTEGER, output INTEGER, cache_write INTEGER, cache_read INTEGER, usd REAL
-)`);
-
-export function record(user: string, t: ReturnType<typeof tally>) {
-  db.run("INSERT INTO usage (user, input, output, cache_write, cache_read, usd) VALUES (?, ?, ?, ?, ?, ?)", [
-    user, t.input, t.output, t.cacheWrite, t.cacheRead, t.usd,
-  ]);
-}
-
-export function spentToday(user: string) {
-  const row = db
-    .query("SELECT COALESCE(SUM(usd), 0) AS usd FROM usage WHERE user = ? AND at >= date('now')")
-    .get(user) as { usd: number };
-  return row.usd;
-}
+const usd =
+  (u.input_tokens * PRICE.input +
+    u.output_tokens * PRICE.output +
+    (u.cache_creation_input_tokens ?? 0) * PRICE.cacheWrite +
+    (u.cache_read_input_tokens ?? 0) * PRICE.cacheRead) / 1_000_000;
 ```
 
-Деталь про `iterations`: когда API сам сжимает историю (об этом ниже), токены на сжатие не попадают в верхние поля `usage`, а лежат отдельной записью в `usage.iterations`. Если считать только верхние поля, расходы получатся заниженными.
+`usage.ts` пишет это в таблицу SQLite (время, логин, четыре числа и сумма) и умеет одним запросом посчитать, сколько сотрудник потратил сегодня.
+
+Деталь про `iterations`: когда API сам сжимает историю (об этом ниже), токены на сжатие не попадают в верхние поля `usage`, а лежат отдельной записью в `usage.iterations`. Если считать только верхние поля, расходы получатся заниженными, поэтому `usage.ts` складывает записи из `iterations`, когда они есть.
 
 Расчёт в коде нужен для лимитов и отчётов внутри компании. Точную сумму к оплате показывает консоль провайдера, и раз в месяц стоит сверять с ней свой журнал.
 
@@ -123,28 +80,15 @@ export function spentToday(user: string) {
 Агент для кэша почти идеален: инструменты и промпт не меняются, а история только растёт в конец. Нужно поставить две метки `cache_control`:
 
 ```ts
-// Порядок инструментов фиксируем: другой порядок это другой префикс и промах кэша
-const toolDefs = Object.values(tools)
-  .map((t) => t.definition)
-  .sort((a, b) => a.name.localeCompare(b.name));
-
-// Системный промпт не меняется весь разговор. Метка кэша в его конце
-// кэширует инструменты и промпт одним куском
-const system: Anthropic.Beta.BetaTextBlockParam[] = [
-  {
-    type: "text",
-    text: `Ты ассистент сотрудников компании. ...`,
-    cache_control: { type: "ephemeral" },
-  },
+const system = [
+  { type: "text", text: "Ты ассистент сотрудников компании. ...", cache_control: { type: "ephemeral" } },
 ];
 
-const stream = client.beta.messages.stream({
+client.beta.messages.stream({
   model: "claude-opus-5-5",
-  // ...
-  // Вторая метка, автоматическая: двигается за концом истории от шага к шагу
-  cache_control: { type: "ephemeral" },
+  cache_control: { type: "ephemeral" }, // автоматическая метка в конце истории
   system,
-  tools: toolDefs,
+  tools: toolDefs, // отсортированы по имени
   messages,
 });
 ```
@@ -194,31 +138,12 @@ return text;
 Описания инструментов тоже входят в каждый запрос. Посмотреть, сколько они весят, можно эндпоинтом подсчёта токенов, он бесплатный:
 
 ```ts
-// count.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { connectMcp } from "./mcp";
-
-// Сколько стоит «пустой» запрос: инструменты, системный промпт и одно слово
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json(), process.env.USER_TOKEN ?? "");
-const tools = Object.values(mcp.tools).map((t) => t.definition);
-
 const { input_tokens } = await client.messages.countTokens({
   model: "claude-opus-5-5",
-  system: "Ты ассистент сотрудников компании...",
+  system,
   tools,
   messages: [{ role: "user", content: "привет" }],
 });
-console.log(`префикс: ${input_tokens} токенов`);
-for (const t of tools) {
-  const { input_tokens: n } = await client.messages.countTokens({
-    model: "claude-opus-5-5",
-    tools: [t],
-    messages: [{ role: "user", content: "привет" }],
-  });
-  console.log(`  ${t.name}: ~${n} токенов`);
-}
-await mcp.close();
 ```
 
 С четырьмя инструментами это неважно. Когда подключите десяток готовых MCP-серверов по 20 инструментов в каждом, описания легко займут десятки тысяч токенов. Тогда инструменты стоит разделить по ролям сотрудников или включить поиск инструментов, при котором модель подгружает описания по мере надобности.
@@ -280,55 +205,18 @@ messages.push({ role: "assistant", content: reply.content });
 - **Глубина размышлений.** `output_config.effort` управляет тем, сколько модель думает. У Claude Opus 5.5 по умолчанию `medium`, и для справочных вопросов этого хватает. `high` стоит включать для аналитики, где нужно связать несколько источников, `low` для простых поисков. Размышления оплачиваются как выход, по 20 долларов за миллион токенов.
 - **Деньги на сотрудника в день.** Проверяем перед каждым шагом, а не только в начале вопроса, иначе один длинный вопрос может уйти далеко за лимит.
 
+В цикле из части 3 перед каждым запросом добавляется проверка, а после ответа запись в журнал:
+
 ```ts
-async function agentTurn() {
-  let usd = 0;
-  let read = 0;
-  let total = 0;
-  try {
-    for (let step = 0; step < MAX_STEPS; step++) {
-      // Лимит проверяем перед каждым шагом, а не только в начале вопроса
-      if (spentToday(me.sub) >= DAILY_LIMIT_USD) {
-        console.log(`\n[дневной лимит ${DAILY_LIMIT_USD} долларов исчерпан, продолжим завтра]`);
-        return;
-      }
-
-      const stream = client.beta.messages.stream({
-        model: "claude-opus-5-5",
-        max_tokens: 32000,
-        betas: ["context-management-2025-06-27", "compact-2026-01-12"],
-        output_config: { effort: "medium" },
-        cache_control: { type: "ephemeral" },
-        context_management: contextManagement,
-        system,
-        tools: toolDefs,
-        messages,
-      });
-      stream.on("text", (delta) => process.stdout.write(delta));
-      const reply = await stream.finalMessage();
-
-      const t = tally(reply.usage);
-      record(me.sub, t);
-      usd += t.usd;
-      read += t.cacheRead;
-      total += t.input + t.cacheRead + t.cacheWrite;
-
-      messages.push({ role: "assistant", content: reply.content });
-
-      if (reply.stop_reason === "tool_use") {
-        // ... вызываем инструменты, как в части 3
-        continue;
-      }
-      // ... обработка max_tokens и refusal
-      return;
-    }
-    console.log(`\n[остановлено после ${MAX_STEPS} шагов]`);
-  } finally {
-    const hit = total ? Math.round((read / total) * 100) : 0;
-    console.log(`\n[${usd.toFixed(3)} доллара, из кэша ${hit}% входа, за сегодня ${spentToday(me.sub).toFixed(2)}]`);
-  }
+if (spentToday(me.sub) >= DAILY_LIMIT_USD) {
+  console.log(`\n[дневной лимит ${DAILY_LIMIT_USD} долларов исчерпан, продолжим завтра]`);
+  return;
 }
+// ... запрос к модели ...
+record(me.sub, tally(reply.usage));
 ```
+
+Заодно цикл суммирует стоимость и долю входа из кэша по всем шагам вопроса и печатает их после ответа.
 
 Пять долларов в день по умолчанию это с запасом: при цене вопроса около десяти центов сотрудник упрётся в лимит после пятидесяти вопросов. Лимит нужен не чтобы экономить на людях, а чтобы ошибка в промпте или зациклившийся агент не сжёг месячный бюджет за ночь. Индивидуальные лимиты для людей и отделов удобно хранить в той же базе, рядом с журналом.
 

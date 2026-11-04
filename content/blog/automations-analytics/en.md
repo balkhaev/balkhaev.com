@@ -26,6 +26,8 @@ In a small company the analyst is usually the owner, opening the CRM, the paymen
 | notice that support is falling behind | an alert when five tickets wait over 4 hours |
 | realize the problem is over | a "✅ back to normal" message with the duration |
 
+::news{topic="automation llm-api"}
+
 ## The main rule: SQL does the numbers
 
 A language model is good at noticing patterns in text and bad at counting. Give it raw leads and ask "how many came in yesterday", and it will almost always answer correctly, but "almost always" isn't good enough for a report. So the split is strict:

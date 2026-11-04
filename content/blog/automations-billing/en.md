@@ -32,6 +32,8 @@ Refunds, disputes and anything else that needs a decision stay with a person. Th
 The example uses YooKassa, the most common payment provider in Russia. Outside Russia the same design works with Stripe: the differences are covered in the notes below.
 :::
 
+::news{topic="automation"}
+
 ## Why money needs a different approach
 
 In the sales part we accepted a rare duplicate: if the CRM created a lead and the worker died, a second lead appears and a manager merges it. That won't do for money. Granting access twice is a loss, a "payment received" email without a payment is a scandal, and an unrecorded payment is a client who paid and got nothing.

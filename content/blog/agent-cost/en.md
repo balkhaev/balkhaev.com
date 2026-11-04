@@ -49,70 +49,27 @@ Let's price a typical conversation. Tools and prompt take 1500 tokens. For each 
 
 Output is expensive per token, but in a long conversation you pay for input: by the tenth question every step sends almost 80 thousand tokens of history. So almost everything in this part is about input.
 
+::news{topic="cost llm-api"}
+
 ## Measure first
 
 Every API response has a `usage` field: how many tokens went to input, how many to output, how many were written to the cache and how many were read from it. We record this for every step together with the employee's login. Without such a log every optimisation is blind, and in a month accounting will ask which department spent how much.
 
+The cost of a step comes from four `usage` fields and four prices:
+
 ```ts
-// usage.ts
-import type Anthropic from "@anthropic-ai/sdk";
-import { Database } from "bun:sqlite";
+const PRICE = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 }; // dollars per million tokens
 
-// Claude Opus 5.5 prices, dollars per million tokens. Check against the pricing page
-const PRICE = { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 };
-export const DAILY_LIMIT_USD = Number(process.env.DAILY_LIMIT_USD ?? 5);
-
-type Tokens = {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens?: number | null;
-  cache_read_input_tokens?: number | null;
-};
-
-// When history compaction ran, its tokens are only in iterations,
-// so we count from those and fall back to the top-level fields only if iterations is absent
-function parts(usage: Anthropic.Beta.BetaUsage): Tokens[] {
-  return usage.iterations?.length ? usage.iterations : [usage];
-}
-
-export function tally(usage: Anthropic.Beta.BetaUsage) {
-  const sum = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
-  for (const p of parts(usage)) {
-    sum.input += p.input_tokens;
-    sum.output += p.output_tokens;
-    sum.cacheWrite += p.cache_creation_input_tokens ?? 0;
-    sum.cacheRead += p.cache_read_input_tokens ?? 0;
-  }
-  const usd =
-    (sum.input * PRICE.input +
-      sum.output * PRICE.output +
-      sum.cacheWrite * PRICE.cacheWrite +
-      sum.cacheRead * PRICE.cacheRead) /
-    1_000_000;
-  return { ...sum, usd };
-}
-
-const db = new Database(process.env.USAGE_DB ?? "usage.db");
-db.exec(`CREATE TABLE IF NOT EXISTS usage (
-  at TEXT DEFAULT CURRENT_TIMESTAMP, user TEXT,
-  input INTEGER, output INTEGER, cache_write INTEGER, cache_read INTEGER, usd REAL
-)`);
-
-export function record(user: string, t: ReturnType<typeof tally>) {
-  db.run("INSERT INTO usage (user, input, output, cache_write, cache_read, usd) VALUES (?, ?, ?, ?, ?, ?)", [
-    user, t.input, t.output, t.cacheWrite, t.cacheRead, t.usd,
-  ]);
-}
-
-export function spentToday(user: string) {
-  const row = db
-    .query("SELECT COALESCE(SUM(usd), 0) AS usd FROM usage WHERE user = ? AND at >= date('now')")
-    .get(user) as { usd: number };
-  return row.usd;
-}
+const usd =
+  (u.input_tokens * PRICE.input +
+    u.output_tokens * PRICE.output +
+    (u.cache_creation_input_tokens ?? 0) * PRICE.cacheWrite +
+    (u.cache_read_input_tokens ?? 0) * PRICE.cacheRead) / 1_000_000;
 ```
 
-A detail about `iterations`: when the API compacts history itself (more on that below), the compaction tokens do not appear in the top-level `usage` fields but sit in a separate entry in `usage.iterations`. Count only the top-level fields and your spend will come out too low.
+`usage.ts` writes this to an SQLite table (time, login, the four numbers and the total) and can tell with one query how much an employee has spent today.
+
+A detail about `iterations`: when the API compacts history itself (more on that below), the compaction tokens do not appear in the top-level `usage` fields but sit in a separate entry in `usage.iterations`. Count only the top-level fields and your spend will come out too low, so `usage.ts` sums the `iterations` entries when they are present.
 
 The calculation in code is for limits and internal reports. The exact amount billed is in the provider's console, and it is worth reconciling your log against it once a month.
 
@@ -123,28 +80,15 @@ The cache works on a prefix. If the beginning of a request matches, byte for byt
 An agent is close to ideal for caching: tools and prompt do not change, and history only grows at the end. We need two `cache_control` markers:
 
 ```ts
-// Fix the tool order: a different order is a different prefix and a cache miss
-const toolDefs = Object.values(tools)
-  .map((t) => t.definition)
-  .sort((a, b) => a.name.localeCompare(b.name));
-
-// The system prompt does not change for the whole conversation. A cache marker at its end
-// caches the tools and the prompt as one piece
-const system: Anthropic.Beta.BetaTextBlockParam[] = [
-  {
-    type: "text",
-    text: `You are an assistant for the company's employees. ...`,
-    cache_control: { type: "ephemeral" },
-  },
+const system = [
+  { type: "text", text: "You are an assistant for company employees. ...", cache_control: { type: "ephemeral" } },
 ];
 
-const stream = client.beta.messages.stream({
+client.beta.messages.stream({
   model: "claude-opus-5-5",
-  // ...
-  // The second, automatic marker moves past the end of the history from step to step
-  cache_control: { type: "ephemeral" },
+  cache_control: { type: "ephemeral" }, // automatic marker at the end of the history
   system,
-  tools: toolDefs,
+  tools: toolDefs, // sorted by name
   messages,
 });
 ```
@@ -194,31 +138,12 @@ Without it the model sometimes selects every deal of the year to add them up in 
 Tool descriptions are part of every request too. The token counting endpoint, which is free, shows how much they weigh:
 
 ```ts
-// count.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { connectMcp } from "./mcp";
-
-// What an "empty" request costs: tools, system prompt and one word
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json(), process.env.USER_TOKEN ?? "");
-const tools = Object.values(mcp.tools).map((t) => t.definition);
-
 const { input_tokens } = await client.messages.countTokens({
   model: "claude-opus-5-5",
-  system: "You are an assistant for the company's employees...",
+  system,
   tools,
-  messages: [{ role: "user", content: "hello" }],
+  messages: [{ role: "user", content: "hi" }],
 });
-console.log(`prefix: ${input_tokens} tokens`);
-for (const t of tools) {
-  const { input_tokens: n } = await client.messages.countTokens({
-    model: "claude-opus-5-5",
-    tools: [t],
-    messages: [{ role: "user", content: "hello" }],
-  });
-  console.log(`  ${t.name}: ~${n} tokens`);
-}
-await mcp.close();
 ```
 
 With four tools this does not matter. Once you connect a dozen off-the-shelf MCP servers with 20 tools each, descriptions easily take tens of thousands of tokens. Then it is worth splitting tools by employee role, or turning on tool search, where the model loads descriptions as it needs them.
@@ -280,55 +205,18 @@ An agent with access to the company database can go into a long loop: the model 
 - **Thinking depth.** `output_config.effort` controls how much the model thinks. On Claude Opus 5.5 the default is `medium`, which is enough for reference questions. Use `high` for analytics that ties several sources together and `low` for simple lookups. Thinking is billed as output, at 20 dollars per million tokens.
 - **Money per employee per day.** Checked before every step, not only at the start of a question, otherwise one long question can go far past the limit.
 
+The loop from part 3 gains a check before every request and a log entry after the reply:
+
 ```ts
-async function agentTurn() {
-  let usd = 0;
-  let read = 0;
-  let total = 0;
-  try {
-    for (let step = 0; step < MAX_STEPS; step++) {
-      // Check the limit before every step, not only at the start of a question
-      if (spentToday(me.sub) >= DAILY_LIMIT_USD) {
-        console.log(`\n[daily limit of ${DAILY_LIMIT_USD} dollars reached, see you tomorrow]`);
-        return;
-      }
-
-      const stream = client.beta.messages.stream({
-        model: "claude-opus-5-5",
-        max_tokens: 32000,
-        betas: ["context-management-2025-06-27", "compact-2026-01-12"],
-        output_config: { effort: "medium" },
-        cache_control: { type: "ephemeral" },
-        context_management: contextManagement,
-        system,
-        tools: toolDefs,
-        messages,
-      });
-      stream.on("text", (delta) => process.stdout.write(delta));
-      const reply = await stream.finalMessage();
-
-      const t = tally(reply.usage);
-      record(me.sub, t);
-      usd += t.usd;
-      read += t.cacheRead;
-      total += t.input + t.cacheRead + t.cacheWrite;
-
-      messages.push({ role: "assistant", content: reply.content });
-
-      if (reply.stop_reason === "tool_use") {
-        // ... call the tools, as in part 3
-        continue;
-      }
-      // ... handling of max_tokens and refusal
-      return;
-    }
-    console.log(`\n[stopped after ${MAX_STEPS} steps]`);
-  } finally {
-    const hit = total ? Math.round((read / total) * 100) : 0;
-    console.log(`\n[${usd.toFixed(3)} dollars, ${hit}% of input from cache, ${spentToday(me.sub).toFixed(2)} today]`);
-  }
+if (spentToday(me.sub) >= DAILY_LIMIT_USD) {
+  console.log(`\n[daily limit of ${DAILY_LIMIT_USD} dollars reached, see you tomorrow]`);
+  return;
 }
+// ... the model request ...
+record(me.sub, tally(reply.usage));
 ```
+
+The loop also adds up the cost and the share of input served from cache across all steps of a question and prints them after the answer.
 
 Five dollars a day by default is generous: at about ten cents a question, an employee hits the limit after fifty questions. The limit is not there to save money on people but so that a prompt bug or a looping agent cannot burn the monthly budget overnight. Individual limits for people and departments fit nicely in the same database, next to the log.
 

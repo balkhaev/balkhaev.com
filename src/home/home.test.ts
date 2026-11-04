@@ -16,6 +16,7 @@ const post = (slug: string, lang: "en" | "ru", date: string): Post => ({
   lang,
   math: false,
   minutes: 1,
+  news: false,
   slug,
   tags: [],
   title: `${slug} ${lang}`,

@@ -13,6 +13,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { visit } from "unist-util-visit";
+import { parseLimit, parseTopics, renderWidget } from "../news/widget";
 import { rehypeCodeBlocks } from "./code";
 import { rehypeDiagrams } from "./diagram";
 
@@ -26,6 +27,8 @@ export interface Rendered {
   html: string;
   /** True when the post has formulas and needs the KaTeX stylesheet. */
   math: boolean;
+  /** True when the post has a news widget and needs its script. */
+  news: boolean;
   toc: Heading[];
 }
 
@@ -42,9 +45,56 @@ function calloutProps(name: string) {
     : { hName: "aside", hProperties: { className: ["callout", kind] } };
 }
 
+const NEWS = "news-widget";
+
+/**
+ * `::news{topic="agents mcp" limit=3}` on its own line: a block of digest
+ * stories on those topics (see src/news/topics.ts). The element is a
+ * placeholder until rehypeNews fills it.
+ */
+function remarkNews() {
+  return (tree: MdastRoot) => {
+    visit(tree, "leafDirective", (node) => {
+      if (node.name !== "news") {
+        return;
+      }
+      const { limit, topic } = node.attributes ?? {};
+      const topics = parseTopics(topic ?? "");
+      node.data = {
+        hName: NEWS,
+        hProperties: {
+          limit: parseLimit(limit ?? undefined),
+          topics: topics.join(" "),
+        },
+      };
+      node.children = [];
+    });
+  };
+}
+
+function rehypeNews(lang: string, found: Collected) {
+  return () => (tree: HastRoot) => {
+    visit(tree, "element", (node: Element, index, parent) => {
+      if (node.tagName !== NEWS || !parent || index === undefined) {
+        return;
+      }
+      found.news = true;
+      const topics = parseTopics(String(node.properties.topics));
+      const limit = Number(node.properties.limit);
+      parent.children.splice(index, 1, {
+        type: "raw",
+        value: renderWidget(topics, limit, lang === "ru" ? "ru" : "en"),
+      });
+    });
+  };
+}
+
 function remarkCallouts() {
   return (tree: MdastRoot) => {
     visit(tree, (node, index, parent) => {
+      if (node.type === "leafDirective" && node.name === "news") {
+        return;
+      }
       if (node.type === "containerDirective") {
         node.data = { ...node.data, ...calloutProps(node.name) };
         return;
@@ -68,6 +118,7 @@ const SUMMARY: Record<string, string> = { en: "Proof", ru: "Доказатель
 interface Collected {
   errors: string[];
   math: boolean;
+  news: boolean;
   toc: Heading[];
 }
 
@@ -114,18 +165,19 @@ function rehypeCollect(lang: string, found: Collected) {
 /**
  * Markdown body of a post to HTML: GFM (tables, footnotes), $math$ via KaTeX,
  * code via Shiki in light and dark themes, ```mermaid diagrams as inline SVG,
- * callouts. Raw HTML in the source is dropped.
+ * callouts, `::news` widgets. Raw HTML in the source is dropped.
  */
 export async function renderMarkdown(
   source: string,
   lang = "en"
 ): Promise<Rendered> {
-  const found: Collected = { errors: [], math: false, toc: [] };
+  const found: Collected = { errors: [], math: false, news: false, toc: [] };
   const file = await unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
     .use(remarkDirective)
+    .use(remarkNews)
     .use(remarkCallouts)
     .use(remarkRehype, {
       footnoteLabel: lang === "ru" ? "Примечания" : "Footnotes",
@@ -141,6 +193,7 @@ export async function renderMarkdown(
     })
     .use(rehypeSlug)
     .use(rehypeCollect(lang, found))
+    .use(rehypeNews(lang, found))
     // Only the build-time diagram SVG is raw here: Markdown HTML was dropped
     // by remark-rehype above.
     .use(rehypeStringify, { allowDangerousHtml: true })
@@ -148,5 +201,10 @@ export async function renderMarkdown(
   if (found.errors.length) {
     throw new Error(`Invalid formula: ${found.errors.join("; ")}`);
   }
-  return { html: String(file), math: found.math, toc: found.toc };
+  return {
+    html: String(file),
+    math: found.math,
+    news: found.news,
+    toc: found.toc,
+  };
 }

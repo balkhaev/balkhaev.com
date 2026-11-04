@@ -14,6 +14,19 @@ HTML and replaces the file atomically. The built edition is available at startup
 An empty response or temporary outage leaves the current page in place. For a one-time
 refresh of a local build run `bun scripts/refresh-news.ts dist/news`.
 
+Every edition the container has seen is also kept in `/news/feed.json` (up to 60).
+Blog posts embed digest stories on their topic with a line of its own:
+
+```md
+::news{topic="agents mcp" limit=3}
+```
+
+Topics are listed in `src/news/topics.ts` (`agents`, `automation`, `coding`, `cost`,
+`inference`, `llm-api`, `mcp`, `open-models`, `search`, `security`); `limit` is 1–6,
+3 by default. The build writes the matching stories into the page, and
+`/blog/news.js` swaps them for the current feed in the browser. With no match the
+widget shows the newest stories instead. An unknown topic fails the build.
+
 ## Scene and interaction
 
 The initial observer frame is 12.5 horizon radii from the centre, six degrees above the accretion disk plane. The rectilinear lens keeps a 64-degree field of view on the shorter screen dimension at radii 3 and above. Below radius 3, its field of view is solved from the actual shadow angle so the shadow's projected radius increases smoothly from about 0.719 towards 0.95 of the shorter screen half-extent. The projection blends towards stereographic between radii 3 and 0.6; the resulting field of view is about 89.69 degrees at the horizon and 169.70 degrees at radius 0.02. CPU picking and GPU rendering use identical unit sightlines. This presentation lens changes the projection while preserving the calculated ray geometry.

@@ -30,6 +30,8 @@ flowchart TD
   end
 ```
 
+::news{topic="automation"}
+
 ## Step 1. The server
 
 Any VPS with Ubuntu 24.04, two cores and 2–4 GB of memory will do. That is a few euros a month at Hetzner, DigitalOcean, Vultr or a local provider. Choose by where your clients are and where paying is convenient: the load from automations is small and hardware differences do not matter here.

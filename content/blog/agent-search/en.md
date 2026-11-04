@@ -27,6 +27,8 @@ We already have an agent loop, so search becomes just another tool. The model wr
 
 So we start with full-text search ranked by BM25. It's cheap, easy to debug (you can see why a document matched), needs no re-embedding every time a document changes, and finds names and numbers exactly. We'll add vectors once we see concrete misses; more on that at the end of the article.
 
+::news{topic="search"}
+
 ## Step 1. Documents
 
 For the example we use a `wiki/` folder of markdown files: vacation, business travel, a client contract, an incident review, the compensation policy, a newcomer guide. In a real company this is an export from Confluence, Notion or Google Drive, but it pays to bring it into the same shape: a title, text, metadata.
@@ -47,70 +49,17 @@ Note the `access` field: who may see the document. In this part we only store it
 
 ## Step 2. Indexing
 
-```ts
-// index.ts
-import { Database } from "bun:sqlite";
-import { readdir } from "node:fs/promises";
-import { YAML } from "bun";
+`index.ts` walks the folder, parses the frontmatter, splits every document into chunks and writes two tables: `docs` with whole documents (for reading) and the full-text `chunks` (for search):
 
-const WIKI = process.argv[2] ?? "wiki";
-const MAX_CHUNK = 1500; // characters: about half a page
-
-const db = new Database("wiki.db");
-db.exec(`
-  DROP TABLE IF EXISTS docs;
-  DROP TABLE IF EXISTS chunks;
-  CREATE TABLE docs (path TEXT PRIMARY KEY, title TEXT, access TEXT, body TEXT);
-  CREATE VIRTUAL TABLE chunks USING fts5(
-    path UNINDEXED, title, heading, body,
-    tokenize = 'porter unicode61'
-  );
-`);
-
-// Split the document at second-level headings, and long sections at paragraphs
-function split(body: string) {
-  const chunks: { heading: string; text: string }[] = [];
-  for (const section of body.split(/^## /m)) {
-    const [first, ...rest] = section.split("\n");
-    const heading = rest.length ? first.trim() : "";
-    const text = rest.length ? rest.join("\n") : section;
-    let current = "";
-    for (const paragraph of text.split(/\n\s*\n/)) {
-      if (current && current.length + paragraph.length > MAX_CHUNK) {
-        chunks.push({ heading, text: current.trim() });
-        current = "";
-      }
-      current += `${paragraph}\n\n`;
-    }
-    if (current.trim()) chunks.push({ heading, text: current.trim() });
-  }
-  return chunks;
-}
-
-let count = 0;
-for (const file of await readdir(WIKI)) {
-  if (!file.endsWith(".md")) continue;
-  const source = await Bun.file(`${WIKI}/${file}`).text();
-  const match = source.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) {
-    console.error(`${file}: no frontmatter, skipping`);
-    continue;
-  }
-  const meta = YAML.parse(match[1]) as { title: string; access?: string[] };
-  const body = match[2];
-  db.run("INSERT INTO docs VALUES (?, ?, ?, ?)", [
-    file,
-    meta.title,
-    JSON.stringify(meta.access ?? ["all"]),
-    body,
-  ]);
-  for (const chunk of split(body)) {
-    db.run("INSERT INTO chunks VALUES (?, ?, ?, ?)", [file, meta.title, chunk.heading, chunk.text]);
-    count++;
-  }
-}
-console.log(`indexed ${count} chunks`);
+```sql
+CREATE TABLE docs (path TEXT PRIMARY KEY, title TEXT, access TEXT, body TEXT);
+CREATE VIRTUAL TABLE chunks USING fts5(
+  path UNINDEXED, title, heading, body,
+  tokenize = 'porter unicode61'
+);
 ```
+
+It splits on `##` headings first, and a section longer than 1500 characters is split again on paragraphs.
 
 ```bash
 bun index.ts wiki
@@ -124,84 +73,16 @@ bun index.ts wiki
 
 ## Step 3. The search MCP server
 
-```ts
-// wiki-server.ts
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
+`wiki-server.ts` is built like the database server from the previous part, with two tools: `search` and `read`. `read` fetches a document from `docs` by path. All of `search` is one query:
 
-const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-
-// The porter tokenizer stems English words, so "payments" finds "payment".
-// OR keeps recall high; bm25 ranks chunks that match more words first
-function toFtsQuery(text: string) {
-  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  return words
-    .filter((w) => w.length > 2)
-    .map((w) => `"${w}"`)
-    .join(" OR ");
-}
-
-function buildServer() {
-  const server = new McpServer({ name: "wiki", version: "1.0.0" });
-
-  server.registerTool(
-    "search",
-    {
-      description:
-        "Full-text search over the company wiki: policies, contracts, incident reviews. " +
-        "Returns chunks with the document path. Search with short keyword queries " +
-        "and rephrase if nothing is found. Call read to see a whole document.",
-      inputSchema: z.object({
-        query: z.string().describe("Keywords, for example \"per diem abroad\""),
-        limit: z.number().int().min(1).max(20).default(8),
-      }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ query, limit }) => {
-      const fts = toFtsQuery(query);
-      if (!fts) return { isError: true, content: [{ type: "text", text: "Empty query" }] };
-      const rows = db
-        .query(
-          `SELECT path, title, heading,
-                  snippet(chunks, 3, '[', ']', '…', 32) AS snippet
-           FROM chunks WHERE chunks MATCH ?
-           ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
-        )
-        .all(fts, limit) as { path: string; title: string; heading: string; snippet: string }[];
-      if (!rows.length) {
-        return { content: [{ type: "text", text: "Nothing found. Try other words." }] };
-      }
-      const text = rows
-        .map((r, i) => `[${i + 1}] ${r.path} · ${r.title}${r.heading ? ` › ${r.heading}` : ""}\n${r.snippet}`)
-        .join("\n\n");
-      return { content: [{ type: "text", text }] };
-    },
-  );
-
-  server.registerTool(
-    "read",
-    {
-      description: "Read a whole wiki document by a path from the search results.",
-      inputSchema: z.object({ path: z.string().describe("For example, travel.md") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ path }) => {
-      const doc = db.query("SELECT title, body FROM docs WHERE path = ?").get(path) as
-        | { title: string; body: string }
-        | null;
-      if (!doc) return { isError: true, content: [{ type: "text", text: `No document ${path}` }] };
-      return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
-    },
-  );
-
-  return server;
-}
-
-// One server per connection: serveStdio calls the factory when the agent starts the process
-serveStdio(buildServer);
+```sql
+SELECT path, title, heading, snippet(chunks, 3, '«', '»', '…', 32) AS snippet
+FROM chunks WHERE chunks MATCH ?
+ORDER BY bm25(chunks, 0, 5, 3, 1)
+LIMIT 8
 ```
+
+Before the query, the words of the question are joined with `OR`, so "payment terms northern steel" becomes `"payment" OR "terms" OR "northern" OR "steel"`. The tool description tells the model how to search: "Use short keyword queries, rephrase if nothing turns up. Call read to see a whole document."
 
 **`search` and `read` together.** Search returns short chunks so the model can skim a dozen candidates without spending its whole context. If a chunk looks right, the model opens the whole document with `read` and reads the surrounding sections. A person does the same: look at the results, then open the page.
 
