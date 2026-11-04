@@ -42,7 +42,7 @@ Prices here are guidelines as of early November 2026. Fresh numbers and notable 
 
 **Interruptible (spot).** 30 to 60 percent cheaper, but the platform can take the GPU back at any moment if someone paying more wants it. On RunPod these are spot pods; on Vast.ai, interruptible offers with a bid. Suitable for batch processing that can resume where it stopped, and unsuitable for an API that users rely on.
 
-**Serverless.** You describe a container, and the platform starts and stops workers to match load and charges only for the time spent processing requests. Convenient for uneven load, but there is a cold start: the first request after idle time waits for a worker to start and load the weights. We cover it in detail in part seven.
+**Serverless.** You describe a container, and the platform starts and stops workers to match load and charges only for the time spent processing requests. Convenient for uneven load, but there is a cold start: the first request after idle time waits for a worker to start and load the weights. It is covered in detail in [part seven](/blog/inference-cost/).
 
 **Long-term discounts.** RunPod gives a discount for prepaying months ahead. It only makes sense once load has been measured and is stable.
 
@@ -114,7 +114,7 @@ A GPU forgotten over a weekend costs as much as a month of network volume. Simpl
 
 - **Stop pods you don't need.** On RunPod a stopped pod is not charged for the GPU but is charged for the pod's own disk. If the weights live on a network volume, you can delete the pod entirely instead of stopping it.
 - **Set a spending limit.** Both platforms work from a prepaid balance. Don't top it up with more than you are prepared to lose, and enable auto top-up only with a limit.
-- **Automatic shutdown when idle.** A simple script that stops the pod if there were no requests in the last hour. We write it in part seven.
+- **Automatic shutdown when idle.** A simple script that stops the pod if there were no requests in the last hour. It is in [part seven](/blog/inference-cost/).
 - **Batch jobs switch the machine off themselves.** The last step of a batch job is a command to destroy the instance.
 
 ## What to choose

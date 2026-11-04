@@ -46,7 +46,7 @@ For your own product with commercial use, the simplest start is Qwen-Image or Z-
 | HunyuanVideo 1.5 | 8.3B | Tencent Community; commercial use below 100M monthly users | from 14 GB in FP8, 24 GB in FP16; up to 1080p |
 | LTX-2.3 | 22B, video and audio | free for companies under 10 million dollars in revenue | from 16 GB in NVFP4 on Blackwell, 32 GB in FP8 |
 
-Video is many times heavier than images: a few seconds of footage take minutes to generate even on an H100. If your product needs video often, count the money especially carefully; more on that in the next part.
+Video is many times heavier than images: a few seconds of footage take minutes to generate even on an H100. If your product needs video often, count the money especially carefully; more on that in the [next part](/blog/inference-cost/).
 
 Generation models change even faster than language models. New versions and accelerated variants appear in the feed above, and almost every such release comes with a ready-made ComfyUI pipeline.
 
@@ -125,4 +125,4 @@ An image in 5 seconds on an RTX 5090 at 1.2 dollars an hour costs about 0.17 cen
 
 ## What's next
 
-In the final part we bring everything about money together: how to calculate the real cost of your own model including idle time, when it pays to keep the GPU on permanently, when to shut it down when idle, and when to move to serverless.
+In the [final part](/blog/inference-cost/) we bring everything about money together: how to calculate the real cost of your own model including idle time, when it pays to keep the GPU on permanently, when to shut it down when idle, and when to move to serverless.
