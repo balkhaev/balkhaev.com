@@ -1,0 +1,67 @@
+context: Commercial automations · 6/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 6
+    title: "Replacing support: *draft replies*"
+    subtitle: Emails and messages become cards with a ready answer. A person sends it.
+
+  - type: list
+    label: What we replace
+    heading: Everything before the reply
+    items:
+      - "Check the inbox: *a card in the chat within seconds*"
+      - "Understand topic and urgency: *category and summary*"
+      - "Find the customer: *the model sees their orders*"
+      - "Write a reply: *a draft from the knowledge base*"
+      - "Don't forget: *a reminder after an hour*"
+
+  - type: list
+    label: Why a draft
+    heading: Auto-replying to customers is a bad idea
+    numbered: true
+    items:
+      - "*The model is confidently wrong sometimes*"
+      - "*Checking costs one tap*"
+      - "*Anyone can write an incoming email*"
+    say: We record whether a person sent the draft as is. A month later you can see where drafts are good.
+
+  - type: diagram
+    label: How it works
+    heading: Card first, analysis next
+    nodes:
+      - { id: in, label: Email or Telegram, col: 0, row: 0, w: 3, step: 0 }
+      - { id: ticket, label: Ticket, sub: no duplicates, col: 4, row: 0, w: 3, step: 1 }
+      - { id: triage, label: Claude, sub: "category, draft", col: 8, row: 0, w: 4, step: 2 }
+      - { id: kb, label: Knowledge base, sub: "kb/*.md, cached", col: 8, row: 3, w: 4, step: 2 }
+      - { id: card, label: Card, sub: in the support chat, col: 4, row: 3, w: 3, step: 3, accent: true }
+      - { id: human, label: Agent, sub: sends it, col: 0, row: 3, w: 3, step: 4 }
+    edges:
+      - { from: in, to: ticket }
+      - { from: ticket, to: triage }
+      - { from: kb, to: triage }
+      - { from: triage, to: card, label: updates }
+      - { from: card, to: human }
+    say: If the model doesn't answer, the ticket doesn't wait. The card is already in the chat; the analysis follows when it can.
+
+  - type: list
+    label: Triage rules
+    heading: How the model drafts
+    items:
+      - "*Only from the knowledge base*: no answer means \"needs a person\""
+      - "*Money, refunds, complaints* are always flagged"
+      - "*Customer data is only their own data*"
+      - "*Prompt cache*: the knowledge base is the same in every request"
+
+  - type: statement
+    label: Replying
+    text: One "Send draft" button, or *your own text as a reply to the card*.
+    say: The answer goes back through the same channel, as a separate job. Two people won't reply twice.
+
+  - type: statement
+    label: Result
+    text: A customer *never gets anything a person hasn't seen*.
+    say: The knowledge base lives in the repository and changes with a normal commit.
+
+  - type: end
+    text: Next, the last replacement, *replacing the analyst*.
+    url: balkhaev.com/blog/automations-support

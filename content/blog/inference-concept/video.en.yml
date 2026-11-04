@@ -1,0 +1,84 @@
+context: Your own inference · 1/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 1
+    title: "When your own model *beats the API*"
+    subtitle: Open models on rented GPUs. Working out when it pays off.
+
+  - type: compare
+    label: Two pricing models
+    heading: Pay per token or per hour
+    columns:
+      - title: API
+        points:
+          - You pay for every token
+          - No requests, no bill
+          - The provider pools thousands of customers
+      - title: Your own GPU
+        pick: true
+        points:
+          - You pay for every hour
+          - Idle time costs the same
+          - Worth exactly as much as it is loaded
+
+  - type: list
+    label: Break-even
+    heading: A GPU at 3 dollars an hour
+    items:
+      - "One user, 50 tokens a second: *about 17 dollars* per million"
+      - "Several requests, 300 a second: *about 2.8 dollars*"
+      - "Packed with batches, 1500 a second: *about 0.55 dollars*"
+      - "Nights and weekends, 0 a second: *infinity*"
+    say: The price of a million tokens is the hourly price divided by tokens per hour. Utilisation decides everything.
+
+  - type: list
+    label: When it makes sense
+    heading: Your own model is worth it for
+    items:
+      - "*Large volumes in bulk*: labelling a million tickets"
+      - "*Steady load* around the clock"
+      - "*Your own fine-tuned model* or LoRA"
+      - "*Version control*, nobody retires it"
+      - "*Images, video and 3D* with your own pipelines"
+
+  - type: list
+    label: When it doesn't
+    heading: Better stay on the API
+    items:
+      - "*Few requests*, and uneven ones"
+      - "*You need the best quality*: top open models need an eight-GPU server"
+      - "*No time for operations*: your own model is a server"
+    say: There is a middle path people forget. The same open model at a provider that bills per token.
+
+  - type: diagram
+    label: The decision
+    heading: Three questions before renting
+    nodes:
+      - { id: q1, label: "Need top quality?", col: 0, row: 0, w: 4, step: 0 }
+      - { id: api, label: Commercial API, col: 0, row: 3, w: 4, step: 1 }
+      - { id: q2, label: "Images, video?", col: 5, row: 0, w: 3, step: 1 }
+      - { id: q3, label: "GPU kept busy?", col: 5, row: 3, w: 3, step: 2 }
+      - { id: own, label: Your own model, sub: on a rented GPU, col: 9, row: 0, w: 3, step: 3, accent: true }
+      - { id: hosted, label: Open model, sub: at a provider, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: q1, to: api, label: "yes" }
+      - { from: q1, to: q2, label: "no" }
+      - { from: q2, to: own, label: "yes" }
+      - { from: q2, to: q3, label: "no" }
+      - { from: q3, to: own, label: "yes" }
+      - { from: q3, to: hosted, label: "no" }
+
+  - type: list
+    label: What we'll build
+    heading: By the end of the series
+    items:
+      - Memory sizing and choosing a GPU
+      - A model and an engine for the task
+      - A rental on RunPod or Vast.ai with weights on a persistent disk
+      - vLLM with an OpenAI-compatible API, a key and measured speed
+      - ComfyUI for images and video
+      - A real cost table for your load
+
+  - type: end
+    text: Next we pick *a GPU*.
+    url: balkhaev.com/blog/inference-concept

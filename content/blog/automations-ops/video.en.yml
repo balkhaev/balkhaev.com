@@ -1,0 +1,88 @@
+context: Commercial automations · 8/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 8
+    title: "Operations: *monitoring, backups, secrets*"
+    subtitle: The last part of the series. How to learn about a failure and survive it.
+
+  - type: list
+    label: What can go wrong
+    heading: And how we'll find out
+    items:
+      - "*The server died*: an external /health check"
+      - "*The worker hung*: queue pings stopped arriving"
+      - "*Logs filled the disk*: logs are capped"
+      - "*The database is lost*: a nightly encrypted backup"
+      - "*A key leaked*: rotation and least privilege"
+      - "*Model spend grew*: a line in the digest and an alert"
+
+  - type: diagram
+    label: Monitoring
+    heading: A signal from outside, not inside
+    nodes:
+      - { id: worker, label: Worker, sub: heartbeat every 5 minutes, col: 0, row: 0, w: 4, step: 0 }
+      - { id: app, label: app, sub: /health, col: 0, row: 3, w: 4, step: 0 }
+      - { id: hc, label: Healthchecks, sub: waits for pings, col: 5, row: 0, w: 3, step: 1 }
+      - { id: uptime, label: Uptime service, sub: every minute, col: 5, row: 3, w: 3, step: 1 }
+      - { id: tg, label: Telegram, sub: and email, col: 9, row: 1, w: 3, step: 2, accent: true }
+    edges:
+      - { from: worker, to: hc, label: ping }
+      - { from: uptime, to: app, label: checks }
+      - { from: hc, to: tg, label: no ping }
+      - { from: uptime, to: tg }
+    say: Last part's alerts run in the worker itself. If it dies, nobody sends them. So the heartbeat goes outside.
+
+  - type: list
+    label: Backups
+    heading: Three properties of a real backup
+    numbered: true
+    items:
+      - "*Stored elsewhere*: another provider's storage"
+      - "*Encrypted*: the private key is not on the server"
+      - "*Can't be erased from the server*: a key without delete rights"
+    say: A backup nobody has restored is a hope, not a backup. Check a restore once a month.
+
+  - type: list
+    label: Secrets
+    heading: Rules for a dozen and a half keys
+    items:
+      - "Values *only in .env on the server*, the list in .env.example"
+      - "*Least privilege* for every key"
+      - "*Rotation*: new key, restart, revoke the old one"
+      - "*Never in logs or in text sent to the model*"
+
+  - type: compare
+    label: Cost
+    heading: What it costs
+    columns:
+      - title: Infrastructure
+        points:
+          - One small VPS
+          - 2 vCPU and 2–4 GB RAM
+          - Plus storage for backups
+      - title: The model
+        pick: true
+        points:
+          - Every request logged
+          - A spend line in the digest
+          - A limit in the provider console
+          - A smaller model for sorting
+
+  - type: list
+    label: Checklist
+    heading: The operations rhythm
+    items:
+      - "*Daily*: digest and alerts"
+      - "*Weekly*: dependency updates"
+      - "*Monthly*: a restore check, fresh images"
+      - "*Quarterly*: keys, permissions, spend"
+      - "*Yearly*: a new Postgres version"
+
+  - type: statement
+    label: Series takeaway
+    text: About *2,200 lines* of code and SQL, no frameworks, on one server.
+    say: Sales, payments, support and analytics run themselves, and people make decisions where mistakes are expensive.
+
+  - type: end
+    text: Eight parts, from an idea *to a system in production*.
+    url: balkhaev.com/blog/automations-ops

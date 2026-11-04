@@ -1,0 +1,72 @@
+context: Your own inference · 7/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 7
+    title: "Money: *the price of a million tokens*"
+    subtitle: Idle time, schedules and serverless.
+
+  - type: statement
+    label: Formula
+    text: The real price is *the monthly bill* divided by useful tokens per month.
+    say: Not the hourly price divided by speed. Idle time eats the savings fastest.
+
+  - type: list
+    label: The bill
+    heading: What it's made of
+    items:
+      - "*GPU hours*, nights and idle time included"
+      - "*Storage*: the weights volume and stopped pods' disks"
+      - "*Experiments*: spin up, try, delete"
+      - "*Your time* on updates and incidents"
+
+  - type: compare
+    label: Three modes
+    heading: What a month costs
+    columns:
+      - title: Always on
+        points:
+          - 730 hours
+          - about $2200
+          - only for round-the-clock load
+      - title: On a schedule
+        pick: true
+        points:
+          - about 220 hours
+          - about $660
+          - working hours and batches
+      - title: Serverless
+        points:
+          - pay for processing
+          - about $400
+          - rare requests
+
+  - type: list
+    label: Mode 2
+    heading: How to turn the GPU off
+    items:
+      - "*Schedule*: start in the morning, stop at night via API"
+      - "*Idle stop*: half an hour with no requests"
+      - "*A batch job* deletes the pod at the end"
+
+  - type: list
+    label: Mode 3
+    heading: The price of serverless
+    items:
+      - "*Cold start*: the first request waits for weights"
+      - "*A second costs more* than on a pod"
+      - "*One active worker* removes the cold start"
+
+  - type: list
+    label: Summary
+    heading: The whole series in five steps
+    numbered: true
+    items:
+      - Estimate the load and decide if you need your own model
+      - Pick a model on your own examples before renting
+      - Work out memory and choose a GPU
+      - Bring up vLLM and measure speed
+      - Pick a mode and compare with a provider's price
+
+  - type: end
+    text: Series done. Your own model pays off while *the GPU is busy*.
+    url: balkhaev.com/blog/inference-cost

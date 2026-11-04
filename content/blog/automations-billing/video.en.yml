@@ -1,0 +1,72 @@
+context: Commercial automations · 5/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 5
+    title: "Replacing the accountant: *payments, access, debts*"
+    subtitle: An invoice in one command, payment, access exactly once, and reminders to debtors.
+
+  - type: list
+    label: What we replace
+    heading: The routine around payments
+    items:
+      - "Issue an invoice: *one command in the chat*"
+      - "Check the money arrived: *a notification and an hourly reconcile*"
+      - "Grant access: *right away, nights and weekends too*"
+      - "Tell the team: *\"Paid\" in the chat*"
+      - "Remind a debtor: *on days 3, 7 and 14*"
+    say: Refunds, disputes and anything needing judgement stay with a person. The system only reports them.
+
+  - type: list
+    label: Money is different
+    heading: Three rules
+    numbered: true
+    items:
+      - "The source of truth is *the payment system*, a notification is only a reason to ask"
+      - "An order becomes paid *in one place with one conditional SQL*"
+      - "Every external action is *a separate job with a key*"
+
+  - type: diagram
+    label: How it works
+    heading: Three paths to one check
+    nodes:
+      - { id: notify, label: Notification, sub: from the provider, col: 0, row: 0, w: 3, step: 0 }
+      - { id: hourly, label: Reconcile, sub: hourly, col: 0, row: 2, w: 3, step: 0 }
+      - { id: back, label: Customer returns, sub: to /pay, col: 0, row: 4, w: 3, step: 0 }
+      - { id: check, label: payment.check, sub: ask the provider, col: 4, row: 2, w: 3, step: 1 }
+      - { id: mark, label: markPaid, sub: first time only, col: 8, row: 2, w: 4, step: 2, accent: true }
+      - { id: fulfill, label: Access, sub: "email and a chat message", col: 8, row: 4, w: 4, step: 3 }
+    edges:
+      - { from: notify, to: check }
+      - { from: hourly, to: check }
+      - { from: back, to: check }
+      - { from: check, to: mark }
+      - { from: mark, to: fulfill }
+    say: However many confirmations arrive and from wherever, access is granted once and only for the right amount.
+
+  - type: list
+    label: Details
+    heading: What makes payment reliable
+    items:
+      - "*Money in cents* as an integer, never a float"
+      - "*The link points to us*, not the provider, and never expires"
+      - "*Idempotence-Key*: a retried request won't create a second payment"
+      - "*A forged notification* fails the check with the provider"
+      - "*Access in its own table*: the database refuses a second one per order"
+
+  - type: statement
+    label: Reminders
+    text: Reminders *never need cancelling*. Each checks the order status when it is sent.
+    say: After the last reminder, the chat gets a message that it's time to call the customer.
+
+  - type: list
+    label: Verified
+    heading: The result
+    items:
+      - An invoice in one command, an email to the customer in seconds
+      - Three confirmations of one payment, one access grant
+      - A forgery rejected, the order untouched
+      - A lost notification picked up by the reconcile
+
+  - type: end
+    text: Money under control. Next, *replacing support*.
+    url: balkhaev.com/blog/automations-billing

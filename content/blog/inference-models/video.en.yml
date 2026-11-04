@@ -1,0 +1,73 @@
+context: Your own inference · 3/7
+scenes:
+  - type: title
+    kicker: Your own inference · part 3
+    title: "What to run: *models and engines*"
+    subtitle: Which open models to run on a rented GPU, and on what.
+
+  - type: list
+    label: The market
+    heading: The main open model families
+    items:
+      - "*Qwen*: the widest lineup, almost all Apache 2.0"
+      - "*DeepSeek*: huge MoEs, strong at reasoning and code"
+      - "*GLM, Kimi*: code, agents and the biggest models"
+      - "*Gemma*: small and mid-size, for a single GPU"
+      - "*gpt-oss*: two MoEs, shipped compressed"
+
+  - type: statement
+    label: License first
+    text: "\"Open\" means different things. For a product, stick to *Apache 2.0 and MIT*."
+    say: Some models have custom licenses with company-size limits, and some image models are non-commercial altogether.
+
+  - type: list
+    label: By budget
+    heading: What fits
+    items:
+      - "*24–32 GB*: Qwen3.6-35B-A3B, Gemma 4 26B, gpt-oss-20b"
+      - "*80–141 GB*: Qwen3.8-27B, Gemma 4 31B, gpt-oss-120b"
+      - "*300–600 GB*: GLM-5.3-Flash, DeepSeek V4.1 Flash on 4–8 GPUs"
+      - "*A terabyte and up*: flagships, that's a cluster"
+    say: The key segment is one server GPU with a twenty-to-thirty-billion model. It covers most tasks.
+
+  - type: list
+    label: By task
+    heading: What to pick
+    items:
+      - "*Labelling and extraction*: a fast MoE with structured output"
+      - "*Chat and knowledge base*: a dense model with long context"
+      - "*Agents*: a model that calls tools reliably"
+      - "*Embeddings and rerankers*: the most underrated use"
+
+  - type: list
+    label: Before renting
+    heading: Test the model on your own examples
+    numbered: true
+    items:
+      - Collect 50–100 real examples with correct answers
+      - Run candidates at a per-token provider
+      - Count the share of correct answers and read the errors
+      - Pick the smallest model that copes
+
+  - type: compare
+    label: Engines
+    heading: What to run it on
+    columns:
+      - title: vLLM
+        pick: true
+        points:
+          - The default choice
+          - Almost every model and GPU
+          - OpenAI-compatible API
+      - title: SGLang
+        points:
+          - Agents and long dialogues
+          - Better shared-prefix cache
+      - title: llama.cpp, Ollama
+        points:
+          - Local, Mac, CPU
+          - Not for server load
+
+  - type: end
+    text: Model and engine chosen. Next, *renting a GPU*.
+    url: balkhaev.com/blog/inference-models
