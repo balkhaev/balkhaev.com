@@ -894,4 +894,4 @@ We checked the whole chain with stubs for the model and Slack:
 
 ## Next
 
-The agent has an interface and can be used. One part remains: taking it to production. Deploying inside the company perimeter, building a proper audit log, checking answer quality with a set of questions and reference answers, and defending against prompt injection in the documents the agent reads.
+The agent has an interface and can be used. [One part remains](/blog/agent-prod/): taking it to production. Deploying inside the company perimeter, building a proper audit log, checking answer quality with a set of questions and reference answers, and defending against prompt injection in the documents the agent reads.
