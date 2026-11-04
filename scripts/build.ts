@@ -79,6 +79,13 @@ const posts = await Promise.all(
     await mkdir(`dist/video/${post.slug}`, { recursive: true });
     await cp(`${base}.mp4`, `dist/${base}.mp4`);
     await cp(`${base}.jpg`, `dist/${base}.jpg`);
+    // A voiced video is longer than its storyboard alone: the render writes
+    // the real length next to it.
+    const meta = file(`${base}.json`);
+    if (await meta.exists()) {
+      const { duration } = (await meta.json()) as { duration?: number };
+      return duration ? { ...post, video: duration } : post;
+    }
     return post;
   })
 );

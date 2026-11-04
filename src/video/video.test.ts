@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { compose, edgeLine, nodeBox, words } from "./compose";
 import { parseStoryboard, sceneDuration, timeline } from "./storyboard";
+import { narration, speakable } from "./voice";
 
 const BOARD = `
 context: Test series
@@ -113,4 +114,54 @@ test("every storyboard in content/blog is valid", async () => {
   for (const board of boards) {
     expect(board.scenes.length).toBeGreaterThan(0);
   }
+});
+
+describe("narration", () => {
+  test("says units and ranges in words", () => {
+    expect(speakable("*24–32 GB*: about $2200, 30–60%", "en")).toBe(
+      "24 to 32 gigabytes: about 2200 dollars, 30 to 60 percent"
+    );
+    expect(speakable("*24–32 ГБ* за 1,5–2×", "ru")).toBe(
+      "от 24 до 32 гигабайт за от 1,5 до 2 раза"
+    );
+  });
+
+  test("builds one line per scene, preferring voice", () => {
+    const board = parseStoryboard(
+      "test.yml",
+      `context: Test
+scenes:
+  - type: title
+    title: "Hello *world*"
+    subtitle: A subtitle
+  - type: compare
+    heading: Pick one
+    columns:
+      - title: A
+        points: [Fast, Cheap]
+      - title: B
+        points: [MCP server]
+  - type: diagram
+    heading: Flow
+    voice: Custom words
+    nodes:
+      - { id: a, label: A, col: 0, row: 0 }
+    edges: []
+`
+    );
+    expect(narration(board, "en")).toEqual([
+      "Hello world. A subtitle.",
+      "Pick one. A: fast, cheap. B: MCP server.",
+      "Custom words",
+    ]);
+  });
+
+  test("a scene gets at least the time its line needs", () => {
+    const board = parseStoryboard(
+      "test.yml",
+      "context: T\nscenes:\n  - type: end\n    text: Bye\n"
+    );
+    expect(timeline(board)[0]?.duration).toBe(4);
+    expect(timeline(board, [9.43])[0]?.duration).toBe(9.5);
+  });
 });

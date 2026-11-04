@@ -4,3 +4,4 @@ dist/
 *.log
 /.video/
 /video/
+__pycache__/
