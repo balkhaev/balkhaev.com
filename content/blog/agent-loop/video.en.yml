@@ -1,0 +1,63 @@
+context: Company AI agent · 3/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 3
+    title: The agent loop *and tools*
+    subtitle: Giving the model tools and writing the harness that turns a chat into an agent.
+
+  - type: statement
+    label: The key idea
+    text: The model doesn't run code. It only *asks* you to call a function.
+    say: We describe tools with a schema, the model replies with a request to call one, we run it and send back the result.
+
+  - type: diagram
+    label: The loop
+    heading: How the agent spins
+    nodes:
+      - { id: user, label: User, col: 0, row: 1, w: 3, step: 0 }
+      - { id: model, label: Model, sub: decides what's next, col: 4, row: 1, w: 4, step: 1, accent: true }
+      - { id: code, label: Your code, sub: runs the tool, col: 4, row: 4, w: 4, step: 2 }
+      - { id: done, label: Answer, col: 9, row: 1, w: 3, step: 3 }
+    edges:
+      - { from: user, to: model }
+      - { from: model, to: code, both: true, label: tool_use / tool_result }
+      - { from: model, to: done, label: end_turn }
+    say: While the model asks for tools, we run them and send the next request. Any other stop reason means the turn is over.
+
+  - type: list
+    label: Tools
+    heading: Four tools for the learning agent
+    items:
+      - "*list_files*: look at a folder"
+      - "*read_file*: read a file"
+      - "*write_file*: write a file, dangerous, asks permission"
+      - "*run_command*: run a command, dangerous, with a timeout"
+
+  - type: list
+    label: Decisions
+    heading: What matters in tools
+    items:
+      - "A path from the model is *untrusted input*: keep it inside the work folder"
+      - "*A tool description is a prompt*: write it as for a colleague"
+      - "*Truncate output*: every character is paid for in every later request"
+      - "*Commands get a timeout*: a dev server never exits"
+
+  - type: list
+    label: Breakdown
+    heading: Rules of the loop
+    numbered: true
+    items:
+      - Put the model's whole reply into history
+      - Send all results in one message
+      - An error is a result too, the model will try another way
+      - A user's refusal doesn't stop the agent
+      - A step limit protects your wallet
+
+  - type: statement
+    label: Takeaway
+    text: An agent is not magic inside the model, it's *a few dozen lines* of your code.
+    say: Claude Code and Cursor work the same way, the difference is details piled up over years. So agent behaviour can be understood, debugged and changed.
+
+  - type: end
+    text: Next we move tools *into MCP servers*.
+    url: balkhaev.com/blog/agent-loop

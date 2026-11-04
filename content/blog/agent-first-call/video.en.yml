@@ -1,0 +1,78 @@
+context: Company AI agent · 2/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 2
+    title: Talking to *a model*
+    subtitle: An API key, the SDK and a terminal chat with streaming and history.
+
+  - type: list
+    label: What an agent is
+    heading: Three parts, marketing aside
+    items:
+      - "*Model*: decides from text what to do next"
+      - "*Tools*: functions in your code the model asks to call"
+      - "*Loop (harness)*: passes history, runs tools, repeats"
+    say: The model is the most expensive and the most replaceable part. Everything interesting happens in the loop, and we write it ourselves.
+
+  - type: list
+    label: Setup
+    heading: Where to start
+    numbered: true
+    items:
+      - Sign up in the provider console and top up the balance
+      - Create an API key
+      - "Put the key in an *environment variable*, not in code or git"
+      - Install the official SDK
+
+  - type: compare
+    label: The response
+    heading: What to look at in every response
+    columns:
+      - title: content
+        points:
+          - A list of blocks, not a string
+          - Text, thinking
+          - Tool calls
+      - title: stop_reason
+        points:
+          - end_turn, finished
+          - max_tokens, hit the limit
+          - tool_use, wants a tool
+      - title: usage
+        pick: true
+        points:
+          - Input tokens
+          - Output tokens
+          - This is what you pay for
+
+  - type: statement
+    label: History
+    text: The API *keeps no conversation*. Every request carries the whole history.
+    say: The model's memory is just an array of messages you grow yourself. So every request costs more than the one before.
+
+  - type: diagram
+    label: The chat
+    heading: How the terminal chat works
+    nodes:
+      - { id: user, label: You, sub: a line in the terminal, col: 0, row: 1, w: 3, step: 0 }
+      - { id: history, label: History, sub: messages array, col: 4, row: 1, w: 4, step: 1, accent: true }
+      - { id: model, label: Model, sub: streams the answer, col: 9, row: 1, w: 3, step: 2 }
+      - { id: usage, label: Token counter, sub: after every answer, col: 4, row: 4, w: 4, step: 3 }
+    edges:
+      - { from: user, to: history, label: question }
+      - { from: history, to: model, both: true, label: whole conversation }
+      - { from: history, to: usage }
+    say: About forty lines. Text prints as it is generated, and the full answer goes back into the history.
+
+  - type: list
+    label: Breakdown
+    heading: Four settings that matter
+    items:
+      - "*system*: role and rules, instructions from the developer"
+      - "*effort*: how deeply the model thinks before answering"
+      - "*Whole reply into history*: service blocks too, or the agent breaks"
+      - "*max_tokens*: a ceiling on length, not a target"
+
+  - type: end
+    text: The model can talk. Next we give it *hands*.
+    url: balkhaev.com/blog/agent-first-call
