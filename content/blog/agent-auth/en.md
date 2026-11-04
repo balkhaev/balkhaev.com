@@ -25,26 +25,19 @@ So permissions are checked neither in the model nor in the prompt, but where the
 
 ## The design
 
-```text
- employee --sign in--> SSO (Keycloak, Entra ID, Okta...)
-                        |
-                        |  token: sub=igor, groups=[sales], aud=company-agent
-                        v
-               +-------------+   token exchange   +-----+
-               |  agent      | -----------------> | SSO |
-               |  (harness)  | <----------------- |     |
-               +------+------+   aud=wiki, 5 min  +-----+
-                      |
-          +-----------+------------+
-          | aud=wiki               | aud=db
-          v                        v
-   +-------------+          +-------------+
-   | wiki MCP    |          | database MCP|
-   | checks the  |          | checks the  |
-   | token,      |          | token,      |
-   | filters by  |          | Postgres    |
-   | group       |          | roles + RLS |
-   +-------------+          +-------------+
+```mermaid
+flowchart TD
+  emp([Employee])
+  sso["<b>SSO</b><br/>Keycloak, Entra ID, Okta…"]
+  agent["<b>Agent</b><br/>harness"]
+  wiki["<b>Wiki MCP</b><br/>checks the token,<br/>filters by group"]
+  db["<b>Database MCP</b><br/>checks the token,<br/>Postgres roles + RLS"]
+  emp -- sign in --> sso
+  sso -- "token<br/>sub=igor, groups=[sales]<br/>aud=company-agent" --> agent
+  agent -- "token exchange" --> sso
+  sso -. "aud=wiki, 5 min" .-> agent
+  agent -- aud=wiki --> wiki
+  agent -- aud=db --> db
 ```
 
 1. The employee signs in through the company SSO. The agent gets a token that says who they are and which groups they belong to.

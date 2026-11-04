@@ -32,29 +32,22 @@ Calling the client, understanding their problem and selling remain a person's jo
 
 ## How it works
 
-```text
-  website form
-       |  POST /forms/lead
-       v
-  intake -> events -> job site.form
-                           |
-                           v
-          +------------ site.form ---------------+
-          |  store the lead, schedule:           |
-          |  lead.notify   now                   |
-          |  lead.qualify  now                   |
-          |  lead.crm      in 2 minutes          |
-          |  lead.remind   in 15 minutes         |
-          +--------------------------------------+
-                |              |            |
-                v              v            v
-          Telegram          Claude:      Bitrix24
-          card              summary,
-                            budget, heat
-                |              |
-                +--> the card is updated
-                       |
-          "I'll take it" -> telegram.callback -> lead assigned
+```mermaid
+flowchart TD
+  form(["Website form"])
+  intake["Intake → events → job site.form"]
+  job["<b>site.form</b><br/>store the lead and schedule:<br/>lead.notify — now<br/>lead.qualify — now<br/>lead.crm — in 2 minutes<br/>lead.remind — in 15 minutes"]
+  card["Telegram card"]
+  claude["<b>Claude</b><br/>summary, budget, heat"]
+  bitrix[Bitrix24]
+  take["“I'll take it” button → telegram.callback"]
+  owner([Lead assigned])
+  form -- "POST /forms/lead" --> intake --> job
+  job -- lead.notify --> card
+  job -- lead.qualify --> claude
+  job -- lead.crm --> bitrix
+  claude -- updates --> card
+  card --> take --> owner
 ```
 
 The key decision: **the card goes out before the model runs**. The model answers in a few seconds, but it may not answer at all: the API is overloaded, a rate limit, the network. If we waited for it, an outage at the model provider would mean the manager never hears about the lead. So the card goes out with the raw text first, and the model fills it in afterwards. Each step is a separate job in the queue with its own retries, and one failing doesn't block the others.

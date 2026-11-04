@@ -15,20 +15,19 @@ tags: [automation, devops, docker, postgres]
 
 ## Что получится
 
-```text
-   GitHub: push в main
-          |
-          v
-   GitHub Actions: проверка типов -> сборка образа -> push в ghcr.io
-          |
-          |  ssh deploy@сервер ./deploy.sh <commit>
-          v
-  +-------------------- VPS -----------------------------------+
-  |                                                            |
-  |  :443  caddy  -->  app (Bun, :3000)  -->  db (Postgres)    |
-  |        HTTPS                              том pgdata       |
-  |                                                            |
-  +------------------------------------------------------------+
+```mermaid
+flowchart TD
+  push(["GitHub: push в main"])
+  ci["<b>GitHub Actions</b><br/>проверка типов → сборка образа → push в ghcr.io"]
+  push --> ci
+  ci -- "ssh deploy@сервер ./deploy.sh &lt;commit&gt;" --> caddy
+  subgraph vps [VPS]
+    direction LR
+    caddy["<b>caddy</b><br/>:443, HTTPS"]
+    app["<b>app</b><br/>Bun, :3000"]
+    db[("<b>db</b><br/>Postgres, том pgdata")]
+    caddy --> app --> db
+  end
 ```
 
 Структура репозитория к концу части:

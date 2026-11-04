@@ -944,3 +944,17 @@ summary:focus-visible {
     text-align: left;
   }
 }
+
+/* Diagrams: ```mermaid rendered to inline SVG at build time. */
+.prose .diagram {
+  margin: 1.6em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+.prose .diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose .diagram .edge-label text {
+  fill: var(--ink-2);
+}

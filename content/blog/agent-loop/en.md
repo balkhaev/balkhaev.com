@@ -45,8 +45,16 @@ You run the function and send the next request, appending the model's reply and 
 
 The model reads the result and decides what comes next: another tool or an answer. That is the agent loop. Every coding agent, from Claude Code to Cursor, is built on top of it.
 
-```text
-user → model → tool_use → your code → tool_result → model → … → end_turn
+```mermaid
+flowchart LR
+  user([User])
+  model[Model]
+  code[Your code]
+  done([Answer])
+  user --> model
+  model -- tool_use --> code
+  code -- tool_result --> model
+  model -- end_turn --> done
 ```
 
 ## Step 1. Tools

@@ -15,20 +15,19 @@ This is the second part of the series on commercial automations. In the [first o
 
 ## What we end up with
 
-```text
-   GitHub: push to main
-          |
-          v
-   GitHub Actions: type check -> build image -> push to ghcr.io
-          |
-          |  ssh deploy@server ./deploy.sh <commit>
-          v
-  +-------------------- VPS -----------------------------------+
-  |                                                            |
-  |  :443  caddy  -->  app (Bun, :3000)  -->  db (Postgres)    |
-  |        HTTPS                              pgdata volume    |
-  |                                                            |
-  +------------------------------------------------------------+
+```mermaid
+flowchart TD
+  push(["GitHub: push to main"])
+  ci["<b>GitHub Actions</b><br/>type check → build image → push to ghcr.io"]
+  push --> ci
+  ci -- "ssh deploy@server ./deploy.sh &lt;commit&gt;" --> caddy
+  subgraph vps [VPS]
+    direction LR
+    caddy["<b>caddy</b><br/>:443, HTTPS"]
+    app["<b>app</b><br/>Bun, :3000"]
+    db[("<b>db</b><br/>Postgres, pgdata volume")]
+    caddy --> app --> db
+  end
 ```
 
 The repository layout by the end of the part:

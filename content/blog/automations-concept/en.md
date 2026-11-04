@@ -90,28 +90,28 @@ In this series we write our own code, because each of the four automations hits 
 
 ## Architecture
 
-```text
-  website   payments    email / Telegram     schedule
-     |           |              |                 |
-     v           v              v                 v
-  +--------------------------------------------------------+
-  |  event intake (HTTP)                                   |
-  |  verifies the signature, stores the event, returns 200 |
-  +---------------------------+----------------------------+
-                              |
-                              v
-  +--------------------------------------------------------+
-  |  Postgres                                              |
-  |  events  |  job queue  |  state (leads, invoices)      |
-  +---------------------------+----------------------------+
-                              |
-                              v
-  +--------------------------------------------------------+
-  |  worker: takes a job, runs it, retries on failure      |
-  +-----+-------------+-------------+-------------+--------+
-        |             |             |             |
-        v             v             v             v
-    Telegram         CRM         payments     model (Claude)
+```mermaid
+flowchart TD
+  site[Website]
+  pay[Payments]
+  mail[Email / Telegram]
+  cron[Schedule]
+  intake["<b>Event intake (HTTP)</b><br/>verifies the signature, stores the event, returns 200"]
+  db[("<b>Postgres</b><br/>events · job queue · state (leads, invoices)")]
+  worker["<b>Worker</b><br/>takes a job, runs it, retries on failure"]
+  tg[Telegram]
+  crm[CRM]
+  pay2[Payments]
+  llm["Model (Claude)"]
+  site --> intake
+  pay --> intake
+  mail --> intake
+  cron --> intake
+  intake --> db --> worker
+  worker --> tg
+  worker --> crm
+  worker --> pay2
+  worker --> llm
 ```
 
 **Event intake.** A small HTTP server. Everything that comes from outside (a form submission, a payment webhook, a message to the bot) is verified, stored in the database and acknowledged immediately. No business logic at intake time: if the CRM is down at this exact second, we must not lose the lead.

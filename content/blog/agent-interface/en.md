@@ -23,23 +23,22 @@ In earlier parts the agent lived in a terminal and took the employee's token fro
 
 ## The design
 
-```text
-  browser ----- /login, /callback ------> SSO
-     |  cookie sid
-     v
-  +----------------------------------+        +-----------+
-  | web.ts                           |        |  Slack    |
-  |  sign-in, sessions, /api/chat    | <----- |  events   |
-  |  slack.ts: /slack/events         | -----> |  replies  |
-  +----------------+-----------------+        +-----------+
-                   |  ask(user, conversation, text, events)
-                   v
-  +----------------------------------+
-  | agent-core.ts                    |
-  |  loop, cache, limits (parts 3-7) | ---> MCP: wiki, database
-  +----------------+-----------------+
-                   v
-             store.db: accounts, conversations
+```mermaid
+flowchart TD
+  browser([Browser])
+  sso[SSO]
+  slack([Slack])
+  web["<b>web.ts</b><br/>sign-in, sessions, /api/chat (SSE)<br/>slack.ts: /slack/events"]
+  core["<b>agent-core.ts</b><br/>loop, cache, limits (parts 3–7)"]
+  mcp["MCP: wiki, database"]
+  store[("store.db<br/>accounts, conversations")]
+  browser -- "/login, /callback" --> sso
+  browser -- "cookie sid" --> web
+  slack -- events --> web
+  web -- replies --> slack
+  web -- "ask(user, conversation, text, events)" --> core
+  core --> mcp
+  core --> store
 ```
 
 ## The core, separate from the interface

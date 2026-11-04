@@ -40,20 +40,21 @@ A different approach works: the model knows nothing in advance but knows how to 
 
 ## What the agent is made of
 
-```text
-                employee
-                    |  question (Slack, web chat)
-                    v
-      +---------------------------+         +-----------------+
-      |  our service (harness)    | <-----> |  model via API  |
-      |  history, loop, logs      |         |  (Claude)       |
-      +-------------+-------------+         +-----------------+
-                    |  tools (MCP) + the employee's token
-     +--------------+-------+-------------+-----------+
-     |              |       |             |           |
-     v              v       v             v           v
- document        database  issue          CRM         git
- search                    tracker
+```mermaid
+flowchart TD
+  emp([Employee])
+  harness["<b>Our service (harness)</b><br/>history, loop, logs"]
+  model["<b>Model via API</b><br/>Claude"]
+  subgraph tools ["Tools (MCP) + the employee's token"]
+    search[Document search]
+    db[(Database)]
+    tracker[Issue tracker]
+    crm[CRM]
+    git[git]
+  end
+  emp -- "question (Slack, web chat)" --> harness
+  harness <--> model
+  harness --> tools
 ```
 
 **The model.** Commercial, over an API. It understands the question, picks tools and writes the answer. We do not train it and can swap it easily. We use Claude here, but the architecture is not tied to a provider.

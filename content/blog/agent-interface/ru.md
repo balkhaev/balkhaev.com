@@ -23,23 +23,22 @@ tags: [agents, oauth, slack, web]
 
 ## Схема
 
-```text
-  браузер ----- /login, /callback ------> SSO
-     |  cookie sid
-     v
-  +----------------------------------+        +-----------+
-  | web.ts                           |        |  Slack    |
-  |  вход, сессии, /api/chat (SSE)   | <----- |  события  |
-  |  slack.ts: /slack/events         | -----> |  ответы   |
-  +----------------+-----------------+        +-----------+
-                   |  ask(user, conversation, text, events)
-                   v
-  +----------------------------------+
-  | agent-core.ts                    |
-  |  цикл, кэш, лимиты (части 3-7)   | ---> MCP: вики, база
-  +----------------+-----------------+
-                   v
-             store.db: учётки, разговоры
+```mermaid
+flowchart TD
+  browser([Браузер])
+  sso[SSO]
+  slack([Slack])
+  web["<b>web.ts</b><br/>вход, сессии, /api/chat (SSE)<br/>slack.ts: /slack/events"]
+  core["<b>agent-core.ts</b><br/>цикл, кэш, лимиты (части 3–7)"]
+  mcp["MCP: вики, база"]
+  store[("store.db<br/>учётки, разговоры")]
+  browser -- "/login, /callback" --> sso
+  browser -- "cookie sid" --> web
+  slack -- события --> web
+  web -- ответы --> slack
+  web -- "ask(user, conversation, text, events)" --> core
+  core --> mcp
+  core --> store
 ```
 
 ## Ядро отдельно от интерфейса
