@@ -119,4 +119,4 @@ Connecting it to a product is no different from connecting to OpenAI: the same r
 
 ## What's next
 
-In the next part we learn to choose a GPU. We look at why the main thing about it is the size and speed of its memory rather than raw compute, how to estimate how much memory a model and its context will take, and which weight formats (FP8, FP4, GGUF) work on which GPUs.
+In the [next part](/blog/inference-gpu/) we learn to choose a GPU. We look at why the main thing about it is the size and speed of its memory rather than raw compute, how to estimate how much memory a model and its context will take, and which weight formats (FP8, FP4, GGUF) work on which GPUs.
