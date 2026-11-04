@@ -684,4 +684,4 @@ The teaching provider is replaced by the corporate one, and almost all the code 
 
 ## Next
 
-The agent works with the employee's permissions and gives away nothing extra. But every question costs money: the context carries the system prompt, tool descriptions, the conversation history and everything the tools returned, and long conversations run into the context window. The next part covers prompt caching, compacting history, per-employee limits and how to work out what the agent costs.
+The agent works with the employee's permissions and gives away nothing extra. But every question costs money: the context carries the system prompt, tool descriptions, the conversation history and everything the tools returned, and long conversations run into the context window. The [next part](/blog/agent-cost/) covers prompt caching, compacting history, per-employee limits and how to work out what the agent costs.
