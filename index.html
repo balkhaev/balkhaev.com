@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
-    <meta content="#0b0a09" name="theme-color">
+    <meta content="#efece6" name="theme-color">
     <meta
       content="Михаил Бальхаев, ML-инженер в генеративном AI. Блог о машинном обучении, проекты и резюме."
       name="description"
@@ -26,7 +26,7 @@
     <link
       as="font"
       crossorigin
-      href="/fonts/source-serif-4-cyrillic-opsz-normal.woff2"
+      href="/cv/fonts/plex-cyrillic.woff2"
       rel="preload"
       type="font/woff2"
     >
@@ -34,30 +34,27 @@
     <title>Михаил Бальхаев · balkhaev</title>
   </head>
   <body id="top">
-    <header class="site-bar">
-      <a class="brand" href="/">balkhaev<span aria-hidden="true">.</span></a>
-      <nav aria-label="Разделы" class="site-nav">
-        <a href="/blog/ru/">Блог</a>
-        <a href="/cv/ru/">Резюме</a>
-        <a
-          href="https://t.me/balkhaev"
-          rel="noopener noreferrer"
-          target="_blank"
-          >Telegram</a
-        >
-      </nav>
-    </header>
-    <main class="home">
-      <section aria-labelledby="hero-title" class="hero">
-        <canvas aria-hidden="true" class="lens" id="lens"></canvas>
-        <div aria-hidden="true" class="poster-fallback">
-          <span>МИХАИЛ</span><span>БАЛЬХАЕВ</span><em>генеративный ai</em>
-        </div>
-        <h1 class="visually-hidden" id="hero-title">
-          Михаил Бальхаев, ML-инженер в генеративном AI
-        </h1>
-        <div class="hole-anchor" id="hole-anchor">
-          <div class="portal-frame">
+    <div class="page">
+      <header class="topbar">
+        <a class="topbar-site" href="/">balkhaev.com</a>
+        <span class="topbar-role">ML-инженер · генеративный AI · Москва</span>
+        <nav aria-label="Разделы" class="topbar-nav">
+          <a href="/blog/ru/">Блог</a>
+          <a href="/cv/ru/">Резюме</a>
+          <a
+            href="https://t.me/balkhaev"
+            rel="noopener noreferrer"
+            target="_blank"
+            >Telegram</a
+          >
+        </nav>
+      </header>
+      <main>
+        <section aria-labelledby="hero-title" class="masthead">
+          <h1 id="hero-title">
+            <span class="visually-hidden">Михаил </span>Бальхаев
+          </h1>
+          <div class="hole-anchor" id="hole-anchor">
             <section
               aria-label="Падение в чёрную дыру"
               class="scene"
@@ -450,132 +447,90 @@
               </button>
             </section>
           </div>
-        </div>
-        <div class="hero-bottom">
-          <p class="hero-copy reveal" style="--i: 1">
-            <span class="hero-kicker">ML-инженер · Москва</span>
+        </section>
+        <section aria-label="Обо мне" class="lead">
+          <p>
             Делаю продукты на генеративных моделях: диффузия для фото и видео,
             синтез речи, LLM-агенты и GPU-инфраструктура под них.
           </p>
-          <p class="actions reveal" style="--i: 2">
-            <a class="action primary" href="/blog/ru/"
+          <p class="lead-actions">
+            <a class="pill accent" href="/blog/ru/"
               >Читать блог <span aria-hidden="true">→</span></a
             >
             <a
-              class="action"
+              class="pill"
               href="https://t.me/balkhaev"
               rel="noopener noreferrer"
               target="_blank"
               >Telegram <span aria-hidden="true">↗</span></a
             >
           </p>
-        </div>
-      </section>
-
-      <div aria-hidden="true" class="marquee">
-        <div class="marquee-track">
-          <span
-            >Диффузия ✦ LLM-агенты ✦ Синтез речи ✦ GPU-инференс ✦ LoRA ✦ RAG ✦
-            ComfyUI ✦ vLLM ✦ MCP ✦&nbsp;</span
-          >
-          <span
-            >Диффузия ✦ LLM-агенты ✦ Синтез речи ✦ GPU-инференс ✦ LoRA ✦ RAG ✦
-            ComfyUI ✦ vLLM ✦ MCP ✦&nbsp;</span
-          >
-        </div>
-        <div class="marquee-track reverse">
-          <span
-            >Qwen Image ✦ Wan 2.2 ✦ Whisper ✦ Kokoro ✦ Claude ✦ Grok ✦ Three.js
-            ✦ WebGL ✦ Unreal ✦&nbsp;</span
-          >
-          <span
-            >Qwen Image ✦ Wan 2.2 ✦ Whisper ✦ Kokoro ✦ Claude ✦ Grok ✦ Three.js
-            ✦ WebGL ✦ Unreal ✦&nbsp;</span
-          >
-        </div>
-      </div>
-
-      <section aria-labelledby="blog-title" class="block">
-        <header class="block-head">
-          <span class="block-index">01</span>
-          <h2 id="blog-title">Блог</h2>
-          <p class="block-note">
-            Агенты, генеративные модели и инженерия вокруг них
-          </p>
-        </header>
-        <div class="block-body">
-          <!-- home:posts -->
-          <p class="block-more">
-            <a href="/blog/ru/">Все записи <span aria-hidden="true">→</span></a>
-            <a href="/blog/ru/atom.xml">RSS</a>
-            <a href="/blog/" hreflang="en" lang="en">In English</a>
-          </p>
-        </div>
-      </section>
-
-      <section aria-labelledby="projects-title" class="block">
-        <header class="block-head">
-          <span class="block-index">02</span>
-          <h2 id="projects-title">Проекты</h2>
-          <p class="block-note">То, что можно открыть и потрогать</p>
-        </header>
-        <div class="block-body">
-          <!-- home:projects -->
-        </div>
-      </section>
-
-      <section aria-labelledby="experience-title" class="block">
-        <header class="block-head">
-          <span class="block-index">03</span>
-          <h2 id="experience-title">Опыт</h2>
-          <p class="block-note">ML с 2024 года, до этого 13 лет в вебе</p>
-        </header>
-        <div class="block-body">
-          <!-- home:experience -->
-          <p class="block-more">
-            <a href="/cv/ru/"
-              >Полное резюме <span aria-hidden="true">→</span></a
-            >
-            <a href="/cv/balkhaev-cv-ru.pdf">PDF</a>
-          </p>
-        </div>
-      </section>
-
-      <section aria-labelledby="contacts-title" class="contacts" id="contacts">
-        <h2 id="contacts-title">Связаться</h2>
-        <ul class="contact-list">
-          <li>
-            <a
-              class="contact-main"
-              href="https://t.me/balkhaev"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <span class="contact-label">Telegram</span>
-              <span class="contact-value"
-                >@balkhaev <span aria-hidden="true">↗</span></span
+        </section>
+        <div class="columns">
+          <section aria-labelledby="blog-title" class="column">
+            <h2 id="blog-title">
+              <span>01 Блог</span
+              ><a class="column-link" href="/blog/ru/"
+                >Все <span aria-hidden="true">→</span></a
               >
-            </a>
-          </li>
-          <li>
-            <a href="mailto:m.balkhaev@gmail.com">
-              <span class="contact-label">Почта</span>
-              <span class="contact-value">m.balkhaev@gmail.com</span>
-            </a>
-          </li>
-          <li>
-            <a href="/cv/ru/">
-              <span class="contact-label">Резюме</span>
-              <span class="contact-value">balkhaev.com/cv</span>
-            </a>
-          </li>
-        </ul>
-      </section>
-    </main>
-    <footer class="site-foot">
-      <span>© 2026 Михаил Бальхаев</span>
-      <a href="#top">Наверх <span aria-hidden="true">↑</span></a>
-    </footer>
+            </h2>
+            <!-- home:posts -->
+          </section>
+          <section aria-labelledby="projects-title" class="column">
+            <h2 id="projects-title"><span>02 Проекты</span><span>5</span></h2>
+            <!-- home:projects -->
+          </section>
+          <section aria-labelledby="experience-title" class="column">
+            <h2 id="experience-title">
+              <span>03 Опыт</span
+              ><a class="column-link" href="/cv/ru/"
+                >Резюме <span aria-hidden="true">→</span></a
+              >
+            </h2>
+            <!-- home:experience -->
+          </section>
+        </div>
+        <section
+          aria-labelledby="contacts-title"
+          class="contacts"
+          id="contacts"
+        >
+          <h2 id="contacts-title">04 Связаться</h2>
+          <ul class="contact-list">
+            <li>
+              <a
+                class="contact-main"
+                href="https://t.me/balkhaev"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <span class="contact-label">Telegram</span>
+                <span class="contact-value"
+                  >@balkhaev <span aria-hidden="true">↗</span></span
+                >
+              </a>
+            </li>
+            <li>
+              <a href="mailto:m.balkhaev@gmail.com">
+                <span class="contact-label">Почта</span>
+                <span class="contact-value">m.balkhaev@gmail.com</span>
+              </a>
+            </li>
+            <li>
+              <a href="/cv/balkhaev-cv-ru.pdf">
+                <span class="contact-label">Резюме</span>
+                <span class="contact-value">PDF</span>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+      <footer class="site-foot">
+        <span>© 2026 Михаил Бальхаев</span>
+        <a href="/blog/" hreflang="en" lang="en">Blog in English</a>
+        <a href="#top">Наверх <span aria-hidden="true">↑</span></a>
+      </footer>
+    </div>
     <script src="/app.js" type="module"></script>
   </body>
 </html>

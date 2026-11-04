@@ -1,4 +1,3 @@
-import { startLens } from "./home/lens";
 import {
   createHoleRenderer,
   type HoleRenderer,
@@ -621,22 +620,4 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
 
 if (canvas && control) {
   start(canvas, control);
-}
-
-const lensCanvas = document.querySelector<HTMLCanvasElement>("#lens");
-const hero = document.querySelector<HTMLElement>(".hero");
-const holeAnchor = document.querySelector<HTMLElement>("#hole-anchor");
-if (lensCanvas && hero && holeAnchor) {
-  const root = document.documentElement;
-  const lens = startLens(
-    lensCanvas,
-    hero,
-    holeAnchor,
-    () => !root.classList.contains("scene-expanded")
-  );
-  if (lens) {
-    new MutationObserver(lens.resume).observe(root, {
-      attributeFilter: ["class"],
-    });
-  }
 }
