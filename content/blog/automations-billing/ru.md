@@ -40,27 +40,32 @@ tags: [automation, payments, yookassa, idempotency]
 
 ## Как это устроено
 
-```text
- /invoice в чате -> заказ (pending) -> письмо со ссылкой /pay/<id>
-                                              |
-          клиент нажал ссылку                 v
-          GET /pay/<id> -----> живой платёж ЮKassa есть? -> редирект на него
-                               нет или отменён? -> создать новый (Idempotence-Key)
-                                              |
-                                              v
-                                     клиент платит в ЮKassa
-                                              |
-   уведомление ЮKassa  ------+                |
-   сверка раз в час    ------+--> payment.check: GET /payments/<id>
-   возврат клиента на /pay --+                |
-                                              v
-                 markPaid: update ... where status = 'pending'
-                                              |  (только первый раз)
-                                              v
-                                       order.fulfill
-                          +-------------------+-------------------+
-                          v                                       v
-                  письмо с доступом                       «💰» в чат
+```mermaid
+flowchart TD
+  invoice(["/invoice в чате"])
+  order["Заказ (pending)<br/>письмо со ссылкой /pay/&lt;id&gt;"]
+  pay["<b>GET /pay/&lt;id&gt;</b><br/>живой платёж ЮKassa есть — редирект на него<br/>нет или отменён — создать новый (Idempotence-Key)"]
+  client["Клиент платит в ЮKassa"]
+  notify[Уведомление ЮKassa]
+  hourly[Сверка раз в час]
+  back[Возврат клиента на /pay]
+  check["<b>payment.check</b><br/>GET /payments/&lt;id&gt;"]
+  mark["<b>markPaid</b><br/>update … where status = 'pending'"]
+  fulfill[order.fulfill]
+  mail[Письмо с доступом]
+  chat["«💰» в чат"]
+  invoice --> order
+  order -- клиент нажал ссылку --> pay
+  pay --> client
+  client --> notify
+  client --> back
+  notify --> check
+  hourly --> check
+  back --> check
+  check --> mark
+  mark -- только первый раз --> fulfill
+  fulfill --> mail
+  fulfill --> chat
 ```
 
 ## Шаг 1. Таблицы

@@ -17,11 +17,14 @@ In the [previous part](/blog/agent-auth/) the agent learned to work with the emp
 
 The model API does not store the conversation. Every request carries everything the model needs to know: tool descriptions, the system prompt and the whole history, including the results of earlier calls. In the agent loop from [part 3](/blog/agent-loop/), one question means several requests in a row, each longer than the one before:
 
-```text
-step 1:  [tools + prompt] [question]
-step 2:  [tools + prompt] [question] [call 1] [result 1]
-step 3:  [tools + prompt] [question] [call 1] [result 1] [call 2] [result 2]
-step 4:  [tools + prompt] [question] [call 1] [result 1] ... [result 3] -> answer
+```mermaid
+flowchart TD
+  s1["<b>Step 1</b><br/>tools + prompt · question"]
+  s2["<b>Step 2</b><br/>tools + prompt · question · call 1 · result 1"]
+  s3["<b>Step 3</b><br/>tools + prompt · question · call 1 · result 1 · call 2 · result 2"]
+  s4["<b>Step 4</b><br/>tools + prompt · question · call 1 · result 1 · … · result 3"]
+  ans([Answer])
+  s1 --> s2 --> s3 --> s4 --> ans
 ```
 
 The result of the first call is paid for on the second step, on the third, on the fourth and beyond, on every step of every later question in the conversation. Input grows with each step, and the total paid for a conversation grows roughly with the square of its length.
