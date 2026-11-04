@@ -26,7 +26,7 @@ To keep the examples concrete, take a typical small company that sells a service
 
 It could be an online school, a studio, a SaaS product or an agency. The industry does not matter much: the processes look alike.
 
-::news{topic="automation agents"}
+::news{topic="automation"}
 
 ## Where a business loses money
 

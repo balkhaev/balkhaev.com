@@ -18,7 +18,7 @@ Over the last year open models stopped being "almost GPT, only worse". Qwen, Dee
 
 It is easy to conclude from this that "we'll run our own model and save money". In this series we work out when that is true, and go all the way from choosing a GPU to a running endpoint you can plug into your product instead of a commercial API.
 
-::news{topic="inference open-models"}
+::news{topic="open-models"}
 
 ## Two ways to pay
 

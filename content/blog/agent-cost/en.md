@@ -50,7 +50,7 @@ Let's price a typical conversation. Tools and prompt take 1500 tokens. For each 
 
 Output is expensive per token, but in a long conversation you pay for input: by the tenth question every step sends almost 80 thousand tokens of history. So almost everything in this part is about input.
 
-::news{topic="cost llm-api"}
+::news{topic="cost"}
 
 ## Measure first
 

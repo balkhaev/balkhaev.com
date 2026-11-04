@@ -35,7 +35,7 @@ Both platforms solve the same problem: give you a GPU with a Docker container on
 
 Prices here are guidelines as of early November 2026. Fresh numbers and notable changes in the rental market show up in the feed below.
 
-::news{topic="inference cost"}
+::news{topic="gpu"}
 
 ## Rental types
 

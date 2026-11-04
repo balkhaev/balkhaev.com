@@ -31,7 +31,7 @@ That is the part of the job we take over:
 
 Calling the client, understanding their problem and selling remain a person's job. But they start a minute after the lead arrives, with the request already parsed, not three hours later.
 
-::news{topic="automation llm-api"}
+::news{topic="automation"}
 
 ## How it works
 

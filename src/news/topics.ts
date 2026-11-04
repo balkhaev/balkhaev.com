@@ -78,6 +78,23 @@ export const TOPICS = {
       "меньше вычислен",
     ],
   },
+  gpu: {
+    label: { en: "GPUs and chips", ru: "GPU и чипы" },
+    words: [
+      "GPU",
+      "видеокарт",
+      "чип",
+      "chip",
+      "ускорител",
+      "accelerator",
+      "TPU",
+      "H100",
+      "B200",
+      "NVIDIA",
+      "Cerebras",
+      "Groq",
+    ],
+  },
   inference: {
     label: { en: "Inference", ru: "Инференс" },
     words: [
@@ -122,6 +139,20 @@ export const TOPICS = {
   mcp: {
     label: { en: "MCP", ru: "MCP" },
     words: ["MCP!", "Model Context Protocol", "коннектор", "connector"],
+  },
+  media: {
+    label: { en: "Images and video", ru: "Картинки и видео" },
+    words: [
+      "изображен",
+      "картин",
+      "image",
+      "видео",
+      "video",
+      "ComfyUI",
+      "FLUX",
+      "Stable Diffusion",
+      "3D",
+    ],
   },
   "open-models": {
     label: { en: "Open models", ru: "Открытые модели" },
@@ -173,6 +204,20 @@ export const TOPICS = {
       "privacy",
     ],
   },
+  voice: {
+    label: { en: "Voice", ru: "Голос" },
+    words: [
+      "голос",
+      "voice",
+      "речи",
+      "речь",
+      "speech",
+      "TTS!",
+      "ASR!",
+      "транскри",
+      "transcri",
+    ],
+  },
 } satisfies Record<string, Topic>;
 
 export type TopicId = keyof typeof TOPICS;
@@ -195,16 +240,24 @@ const MATCHERS = Object.fromEntries(
   ])
 ) as Record<TopicId, RegExp>;
 
-/** How many topic words a story mentions; the title counts double. */
+/**
+ * How well a story fits the topics; 0 means it does not. A story tagged by
+ * hand fits when it shares a tag. An untagged one must name a topic word in
+ * its title: a word only in the text is too often a passing mention.
+ */
 export function score(story: Story, topics: TopicId[]) {
+  if (story.topics) {
+    return 10 * topics.filter((id) => story.topics?.includes(id)).length;
+  }
   let total = 0;
+  let titled = false;
   for (const id of topics) {
     const matcher = MATCHERS[id];
-    total +=
-      2 * (story.title.match(matcher)?.length ?? 0) +
-      (story.text.match(matcher)?.length ?? 0);
+    const inTitle = story.title.match(matcher)?.length ?? 0;
+    titled ||= inTitle > 0;
+    total += 2 * inTitle + (story.text.match(matcher)?.length ?? 0);
   }
-  return total;
+  return titled ? total : 0;
 }
 
 export interface Pick {
@@ -223,6 +276,15 @@ export const NEAR_DAYS = 60;
 const DAY = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** A small stable string hash: the same slug always picks the same slice. */
+function hash(text: string) {
+  let value = 7;
+  for (const char of text) {
+    value = (value * 31 + (char.codePointAt(0) ?? 0)) % 1_000_003;
+  }
+  return value;
+}
+
 const distance = (a: string, b: string) =>
   Math.abs(Date.parse(a) - Date.parse(b)) / DAY;
 
@@ -230,15 +292,19 @@ const distance = (a: string, b: string) =>
  * Stories for a widget: those that mention the topics, newest edition first
  * and the stronger match first within an edition. With `near` (a post's date),
  * matches within NEAR_DAYS of it come first, closest first, then the other
- * matches. With no
- * match at all, the newest stories (near the date when there are any), so the
- * widget is never empty.
+ * matches. With no match the list is empty and the widget stays hidden.
  */
 export function pickStories(
   issues: Issue[],
   topics: TopicId[],
   limit: number,
-  near?: string
+  near?: string,
+  /**
+   * Any stable string, such as a post slug. Without stories near the date,
+   * it picks which slice of the top matches to show, so posts on one topic
+   * do not all show the same three stories.
+   */
+  seed?: string
 ): Picked {
   const all = [...issues]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -268,19 +334,19 @@ export function pickStories(
           ? b.points - a.points || a.order - b.order
           : b.item.date.localeCompare(a.item.date))
     );
-  if (scored.length) {
-    return {
-      matched: true,
-      stories: scored.slice(0, limit).map(({ item }) => item),
-    };
+  if (scored.length === 0) {
+    return { matched: false, stories: [] };
   }
-  const nearby = unique
-    .filter(close)
-    .sort((a, b) =>
-      near ? distance(a.date, near) - distance(b.date, near) : 0
-    );
-  return {
-    matched: false,
-    stories: (nearby.length ? nearby : unique).slice(0, limit),
-  };
+  const nearFirst = scored[0] && close(scored[0].item);
+  const pool = scored.slice(0, limit * 3);
+  const windows = Math.ceil(pool.length / limit);
+  const start = seed && !nearFirst ? (hash(seed) % windows) * limit : 0;
+  const chosen = [...pool.slice(start), ...pool.slice(0, start)].slice(
+    0,
+    limit
+  );
+  if (start) {
+    chosen.sort((a, b) => b.item.date.localeCompare(a.item.date));
+  }
+  return { matched: true, stories: chosen.map(({ item }) => item) };
 }

@@ -1088,3 +1088,7 @@ summary:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+.prose .news-widget[hidden] {
+  display: none;
+}

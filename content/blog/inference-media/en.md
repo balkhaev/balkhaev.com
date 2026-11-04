@@ -20,7 +20,7 @@ So instead of an engine like vLLM, people use a pipeline builder. The most commo
 
 One more difference: images and video don't benefit from batching as much as text does. A single generation usually occupies the whole GPU for seconds or minutes. So here it is more convenient to count seconds per generation rather than tokens.
 
-::news{topic="open-models inference"}
+::news{topic="media"}
 
 ## Which models to use now
 

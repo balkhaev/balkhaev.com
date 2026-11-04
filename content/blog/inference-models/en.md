@@ -28,7 +28,7 @@ The main families come from a handful of companies, each with a line-up from sma
 
 The news feed below is a handy way to follow fresh releases: it picks stories about open weights and inference.
 
-::news{topic="open-models inference"}
+::news{topic="open-models"}
 
 ## Licence first
 

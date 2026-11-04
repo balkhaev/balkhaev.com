@@ -73,7 +73,12 @@ function remarkNews() {
   };
 }
 
-function rehypeNews(lang: string, found: Collected, date?: string) {
+function rehypeNews(
+  lang: string,
+  found: Collected,
+  date?: string,
+  seed?: string
+) {
   return () => (tree: HastRoot) => {
     visit(tree, "element", (node: Element, index, parent) => {
       if (node.tagName !== NEWS || !parent || index === undefined) {
@@ -89,7 +94,8 @@ function rehypeNews(lang: string, found: Collected, date?: string) {
           limit,
           lang === "ru" ? "ru" : "en",
           nearDate(date),
-          mergeIssues([])
+          mergeIssues([]),
+          seed
         ),
       });
     });
@@ -178,7 +184,9 @@ export async function renderMarkdown(
   source: string,
   lang = "en",
   /** The post's date: its news widgets prefer stories from around then. */
-  date?: string
+  date?: string,
+  /** The post's slug: posts on one topic show different stories. */
+  seed?: string
 ): Promise<Rendered> {
   const found: Collected = { errors: [], math: false, news: false, toc: [] };
   const file = await unified()
@@ -202,7 +210,7 @@ export async function renderMarkdown(
     })
     .use(rehypeSlug)
     .use(rehypeCollect(lang, found))
-    .use(rehypeNews(lang, found, date))
+    .use(rehypeNews(lang, found, date, seed))
     // Only the build-time diagram SVG is raw here: Markdown HTML was dropped
     // by remark-rehype above.
     .use(rehypeStringify, { allowDangerousHtml: true })

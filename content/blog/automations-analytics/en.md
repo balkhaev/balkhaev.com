@@ -27,7 +27,7 @@ In a small company the analyst is usually the owner, opening the CRM, the paymen
 | notice that support is falling behind | an alert when five tickets wait over 4 hours |
 | realize the problem is over | a "✅ back to normal" message with the duration |
 
-::news{topic="automation llm-api"}
+::news{topic="automation"}
 
 ## The main rule: SQL does the numbers
 

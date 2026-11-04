@@ -35,7 +35,7 @@ What this buys us:
 - **Reuse.** The same server plugs into Claude Desktop, Claude Code or Cursor. Employees can use it without our agent.
 - **Isolation.** Only the MCP server process knows the database password, not the agent and certainly not the model.
 
-::news{topic="mcp agents"}
+::news{topic="mcp"}
 
 ## Step 1. A demo company database
 

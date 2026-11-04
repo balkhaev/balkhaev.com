@@ -28,7 +28,7 @@ tags: [inference, open-source, llm]
 
 Свежие релизы удобно смотреть в ленте новостей ниже: она подбирает новости про открытые веса и инференс.
 
-::news{topic="open-models inference"}
+::news{topic="open-models"}
 
 ## Сначала лицензия
 
