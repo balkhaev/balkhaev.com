@@ -301,4 +301,4 @@ In practice a mix works well: narrow tools for frequent and important questions 
 
 ## Next
 
-The agent can now answer questions about structured data. But most of a company's knowledge is not in tables, it is in text: the wiki, policies, contracts, meeting notes. In the next part we teach the agent to search documents.
+The agent can now answer questions about structured data. But most of a company's knowledge is not in tables, it is in text: the wiki, policies, contracts, meeting notes. In [the next part](/blog/agent-search/) we teach the agent to search documents.
