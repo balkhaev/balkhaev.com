@@ -1,7 +1,8 @@
 ---
 title: "Permissions: SSO, OAuth and an agent acting on behalf of an employee"
 description: The agent gets the employee's token from the company SSO, exchanges it for short-lived tokens for each system, and the wiki and the database themselves cut out whatever that person must not see.
-date: 2026-11-04
+date: 2025-07-08
+updated: 2026-11-04
 series: company-agent
 part: 6
 tags: [agents, security, oauth, mcp, postgres]

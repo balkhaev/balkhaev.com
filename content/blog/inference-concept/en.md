@@ -1,7 +1,8 @@
 ---
 title: "Concept: when your own model beats an API"
 description: When it makes sense to run an open model on a rented GPU and when paying per token is cheaper. A simple break-even formula and the plan for the series.
-date: 2026-11-04
+date: 2026-02-10
+updated: 2026-11-04
 series: inference
 part: 1
 tags: [inference, gpu, open-source]

@@ -1,7 +1,8 @@
 ---
 title: "Replacing the salesperson: lead, qualification and a manager in a minute"
 description: The first real automation of the series. A website lead reaches a manager in Telegram within seconds, Claude parses the free text, a lead appears in the CRM, and if nobody takes it, the bot reminds and escalates.
-date: 2026-11-04
+date: 2024-05-14
+updated: 2026-11-04
 series: automations
 part: 4
 tags: [automation, sales, telegram, claude, crm]

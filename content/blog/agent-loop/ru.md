@@ -1,7 +1,8 @@
 ---
 title: Агентный цикл и инструменты
 description: Даём модели инструменты для работы с файлами и командами и пишем harness, который превращает чат в агента.
-date: 2026-11-04
+date: 2025-03-18
+updated: 2026-11-04
 series: company-agent
 part: 3
 tags: [agents, practice, claude]

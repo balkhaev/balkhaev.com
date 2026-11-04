@@ -1,7 +1,8 @@
 ---
 title: "Concept: an agent that knows the company"
 description: What agent we are building, why a chat bot is not enough, and what parts the system is made of.
-date: 2026-11-04
+date: 2025-01-21
+updated: 2026-11-04
 series: company-agent
 part: 1
 tags: [agents, architecture]

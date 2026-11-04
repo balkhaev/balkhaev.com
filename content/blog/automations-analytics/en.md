@@ -1,7 +1,8 @@
 ---
 title: "Replacing the analyst: a morning digest and alerts"
 description: Every morning Telegram gets a digest of yesterday's leads, payments and support, compared with the week and with commentary from Claude. When something goes suspiciously quiet or gets stuck, the system speaks up by itself, once when it starts and once when it ends.
-date: 2026-11-04
+date: 2024-10-08
+updated: 2026-11-04
 series: automations
 part: 7
 tags: [automation, analytics, alerts, claude, postgres]

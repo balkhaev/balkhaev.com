@@ -1,7 +1,8 @@
 ---
 title: "Картинки и видео: ComfyUI на арендованной видеокарте"
 description: Какие открытые модели для картинок и видео брать сейчас, сколько им нужно памяти, как поднять ComfyUI на RunPod или Vast.ai и превратить пайплайн в API для своего продукта.
-date: 2026-11-04
+date: 2026-08-25
+updated: 2026-11-04
 series: inference
 part: 6
 tags: [inference, gpu, images, video]

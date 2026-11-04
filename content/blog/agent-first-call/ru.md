@@ -1,7 +1,8 @@
 ---
 title: Первый разговор с моделью
 description: Берём коммерческую модель по API и за 40 строк пишем чат в терминале со стримингом и историей.
-date: 2026-11-04
+date: 2025-02-18
+updated: 2026-11-04
 series: company-agent
 part: 2
 tags: [agents, practice, claude]

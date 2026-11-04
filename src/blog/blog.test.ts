@@ -232,3 +232,23 @@ test("a broken diagram fails the build", async () => {
     renderMarkdown("```mermaid\nflowchrt TD\n  a --> b\n```")
   ).rejects.toThrow();
 });
+
+test("keeps a later revision date and rejects an earlier one", async () => {
+  const revised = await parsePost(
+    "a.md",
+    post(`${VALID}\nupdated: 2026-12-01`),
+    "a",
+    "en"
+  );
+  expect(revised.updated).toBe("2026-12-01");
+  const same = await parsePost(
+    "a.md",
+    post(`${VALID}\nupdated: 2026-11-04`),
+    "a",
+    "en"
+  );
+  expect(same.updated).toBeUndefined();
+  await expect(
+    parsePost("a.md", post(`${VALID}\nupdated: 2025-01-01`), "a", "en")
+  ).rejects.toThrow('"updated"');
+});
