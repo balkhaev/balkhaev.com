@@ -310,4 +310,4 @@ The bigger takeaway is this: an agent is not magic inside the model, it is a few
 
 ## Next
 
-The tools are hard-coded in the agent for now. In the next part we connect **MCP**, the protocol that lets an agent get tools from external servers. Through it the agent reaches the company's internal systems: the database, the wiki, the issue tracker. We will write our own MCP server for the database.
+The tools are hard-coded in the agent for now. In [the next part](/blog/agent-mcp/) we connect **MCP**, the protocol that lets an agent get tools from external servers. Through it the agent reaches the company's internal systems: the database, the wiki, the issue tracker. We will write our own MCP server for the database.
