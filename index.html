@@ -39,7 +39,12 @@
       <nav aria-label="Разделы" class="site-nav">
         <a href="/blog/ru/">Блог</a>
         <a href="/cv/ru/">Резюме</a>
-        <a href="#contacts">Контакты</a>
+        <a
+          href="https://t.me/balkhaev"
+          rel="noopener noreferrer"
+          target="_blank"
+          >Telegram</a
+        >
       </nav>
     </header>
     <main class="home">
@@ -445,7 +450,6 @@
               </button>
             </section>
           </div>
-          <span aria-hidden="true" class="hole-hint">нажми, чтобы упасть</span>
         </div>
         <div class="hero-bottom">
           <p class="hero-copy reveal" style="--i: 1">
@@ -457,9 +461,13 @@
             <a class="action primary" href="/blog/ru/"
               >Читать блог <span aria-hidden="true">→</span></a
             >
-            <button class="action" data-open-scene type="button">
-              Упасть в дыру <span aria-hidden="true">↘</span>
-            </button>
+            <a
+              class="action"
+              href="https://t.me/balkhaev"
+              rel="noopener noreferrer"
+              target="_blank"
+              >Telegram <span aria-hidden="true">↗</span></a
+            >
           </p>
         </div>
       </section>
@@ -533,31 +541,35 @@
         </div>
       </section>
 
-      <section
-        aria-labelledby="contacts-title"
-        class="block contacts"
-        id="contacts"
-      >
-        <header class="block-head">
-          <span class="block-index">04</span>
-          <h2 id="contacts-title">Контакты</h2>
-          <p class="block-note">Открыт к работе и проектам</p>
-        </header>
-        <div class="block-body">
-          <a class="contact-big" href="mailto:m.balkhaev@gmail.com"
-            >m.balkhaev@gmail.com</a
-          >
-          <p class="block-more">
+      <section aria-labelledby="contacts-title" class="contacts" id="contacts">
+        <h2 id="contacts-title">Связаться</h2>
+        <ul class="contact-list">
+          <li>
             <a
+              class="contact-main"
               href="https://t.me/balkhaev"
               rel="noopener noreferrer"
               target="_blank"
-              >Telegram <span aria-hidden="true">↗</span></a
             >
-            <a href="/cv/ru/">Резюме</a>
-            <a href="/blog/ru/">Блог</a>
-          </p>
-        </div>
+              <span class="contact-label">Telegram</span>
+              <span class="contact-value"
+                >@balkhaev <span aria-hidden="true">↗</span></span
+              >
+            </a>
+          </li>
+          <li>
+            <a href="mailto:m.balkhaev@gmail.com">
+              <span class="contact-label">Почта</span>
+              <span class="contact-value">m.balkhaev@gmail.com</span>
+            </a>
+          </li>
+          <li>
+            <a href="/cv/ru/">
+              <span class="contact-label">Резюме</span>
+              <span class="contact-value">balkhaev.com/cv</span>
+            </a>
+          </li>
+        </ul>
       </section>
     </main>
     <footer class="site-foot">
