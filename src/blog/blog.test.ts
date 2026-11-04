@@ -1,13 +1,14 @@
 import { expect, test } from "bun:test";
 import { loadPosts, parsePost } from "./content";
-import { blogPath, renderIndex, renderPost } from "./render";
+import { renderMarkdown } from "./markdown";
+import { blogPath, renderFeed, renderIndex, renderPost } from "./render";
 
 const post = (frontmatter: string, body = "Hello **world**.") =>
   `---\n${frontmatter}\n---\n${body}\n`;
 const VALID = "title: T\ndescription: D\ndate: 2026-11-04\ntags: [ml]";
 
-test("parses frontmatter and renders Markdown", () => {
-  const parsed = parsePost(
+test("parses frontmatter and renders Markdown", async () => {
+  const parsed = await parsePost(
     "x.md",
     post(VALID, "## Head\n\n| a |\n| - |\n| 1 |"),
     "x",
@@ -15,6 +16,7 @@ test("parses frontmatter and renders Markdown", () => {
   );
   expect(parsed).toMatchObject({
     date: "2026-11-04",
+    math: false,
     tags: ["ml"],
     title: "T",
   });
@@ -22,33 +24,77 @@ test("parses frontmatter and renders Markdown", () => {
   expect(parsed.html).toContain("<table>");
 });
 
-test("drops raw HTML from the source", () => {
-  const parsed = parsePost(
-    "x.md",
-    post(VALID, "<script>alert(1)</script>"),
-    "x",
-    "en"
-  );
-  expect(parsed.html).not.toContain("<script>");
+test("drops raw HTML from the source", async () => {
+  const { html } = await renderMarkdown("<script>alert(1)</script>");
+  expect(html).not.toContain("<script>");
 });
 
-test("rejects malformed posts with the file name", () => {
-  expect(() => parsePost("a.md", "no frontmatter", "a", "en")).toThrow("a.md");
-  expect(() =>
+test("renders inline and display math at build time", async () => {
+  const { html, math } = await renderMarkdown(
+    "Energy $E = mc^2$.\n\n$$\n\\sum_{i=1}^n x_i\n$$"
+  );
+  expect(math).toBe(true);
+  expect(html).toContain('class="katex"');
+  expect(html).toContain('class="katex-display"');
+  expect(html).not.toContain("$E");
+});
+
+test("a broken formula fails the build", async () => {
+  await expect(renderMarkdown("$\\frac{1}{$")).rejects.toThrow();
+});
+
+test("highlights code in both themes and tolerates unknown languages", async () => {
+  const { html } = await renderMarkdown(
+    "```python\nimport torch\n```\n\n```nonsense\nx\n```"
+  );
+  expect(html).toContain("--shiki-dark");
+  expect(html).toContain("--shiki-light");
+  expect(html).toContain("import");
+});
+
+test("turns directives into callouts and keeps colons in prose", async () => {
+  const { html } = await renderMarkdown(
+    ":::warning\nCareful.\n:::\n\n:::proof\nTrivial.\n:::\n\nRatio 3:2 at 10:30, see note:here."
+  );
+  expect(html).toContain('<aside class="callout warning">');
+  expect(html).toContain(
+    '<details class="callout proof"><summary>Proof</summary>'
+  );
+  expect(html).toContain("Ratio 3:2 at 10:30, see note:here.");
+});
+
+test("collects h2/h3 for the table of contents", async () => {
+  const { toc } = await renderMarkdown(
+    "## One\n\n### Sub\n\n#### Deep\n\n## Two[^1]\n\n[^1]: Note."
+  );
+  expect(toc).toEqual([
+    { depth: 2, id: "one", text: "One" },
+    { depth: 3, id: "sub", text: "Sub" },
+    { depth: 2, id: "two1", text: "Two" },
+  ]);
+});
+
+test("rejects malformed posts with the file name", async () => {
+  await expect(parsePost("a.md", "no frontmatter", "a", "en")).rejects.toThrow(
+    "a.md"
+  );
+  await expect(
     parsePost("a.md", post("title: T\ndate: 2026-11-04"), "a", "en")
-  ).toThrow('"description"');
-  expect(() =>
+  ).rejects.toThrow('"description"');
+  await expect(
     parsePost(
       "a.md",
       post(VALID.replace("2026-11-04", "04.11.2026")),
       "a",
       "en"
     )
-  ).toThrow('"date"');
-  expect(() => parsePost("a.md", post(VALID), "ru", "en")).toThrow("slug");
-  expect(() => parsePost("a.md", post(VALID), "Bad Slug", "en")).toThrow(
+  ).rejects.toThrow('"date"');
+  await expect(parsePost("a.md", post(VALID), "ru", "en")).rejects.toThrow(
     "slug"
   );
+  await expect(
+    parsePost("a.md", post(VALID), "Bad Slug", "en")
+  ).rejects.toThrow("slug");
 });
 
 test("English lives at /blog/, Russian at /blog/ru/", () => {
@@ -56,28 +102,40 @@ test("English lives at /blog/, Russian at /blog/ru/", () => {
   expect(blogPath("ru", "hello")).toBe("/blog/ru/hello/");
 });
 
-test("posts link their translation and escape titles", () => {
-  const en = parsePost(
+test("posts link their translation, escape titles and load KaTeX only with math", async () => {
+  const en = await parsePost(
     "en.md",
-    post(VALID.replace("T", "A <b> & C")),
+    post(VALID.replace("T", "A <b> & C"), "$x$"),
     "x",
     "en"
   );
-  const ru = parsePost("ru.md", post(VALID), "x", "ru");
+  const ru = await parsePost("ru.md", post(VALID), "x", "ru");
   const html = renderPost(en, [en, ru]);
   expect(html).toContain('<html lang="en">');
   expect(html).toContain("A &lt;b&gt; &amp; C");
   expect(html).toContain(
     'href="https://balkhaev.com/blog/ru/x/" hreflang="ru"'
   );
+  expect(html).toContain("katex.min.css");
+  expect(renderPost(ru, [en, ru])).not.toContain("katex.min.css");
   const index = renderIndex("ru", [en, ru]);
   expect(index).toContain('href="/blog/ru/x/"');
   expect(index).not.toContain('href="/blog/x/"');
 });
 
-test("an untranslated post does not claim a translation", () => {
-  const ru = parsePost("ru.md", post(VALID), "only-ru", "ru");
+test("an untranslated post does not claim a translation", async () => {
+  const ru = await parsePost("ru.md", post(VALID), "only-ru", "ru");
   expect(renderPost(ru, [ru])).not.toContain('hreflang="en" rel="alternate"');
+});
+
+test("the feed lists one language with escaped content", async () => {
+  const en = await parsePost("en.md", post(VALID, "a < b"), "x", "en");
+  const ru = await parsePost("ru.md", post(VALID), "y", "ru");
+  const feed = renderFeed("en", [en, ru]);
+  expect(feed).toContain("<id>https://balkhaev.com/blog/x/</id>");
+  expect(feed).not.toContain("/blog/ru/y/");
+  expect(feed).toContain("a &amp;#x3C; b");
+  expect(feed).toContain('rel="self"');
 });
 
 test("every committed post is valid", async () => {
