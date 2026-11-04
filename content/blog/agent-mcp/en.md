@@ -23,6 +23,8 @@ It is simple:
 - An **MCP client** lives inside the agent. It connects to servers, fetches their tool lists, shows them to the model and forwards the calls.
 - There are two **transports**: `stdio`, where the client starts the server as a child process and talks over stdin/stdout, and HTTP, where the server runs on its own and is reached over the network. Today we use `stdio`; HTTP comes up in the permissions part.
 
+We use the current protocol revision, [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28), and version 2 of the TypeScript SDK. It splits the SDK into `@modelcontextprotocol/server` and `@modelcontextprotocol/client`, and the protocol itself is now stateless: every request carries the protocol version and client details, so a server scales like an ordinary HTTP service. The client negotiates the version itself and can still talk to older 2025-era servers.
+
 Besides tools, a server can expose resources (documents to read) and ready-made prompts, but for an agent tools are what matters.
 
 What this buys us:
@@ -102,7 +104,7 @@ console.log("company.db is ready");
 ```
 
 ```bash
-bun add @modelcontextprotocol/sdk zod
+bun add @modelcontextprotocol/server @modelcontextprotocol/client zod
 bun seed.ts
 ```
 
@@ -112,8 +114,8 @@ The server offers two tools: `describe_schema` returns a description of the tabl
 
 ```ts
 // db-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
 
@@ -132,44 +134,49 @@ deals: id, client_id → clients.id, owner_id → employees.id (account manager)
 
 SQLite dialect. Month of a date: strftime('%Y-%m', closed_at).`;
 
-const server = new McpServer({ name: "company-db", version: "1.0.0" });
+function buildServer() {
+  const server = new McpServer({ name: "company-db", version: "1.0.0" });
 
-server.registerTool(
-  "describe_schema",
-  {
-    description: "Describes the tables and columns of the company database. Call it before the first query.",
-    annotations: { readOnlyHint: true },
-  },
-  async () => ({ content: [{ type: "text", text: DOCS }] }),
-);
+  server.registerTool(
+    "describe_schema",
+    {
+      description: "Describes the tables and columns of the company database. Call it before the first query.",
+      annotations: { readOnlyHint: true },
+    },
+    async () => ({ content: [{ type: "text", text: DOCS }] }),
+  );
 
-server.registerTool(
-  "query",
-  {
-    description: `Run one SELECT against the company database (SQLite, read-only). Returns up to ${MAX_ROWS} rows as JSON.`,
-    inputSchema: { sql: z.string().describe("One SELECT or WITH ... SELECT query") },
-    annotations: { readOnlyHint: true },
-  },
-  async ({ sql }) => {
-    const text = sql.trim().replace(/;$/, "");
-    if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
-      return {
-        isError: true,
-        content: [{ type: "text", text: "Only a single SELECT query is allowed" }],
-      };
-    }
-    try {
-      const rows = db.query(text).all();
-      const shown = rows.slice(0, MAX_ROWS);
-      const note = rows.length > MAX_ROWS ? `\n(showing ${MAX_ROWS} of ${rows.length})` : "";
-      return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-    } catch (err) {
-      return { isError: true, content: [{ type: "text", text: String(err) }] };
-    }
-  },
-);
+  server.registerTool(
+    "query",
+    {
+      description: `Run one SELECT against the company database (SQLite, read-only). Returns up to ${MAX_ROWS} rows as JSON.`,
+      inputSchema: z.object({ sql: z.string().describe("One SELECT or WITH ... SELECT query") }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ sql }) => {
+      const text = sql.trim().replace(/;$/, "");
+      if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Only a single SELECT query is allowed" }],
+        };
+      }
+      try {
+        const rows = db.query(text).all();
+        const shown = rows.slice(0, MAX_ROWS);
+        const note = rows.length > MAX_ROWS ? `\n(showing ${MAX_ROWS} of ${rows.length})` : "";
+        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
+      } catch (err) {
+        return { isError: true, content: [{ type: "text", text: String(err) }] };
+      }
+    },
+  );
 
-await server.connect(new StdioServerTransport());
+  return server;
+}
+
+// One server per connection: serveStdio calls the factory when the agent starts the process
+serveStdio(buildServer);
 ```
 
 Why it is built this way.
@@ -181,6 +188,8 @@ Why it is built this way.
 **A row limit.** The model does not need a hundred thousand rows; it needs aggregates. The limit protects the context and your wallet, and the note "showing 200 of 5000" nudges the model to rewrite the query with `GROUP BY`.
 
 **Errors are returned, not thrown.** `isError: true` with SQLite's error text lets the model read what is wrong with the query and fix it. In practice the model often gets a column name wrong on the first try and fixes the query on the second.
+
+**A factory, not a single server.** `serveStdio` takes a function that builds the server and calls it for each connection. The HTTP version in [part 6](/blog/agent-auth/) works the same way: there the server is built per request for a specific employee.
 
 **`readOnlyHint`.** The annotation tells the client the tool changes nothing. Our agent asks for confirmation only for tools without it.
 
@@ -209,8 +218,8 @@ The client connects to every server, fetches its tool list and turns each tool i
 ```ts
 // mcp.ts
 import type Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
 import type { Tool } from "./tools";
 
@@ -223,7 +232,11 @@ export async function connectMcp(config: Record<string, ServerConfig>) {
   const clients: Client[] = [];
 
   for (const [serverName, params] of Object.entries(config)) {
-    const client = new Client({ name: "company-agent", version: "1.0.0" });
+    // auto: speak the 2026-07-28 revision, fall back to the 2025 protocol for older servers
+    const client = new Client(
+      { name: "company-agent", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
     await client.connect(new StdioClientTransport({ ...params, stderr: "inherit" }));
     clients.push(client);
 

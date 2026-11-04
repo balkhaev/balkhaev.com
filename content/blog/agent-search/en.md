@@ -8,20 +8,24 @@ tags: [agents, search, rag, mcp]
 ---
 
 :::tldr
-We split documents into chunks at headings and put them into SQLite's full-text index (FTS5 with BM25 ranking). On top of the index sits an MCP server with two tools: `search` finds chunks, `read` returns a whole document. The model decides what to search for, rephrases queries and combines what it finds with data from the database. Vector search comes later, once we can see where keywords fall short.
+We split documents into chunks at headings and put them into SQLite's full-text index (FTS5 with BM25 ranking). On top of the index sits an MCP server with two tools: `search` finds chunks, `read` returns a whole document. The model decides what to search for, rephrases queries and combines what it finds with data from the database. Vectors aren't required for this: they are added next to full-text search when measurements show misses, not instead of it.
 :::
 
 In [the previous part](/blog/agent-mcp/) the agent learned to answer from tables. Tables hold numbers, though, and most of a company's knowledge lives in text: policies, contracts, incident reviews, meeting notes. SQL cannot answer "what are the payment terms in our contract with this client".
 
-## Classic RAG and agentic search
+## What RAG is, and why it doesn't have to mean vectors
 
-The standard recipe, called RAG (retrieval-augmented generation), goes like this: split documents into chunks, turn each chunk into an embedding vector, and at question time find the nearest chunks and paste them into the prompt. The model answers from whatever it was given.
+RAG (retrieval-augmented generation) means one thing only: before answering, find the right documents and give them to the model. The definition says nothing about how to search. But over the past few years RAG has almost become a synonym for one recipe: documents are cut into chunks, each chunk is turned into an embedding, and at question time the nearest vectors are found and pasted into the prompt.
 
-That recipe gets one attempt. If the first search brings back the wrong chunks, the model answers from them or says it does not know. It cannot ask again.
+That recipe has two weaknesses.
 
-We already have an agent loop, so search becomes just another tool. The model writes the query, looks at the results, searches again with other words if needed, opens a whole document and checks it against the database. That is exactly how a person searches. Coding agents like Claude Code search files with plain `grep`, no vectors at all, and do well: what matters more is that the model can search many times.
+**One attempt.** If the first search brings back the wrong chunks, the model answers from them or says it doesn't know. It can't ask again.
 
-So we start with something simple and proven: full-text search ranked with BM25. Vectors come once we see specific misses.
+**Vectors are bad at exact things.** An embedding captures the general meaning of a chunk, while work questions often hinge on an exact string: contract number 2026-041, a client's name, an error code, a surname. Full-text search finds these at once, while vector search may rank a chunk "about something similar" higher. On company documents full of names and terms, BM25 is usually no worse than embeddings, and the two work best together.
+
+We already have an agent loop, so search becomes just another tool. The model writes the query itself, looks at the result, searches with other words, opens the whole document and checks it against the database. That's how a person searches. Coding agents work the same way: Claude Code searches a project with grep and by reading files, with no vector index. What makes the difference is that the model can search many times and check what it found.
+
+So we start with full-text search ranked by BM25. It's cheap, easy to debug (you can see why a document matched), needs no re-embedding every time a document changes, and finds names and numbers exactly. We'll add vectors once we see concrete misses; more on that at the end of the article.
 
 ## Step 1. Documents
 
@@ -122,8 +126,8 @@ bun index.ts wiki
 
 ```ts
 // wiki-server.ts
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { Database } from "bun:sqlite";
 import { z } from "zod";
 
@@ -139,59 +143,64 @@ function toFtsQuery(text: string) {
     .join(" OR ");
 }
 
-const server = new McpServer({ name: "wiki", version: "1.0.0" });
+function buildServer() {
+  const server = new McpServer({ name: "wiki", version: "1.0.0" });
 
-server.registerTool(
-  "search",
-  {
-    description:
-      "Full-text search over the company wiki: policies, contracts, incident reviews. " +
-      "Returns chunks with the document path. Search with short keyword queries " +
-      "and rephrase if nothing is found. Call read to see a whole document.",
-    inputSchema: {
-      query: z.string().describe("Keywords, for example \"per diem abroad\""),
-      limit: z.number().int().min(1).max(20).default(8),
+  server.registerTool(
+    "search",
+    {
+      description:
+        "Full-text search over the company wiki: policies, contracts, incident reviews. " +
+        "Returns chunks with the document path. Search with short keyword queries " +
+        "and rephrase if nothing is found. Call read to see a whole document.",
+      inputSchema: z.object({
+        query: z.string().describe("Keywords, for example \"per diem abroad\""),
+        limit: z.number().int().min(1).max(20).default(8),
+      }),
+      annotations: { readOnlyHint: true },
     },
-    annotations: { readOnlyHint: true },
-  },
-  async ({ query, limit }) => {
-    const fts = toFtsQuery(query);
-    if (!fts) return { isError: true, content: [{ type: "text", text: "Empty query" }] };
-    const rows = db
-      .query(
-        `SELECT path, title, heading,
-                snippet(chunks, 3, '[', ']', '…', 32) AS snippet
-         FROM chunks WHERE chunks MATCH ?
-         ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
-      )
-      .all(fts, limit) as { path: string; title: string; heading: string; snippet: string }[];
-    if (!rows.length) {
-      return { content: [{ type: "text", text: "Nothing found. Try other words." }] };
-    }
-    const text = rows
-      .map((r, i) => `[${i + 1}] ${r.path} · ${r.title}${r.heading ? ` › ${r.heading}` : ""}\n${r.snippet}`)
-      .join("\n\n");
-    return { content: [{ type: "text", text }] };
-  },
-);
+    async ({ query, limit }) => {
+      const fts = toFtsQuery(query);
+      if (!fts) return { isError: true, content: [{ type: "text", text: "Empty query" }] };
+      const rows = db
+        .query(
+          `SELECT path, title, heading,
+                  snippet(chunks, 3, '[', ']', '…', 32) AS snippet
+           FROM chunks WHERE chunks MATCH ?
+           ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
+        )
+        .all(fts, limit) as { path: string; title: string; heading: string; snippet: string }[];
+      if (!rows.length) {
+        return { content: [{ type: "text", text: "Nothing found. Try other words." }] };
+      }
+      const text = rows
+        .map((r, i) => `[${i + 1}] ${r.path} · ${r.title}${r.heading ? ` › ${r.heading}` : ""}\n${r.snippet}`)
+        .join("\n\n");
+      return { content: [{ type: "text", text }] };
+    },
+  );
 
-server.registerTool(
-  "read",
-  {
-    description: "Read a whole wiki document by a path from the search results.",
-    inputSchema: { path: z.string().describe("For example, travel.md") },
-    annotations: { readOnlyHint: true },
-  },
-  async ({ path }) => {
-    const doc = db.query("SELECT title, body FROM docs WHERE path = ?").get(path) as
-      | { title: string; body: string }
-      | null;
-    if (!doc) return { isError: true, content: [{ type: "text", text: `No document ${path}` }] };
-    return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
-  },
-);
+  server.registerTool(
+    "read",
+    {
+      description: "Read a whole wiki document by a path from the search results.",
+      inputSchema: z.object({ path: z.string().describe("For example, travel.md") }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ path }) => {
+      const doc = db.query("SELECT title, body FROM docs WHERE path = ?").get(path) as
+        | { title: string; body: string }
+        | null;
+      if (!doc) return { isError: true, content: [{ type: "text", text: `No document ${path}` }] };
+      return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
+    },
+  );
 
-await server.connect(new StdioServerTransport());
+  return server;
+}
+
+// One server per connection: serveStdio calls the factory when the agent starts the process
+serveStdio(buildServer);
 ```
 
 **`search` and `read` together.** Search returns short chunks so the model can skim a dozen candidates without spending its whole context. If a chunk looks right, the model opens the whole document with `read` and reads the surrounding sections. A person does the same: look at the results, then open the page.
@@ -225,14 +234,20 @@ More questions to try: "what is the per diem abroad?", "why did the payment serv
 
 And the control question again: "what average raise is budgeted for 2026?". The agent answers from the compensation policy, even though its `access` field limits it to HR and management. We fix that in the next part.
 
-## When you need vectors
+## When to add vectors, and what to try first
 
-Full-text search finds what is named with the same words. It misses when the user and the document say the same thing differently: "time off" and "unpaid leave", "quit" and "termination of employment", a question in English about a document in Russian. The agent partly makes up for it by rephrasing, but does not always guess right.
+Full-text search misses when the user and the document say the same thing in different words: "day off" and "unpaid leave", "quit" and "termination of the employment contract", a question in English and a document in Russian. The agent partly makes up for this by rephrasing the query, but it doesn't always guess.
 
-That is when you add vector search: at indexing time each chunk becomes an embedding (through an API such as Voyage, or a local model such as multilingual-e5), stored in pgvector or a separate vector database, and search looks for the nearest ones. A hybrid works best: run both searches and merge the lists with Reciprocal Rank Fusion. It does not need to compare BM25 scores with cosine similarity, which are not comparable; it only needs positions in the lists:
+Before a vector index, try the cheap steps:
+
+- **Synonyms in the search tool.** A small dictionary of company terms ("day off" → "unpaid leave") expands the query before FTS. It's a couple of dozen lines, and its behaviour is completely predictable.
+- **A hint in the tool description.** Ask the model to search with two or three phrasings, including the official terms. The model rephrases anyway, but an explicit instruction noticeably raises the share of successful searches.
+- **Context on chunks.** A chunk saying "payment within 30 days" is useless without the contract's name. At indexing time each chunk gets a line saying where it came from: document, section, client. Anthropic described this technique as Contextual Retrieval, and it improves both full-text and vector search. Our index already stores the document title and section heading next to the text, which is the simplest version of the same idea.
+
+If misses remain, vector search is added next to full-text search, not instead of it. Each chunk is turned into an embedding at indexing time (through an API such as Voyage, or a local model like multilingual-e5), stored in pgvector or a separate vector database, and both searches run for each question. The lists are merged with Reciprocal Rank Fusion. It doesn't need to compare incomparable BM25 and cosine scores; positions in the lists are enough:
 
 ```ts
-// Each list is sorted by relevance, best first; items are chunk ids
+// Each list is sorted by descending relevance; items are chunk ids
 function rrf(lists: string[][], k = 60) {
   const scores = new Map<string, number>();
   for (const list of lists) {
@@ -244,9 +259,18 @@ function rrf(lists: string[][], k = 60) {
 }
 ```
 
-A chunk that ranks high in both lists rises to the top, and one found by only one method still makes it into the results.
+A chunk ranked high in both lists rises to the top, and one found by only one method still makes it into the results. If that's not enough, the next step is a reranker: a model that takes the question and 30–50 candidates from the hybrid search and re-sorts them by meaning. It's slower than search, so it only works on a short list.
 
-Start with full-text search and record the questions the agent failed to answer even though the document existed. Once there is a noticeable number of them, it becomes clear whether you need vectors and which ones.
+Where vectors really win:
+
+- questions in plain words against documents written in bureaucratese;
+- a question in one language, documents in another;
+- "find similar": similar incidents, contracts, customer requests;
+- very large archives, where the agent can't afford a dozen searches per question.
+
+Where they're not needed: exact numbers, names and codes, and a small wiki where a couple of queries are enough for the agent.
+
+Decide by measurement, not fashion. Record the questions the agent failed to answer even though the document existed, and add them to the [check questions from part 9](/blog/agent-prod/#check-questions). Then you can see what each step bought you: synonyms, chunk context, vectors, a reranker.
 
 ## Next
 
