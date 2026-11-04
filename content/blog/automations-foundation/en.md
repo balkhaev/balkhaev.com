@@ -566,4 +566,4 @@ The percent sign must be escaped in crontab, hence `\%F`.
 - HTTPS with no manual certificate work.
 - Deploy on push to main: checks, build, migrations, restart, health check. Rollback in one command.
 
-This foundation will not change for the rest of the series. In the next part we write the core of the system: webhook signature checks, a job queue in Postgres, a worker with retries and a schedule. After that we can start plugging real automations into the service.
+This foundation will not change for the rest of the series. In the [next part](/blog/automations-queue/) we write the core of the system: webhook signature checks, a job queue in Postgres, a worker with retries and a schedule. After that we can start plugging real automations into the service.
