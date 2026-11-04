@@ -57,6 +57,8 @@ flowchart LR
   model -- end_turn --> done
 ```
 
+::news{topic="agents"}
+
 ## Step 1. Tools
 
 The agent gets four tools: list a folder, read a file, write a file and run a command. The last two are dangerous, so the agent asks before using them.

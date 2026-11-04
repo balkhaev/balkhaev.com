@@ -64,7 +64,7 @@ jobs:
         run: bun run deploy
       - name: Smoke test
         run: |
-          for path in / /cv/ /blog/ /blog/ru/ /sitemap.xml; do
+          for path in / /cv/ /blog/ /blog/ru/ /sitemap.xml /news/feed.json /blog/news.js; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "https://balkhaev.com$path")
             echo "$path $code"
             [ "$code" = 200 ] || exit 1

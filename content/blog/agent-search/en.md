@@ -27,6 +27,8 @@ We already have an agent loop, so search becomes just another tool. The model wr
 
 So we start with full-text search ranked by BM25. It's cheap, easy to debug (you can see why a document matched), needs no re-embedding every time a document changes, and finds names and numbers exactly. We'll add vectors once we see concrete misses; more on that at the end of the article.
 
+::news{topic="search"}
+
 ## Step 1. Documents
 
 For the example we use a `wiki/` folder of markdown files: vacation, business travel, a client contract, an incident review, the compensation policy, a newcomer guide. In a real company this is an export from Confluence, Notion or Google Drive, but it pays to bring it into the same shape: a title, text, metadata.

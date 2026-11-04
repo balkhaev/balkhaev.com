@@ -21,6 +21,8 @@ In earlier parts the agent lived in a terminal and took the employee's token fro
 - **Remember conversations.** Close the tab, open it tomorrow, carry on.
 - **Ask for confirmation** of dangerous actions from [part 3](/blog/agent-loop/), now with a button instead of the terminal.
 
+::news{topic="agents"}
+
 ## The design
 
 ```mermaid

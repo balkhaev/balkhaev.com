@@ -959,3 +959,109 @@ summary:focus-visible {
 .prose .diagram .edge-label text {
   fill: var(--ink-2);
 }
+
+/* News widget: digest stories on the post's topic (::news in Markdown). */
+.prose .news-widget {
+  margin: 2.2em 0;
+  font-size: 16px;
+  line-height: 1.5;
+  border-top: 2px solid var(--line);
+  border-bottom: 1px solid var(--hair);
+}
+.prose .news-widget p {
+  margin: 0;
+}
+.prose .news-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  justify-content: space-between;
+  padding: 10px 0 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.prose .news-kicker {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.prose .news-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--signal);
+  border-radius: 50%;
+}
+.prose .news-topic {
+  color: var(--muted);
+}
+.prose .news-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.prose .news-item {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  padding: 14px 0;
+  margin: 0;
+  border-top: 1px solid var(--hair);
+}
+.prose .news-no {
+  padding-top: 3px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--signal);
+}
+.prose .news-main {
+  min-width: 0;
+}
+.prose a.news-title {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.prose a.news-title:hover {
+  color: var(--signal);
+}
+.prose .news-text {
+  margin-top: 4px;
+  color: var(--ink-2);
+}
+.prose .news-meta,
+.prose .news-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.prose .news-meta {
+  margin-top: 6px;
+}
+.prose .news-foot {
+  justify-content: space-between;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--hair);
+}
+.prose .news-foot a {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+@media (max-width: 560px) {
+  .prose .news-item {
+    grid-template-columns: 28px 1fr;
+    gap: 8px;
+  }
+  .prose .news-text {
+    font-size: 15px;
+  }
+}
