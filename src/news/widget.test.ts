@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderMarkdown } from "../blog/markdown";
-import { FIRST_ISSUE, type Issue } from "./content";
-import { mergeIssues } from "./feed";
+import { ARCHIVE, FIRST_ISSUE, type Issue } from "./content";
+import { mergeIssues, nearDate } from "./feed";
 import { pickStories } from "./topics";
 import { parseTopics, renderWidget } from "./widget";
 
@@ -61,7 +61,7 @@ test("rejects unknown topics", () => {
 });
 
 test("renders an escaped widget in the post language", () => {
-  const html = renderWidget(["open-models"], 2, "en", [
+  const html = renderWidget(["open-models"], 2, "en", undefined, [
     { ...issues[0], stories: [story("<b>open</b> weights")] } as Issue,
   ]);
   expect(html).toContain('data-topics="open-models"');
@@ -94,9 +94,38 @@ test("the feed keeps one valid edition per date and the launch edition", () => {
     { ...issues[0], post: 9 },
     bad,
   ] as Issue[]);
-  expect(merged.map((issue) => issue.date)).toEqual([
+  expect(merged.map((issue) => issue.date).slice(0, 2)).toEqual([
     "2026-11-08",
     FIRST_ISSUE.date,
   ]);
+  expect(merged).toHaveLength(2 + ARCHIVE.length);
   expect(merged[0]?.post).toBe(2);
+});
+
+test("prefers matches near the post's date, then the rest", () => {
+  const picked = pickStories(issues, ["mcp"], 2, "2026-09-01");
+  expect(picked.stories.map((item) => item.date)).toEqual([
+    "2026-11-08",
+    "2026-11-06",
+  ]);
+  const old = [
+    { date: "2026-01-10", post: null, stories: [story("MCP старый")] },
+    ...issues,
+  ] as Issue[];
+  const near = pickStories(old, ["mcp"], 2, "2026-01-20");
+  expect(near.stories[0]?.story.title).toBe("MCP старый");
+});
+
+test("the archive is real-looking data: https links, one edition per date", () => {
+  const dates = ARCHIVE.map((issue) => issue.date);
+  expect(new Set(dates).size).toBe(dates.length);
+  expect(ARCHIVE.length).toBeGreaterThan(40);
+  for (const issue of ARCHIVE) {
+    for (const item of issue.stories) {
+      expect(item.url.startsWith("https://")).toBe(true);
+      expect(item.title.length).toBeGreaterThan(5);
+    }
+  }
+  expect(nearDate("2024-05-01")).toBeUndefined();
+  expect(nearDate("2026-03-01")).toBe("2026-03-01");
 });

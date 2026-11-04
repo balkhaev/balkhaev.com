@@ -14,7 +14,10 @@ HTML and replaces the file atomically. The built edition is available at startup
 An empty response or temporary outage leaves the current page in place. For a one-time
 refresh of a local build run `bun scripts/refresh-news.ts dist/news`.
 
-Every edition the container has seen is also kept in `/news/feed.json` (up to 60).
+Before the channel, `src/news/archive.json` holds a year of real stories
+(November 2025 – October 2026, weekly editions, each linked to its source) collected
+from the ThursdAI release ledger, The AI Track monthly roundups and similar trackers.
+Every edition the container has seen, plus the archive, is kept in `/news/feed.json`.
 Blog posts embed digest stories on their topic with a line of its own:
 
 ```md
@@ -25,7 +28,8 @@ Topics are listed in `src/news/topics.ts` (`agents`, `automation`, `coding`, `co
 `inference`, `llm-api`, `mcp`, `open-models`, `search`, `security`); `limit` is 1–6,
 3 by default. The build writes the matching stories into the page, and
 `/blog/news.js` swaps them for the current feed in the browser. With no match the
-widget shows the newest stories instead. An unknown topic fails the build.
+widget shows the newest stories instead. When the archive covers a post's date,
+the widget prefers matches within 60 days of it. An unknown topic fails the build.
 
 ## Scene and interaction
 

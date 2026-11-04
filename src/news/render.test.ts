@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
-import { FIRST_ISSUE } from "./content";
+import { ARCHIVE, FIRST_ISSUE } from "./content";
 import { renderNews } from "./render";
 
 test("serves all four launch stories with original links before a channel issue exists", () => {
   const page = renderNews();
-  expect(page.split('<article class="story">')).toHaveLength(5);
+  const stories = ARCHIVE.reduce((sum, issue) => sum + issue.stories.length, 0);
+  expect(page.split('<article class="story">')).toHaveLength(5 + stories);
+  expect(page).toContain(ARCHIVE.at(-1)?.stories[0]?.url ?? "missing");
   for (const story of FIRST_ISSUE.stories) {
     expect(page).toContain(story.title);
     expect(page).toContain(`href="${story.url}"`);

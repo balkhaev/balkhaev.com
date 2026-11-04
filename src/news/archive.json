@@ -1,0 +1,1160 @@
+[
+  {
+    "date": "2026-10-29",
+    "post": null,
+    "stories": [
+      {
+        "source": "OpenAI",
+        "text": "Быстрая модель за $1/$5.",
+        "title": "GPT-6.1 Terra для управления компьютером",
+        "url": "https://openai.com/index/introducing-gpt-6-1-terra"
+      },
+      {
+        "source": "Google",
+        "text": "Генерирует видео и звук и держит окружение согласованным.",
+        "title": "Genie 4: модель мира со звуком",
+        "url": "https://blog.google/innovation-and-ai/models-and-research/google-deepmind/introducing-genie-4/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Открытая модель распознавания речи на 40 языках, WER 2,8%.",
+        "title": "Nemotron 3.5 Transcribe",
+        "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B"
+      }
+    ]
+  },
+  {
+    "date": "2026-10-22",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "Исследовательское превью на Opus 5.5 для Pro и Max в США.",
+        "title": "Claude Duet: постоянный личный агент",
+        "url": "https://claude.com/product/claude-duet"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Компания сообщает рост Terminal-Bench 4.0 с 31,2 до 42,3.",
+        "title": "DeepSeek V4.1-Flash-1017 под MIT",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+      },
+      {
+        "source": "Recursive",
+        "text": "MoE на 39,8B с 2,5B активных под Apache 2.0.",
+        "title": "Recursive Flint для кода на Mac",
+        "url": "https://www.recursive.com/updates/introducing-recursive-flint"
+      }
+    ]
+  },
+  {
+    "date": "2026-10-15",
+    "post": null,
+    "stories": [
+      {
+        "source": "Meta AI",
+        "text": "Открытая MoE на 816B (42B активных) с контекстом 1M.",
+        "title": "Meta Muse Spark Open",
+        "url": "https://research.meta.ai/blog/muse-spark-open"
+      },
+      {
+        "source": "NVIDIA",
+        "text": "Открытая VL-модель на 120B вместе с данными и рецептами.",
+        "title": "Nemotron 3.5 Super VL для документов и видео",
+        "url": "https://developer.nvidia.com/blog/nvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning/"
+      },
+      {
+        "source": "Google",
+        "text": "$2/$10 до 30 ноября, потом $4/$20.",
+        "title": "Gemini 4 Argon вышла в API",
+        "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-argon/"
+      }
+    ]
+  },
+  {
+    "date": "2026-10-08",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "$0,50 за миллион выходных токенов для ответов короче 100K.",
+        "title": "Claude Haiku 5.5 за $0,10 на входе",
+        "url": "https://www.anthropic.com/claude-haiku-5-5"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "MoE на 78B (3,46B активных), обучена с нуля на немецком и английском, Apache 2.0.",
+        "title": "Aleph Alpha Kolibri-1",
+        "url": "https://huggingface.co/Aleph-Alpha/kolibri-1"
+      }
+    ]
+  },
+  {
+    "date": "2026-10-01",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "По словам Anthropic, до 30% дешевле на задачу, чем Sonnet 5.",
+        "title": "Claude Sonnet 5.5",
+        "url": "https://anthropic.com/claude-sonnet-5-5"
+      },
+      {
+        "source": "ElevenLabs",
+        "text": "Выразительный синтез речи на 90+ языках.",
+        "title": "Eleven v4 и Turbo для голосовых агентов",
+        "url": "https://elevenlabs.io/blog/eleven-v4"
+      },
+      {
+        "source": "OpenAI",
+        "text": "Агент на GPT-6 Astra работает со своим облачным компьютером и браузером. Сначала только для Pro.",
+        "title": "dots: постоянный агент в ChatGPT",
+        "url": "https://openai.com/index/introducing-dots/"
+      }
+    ]
+  },
+  {
+    "date": "2026-09-23",
+    "post": null,
+    "stories": [
+      {
+        "source": "xAI",
+        "text": "Новая базовая модель xAI по $2/$6 за миллион токенов.",
+        "title": "Grok 4.7",
+        "url": "https://x.ai/news/grok-4-7"
+      },
+      {
+        "source": "Anthropic",
+        "text": "Первая модель семейства 5.5; по словам Anthropic, близка к Fable 5.1 на большинстве задач.",
+        "title": "Claude Opus 5.5",
+        "url": "https://anthropic.com/claude-opus-5-5"
+      },
+      {
+        "source": "OpenAI",
+        "text": "Младшие уровни GPT-6 примерно вдвое дешевле аналогов GPT-5.6.",
+        "title": "GPT-6 Sol и Luna",
+        "url": "https://openai.com/index/introducing-gpt-6-sol-and-luna"
+      },
+      {
+        "source": "Black Forest Labs",
+        "text": "Black Forest Labs открыла 7B-модель действий для роботов.",
+        "title": "FLUX 3 Action управляет роботами",
+        "url": "https://bfl.ai/blog/flux-3-action"
+      }
+    ]
+  },
+  {
+    "date": "2026-09-17",
+    "post": null,
+    "stories": [
+      {
+        "source": "PrismML",
+        "text": "PrismML выпустила сжатую модель под Apache 2.0.",
+        "title": "Ternary Bonsai 2: Qwen3.8 27B в тернарных весах",
+        "url": "https://prismml.com/news/bonsai-2-27b"
+      },
+      {
+        "source": "Google",
+        "text": "Модели речь-в-речь вызывают инструменты асинхронно.",
+        "title": "Gemini 3.8 Live: голос на 97 языках",
+        "url": "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-8-live-gemini-3-8-live-extended-thinking/"
+      }
+    ]
+  },
+  {
+    "date": "2026-09-10",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "552B параметров, 8–16B активных, контекст 1M.",
+        "title": "DeepSeek V4.1 Flash: мультимодальная MoE под MIT",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Визуально-языковая MoE на 124B с 5,5B активных.",
+        "title": "Ant Group открыла Ling-3.0-flash-VL",
+        "url": "https://huggingface.co/inclusionAI/Ling-3.0-flash-VL"
+      }
+    ]
+  },
+  {
+    "date": "2026-09-03",
+    "post": null,
+    "stories": [
+      {
+        "source": "OpenAI",
+        "text": "$10/$50 за миллион токенов; OpenAI сообщает рекордные результаты на ARC-AGI-3 и FrontierMath.",
+        "title": "OpenAI выпустила GPT-6 Astra",
+        "url": "https://openai.com/index/gpt-6-astra/"
+      },
+      {
+        "source": "Anthropic",
+        "text": "Чтение из кэша подешевело на 75%, до $0,25 за миллион токенов.",
+        "title": "Claude Fable 5.1 и Mythos 5.1",
+        "url": "https://www.anthropic.com/claude-fable-and-mythos-5-1"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "MoE на 770B (49B активных), контекст 1M, Apache 2.0.",
+        "title": "Tencent Hy4 preview с открытыми весами",
+        "url": "https://huggingface.co/tencent/Hy4-preview"
+      }
+    ]
+  },
+  {
+    "date": "2026-08-28",
+    "post": null,
+    "stories": [
+      {
+        "source": "Salesforce",
+        "text": "Плагин с 37 готовыми навыками для продаж.",
+        "title": "Claudeforce: Claude внутри Salesforce",
+        "url": "https://www.salesforce.com/news/press-releases/2026/08/26/salesforce-and-anthropic-announce-claudeforce/"
+      },
+      {
+        "source": "Z.ai",
+        "text": "Z.ai открыла MoE на 320B с 18B активных.",
+        "title": "GLM-5.3-Flash под MIT",
+        "url": "https://z.ai/blog/glm-5.3-flash"
+      },
+      {
+        "source": "Qwen",
+        "text": "Открытые веса: 125B параметров плюс N-граммная таблица эмбеддингов, 6B активных.",
+        "title": "Qwen3.8-Flash-Next показывает архитектуру Qwen4",
+        "url": "https://qwen.ai/blog?id=qwen3.8-flash-next"
+      },
+      {
+        "source": "The Japan Times",
+        "text": "Исследовательское превью стандарта, по которому модель находит устройства и управляет ими.",
+        "title": "Anthropic Model Hardware Standard",
+        "url": "https://www.japantimes.co.jp/business/2026/08/28/tech/anthropic-claude-ai-robots/"
+      }
+    ]
+  },
+  {
+    "date": "2026-08-20",
+    "post": null,
+    "stories": [
+      {
+        "source": "Axios",
+        "text": "Протокол Google будет развиваться рядом с MCP под Linux Foundation.",
+        "title": "A2A переходит в Agentic AI Foundation",
+        "url": "https://www.axios.com/2026/08/17/a2a-agentic-ai-foundation-open-ai-standards"
+      },
+      {
+        "source": "Fortune",
+        "text": "Пауза и новые протоколы безопасности объявлены после инцидента с Hugging Face.",
+        "title": "OpenAI на две недели остановила обучение",
+        "url": "https://fortune.com/2026/08/18/openai-says-it-paused-ai-training-for-two-weeks-and-announces-new-security-protocols-following-hugging-face-hack/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "По данным ThursdAI, модель на уровне GPT-5.6 Luna с максимальными рассуждениями.",
+        "title": "Qwen3.8-27B под Apache 2.0",
+        "url": "https://huggingface.co/Qwen/Qwen3.8-27B"
+      }
+    ]
+  },
+  {
+    "date": "2026-08-13",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "MoE на 1,6T параметров с 49B активных и контекстом 1M.",
+        "title": "DeepSeek V4 Pro перевыпущена под MIT",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro-0813"
+      },
+      {
+        "source": "Meta AI",
+        "text": "Открытая агентная модель под Apache 2.0, 76,0 на SWE-Bench Verified по данным Meta.",
+        "title": "Meta Muse Glimmer 30B на одной видеокарте",
+        "url": "https://research.meta.ai/blog/introducing-muse-glimmer-open-agentic-model"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "30B MoE с 3B активных, до 4 раз быстрее на выводе.",
+        "title": "Nemotron 3.5 Lightning в NVFP4",
+        "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4"
+      },
+      {
+        "source": "xAI",
+        "text": "$2/$6 за миллион токенов и 61 в Artificial Analysis Intelligence Index.",
+        "title": "xAI выпустила Grok 4.6",
+        "url": "https://x.ai/news/grok-4-6"
+      }
+    ]
+  },
+  {
+    "date": "2026-08-04",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Модель Liquid AI занимает около 1,7 ГБ в Q4 и обучена с RL в реальных агентных обвязках.",
+        "title": "LFM2.5-2.6B для агентов на телефоне",
+        "url": "https://huggingface.co/LiquidAI/LFM2.5-2.6B"
+      }
+    ]
+  },
+  {
+    "date": "2026-07-31",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Полные чекпоинты, код модели и технический отчёт.",
+        "title": "Moonshot выложила веса Kimi K3",
+        "url": "https://huggingface.co/moonshotai/Kimi-K3"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Открытая MoE на 276B от Thinking Machines.",
+        "title": "Inkling-Small: 12B активных за $0,30",
+        "url": "https://huggingface.co/thinkingmachines/Inkling-Small"
+      },
+      {
+        "source": "ByteDance",
+        "text": "ByteDance выпустила модель с 30-секундными клипами и режимом длинного видео.",
+        "title": "Seedance 2.5 снимает ролики до 3 минут",
+        "url": "https://dreamina.capcut.com/seedance/seedance-2-5"
+      }
+    ]
+  },
+  {
+    "date": "2026-07-24",
+    "post": null,
+    "stories": [
+      {
+        "source": "Poolside",
+        "text": "Открытая MoE на 118B (8B активных) с контекстом 1M.",
+        "title": "Poolside Laguna S 2.1 для агентного кода",
+        "url": "https://poolside.ai/models"
+      },
+      {
+        "source": "Google DeepMind",
+        "text": "Google выпустила три Flash-модели; 3.6 Flash стоит $1,50/$7,50.",
+        "title": "Gemini 3.6 Flash",
+        "url": "https://deepmind.google/models/gemini/flash/"
+      },
+      {
+        "source": "Anthropic",
+        "text": "Цена прежняя, $5/$25 за миллион токенов, контекст 1M.",
+        "title": "Claude Opus 5",
+        "url": "https://www.anthropic.com/news/claude-opus-5"
+      }
+    ]
+  },
+  {
+    "date": "2026-07-16",
+    "post": null,
+    "stories": [
+      {
+        "source": "PrismML",
+        "text": "PrismML выпустила квантизованные сборки под Apache 2.0.",
+        "title": "Bonsai 27B: Qwen 3.6 в 1 бит на 3,9 ГБ",
+        "url": "https://prismml.com/news/bonsai-27b"
+      },
+      {
+        "source": "Thinking Machines",
+        "text": "MoE на 975B (41B активных) под Apache 2.0, обучена на 45T мультимодальных токенов.",
+        "title": "Thinking Machines открыла Inkling",
+        "url": "https://thinkingmachines.ai/news/introducing-inkling"
+      },
+      {
+        "source": "Moonshot AI",
+        "text": "Moonshot открыла API, веса обещаны позже.",
+        "title": "Kimi K3: 2,8T параметров и контекст 1M",
+        "url": "https://www.kimi.com/blog/kimi-k3"
+      }
+    ]
+  },
+  {
+    "date": "2026-07-09",
+    "post": null,
+    "stories": [
+      {
+        "source": "OpenAI",
+        "text": "Три уровня: флагман Sol за $5/$30, Terra и Luna дешевле.",
+        "title": "GPT-5.6 стала доступна всем",
+        "url": "https://openai.com/index/previewing-gpt-5-6-sol/"
+      },
+      {
+        "source": "Meta AI",
+        "text": "Агентная модель с контекстом 1M, API в публичном превью.",
+        "title": "Meta Muse Spark 1.1 и платный API",
+        "url": "https://ai.meta.com/blog/introducing-muse-spark-msl/"
+      }
+    ]
+  },
+  {
+    "date": "2026-06-26",
+    "post": null,
+    "stories": [
+      {
+        "source": "OpenAI",
+        "text": "Ускоритель сделан вместе с Broadcom.",
+        "title": "Jalapeño: первый чип OpenAI для инференса",
+        "url": "https://openai.com/index/jalapeno/"
+      },
+      {
+        "source": "Sakana AI",
+        "text": "Роутер переписывает запрос, выбирает модель и проверяет ответ.",
+        "title": "Sakana Fugu: API оркестрации агентов",
+        "url": "https://sakana.ai/fugu/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Sol, Terra и Luna вышли под проверкой правительства США из-за кибервозможностей.",
+        "title": "GPT-5.6 в ограниченном превью",
+        "url": "https://theaitrack.com/gpt-5-6-launch-us-ai-review/"
+      }
+    ]
+  },
+  {
+    "date": "2026-06-18",
+    "post": null,
+    "stories": [
+      {
+        "source": "Z.ai",
+        "text": "Z.ai выпустила MoE на 753B под MIT.",
+        "title": "GLM-5.2: открытая модель с контекстом 1M",
+        "url": "https://z.ai/blog/glm-5.2"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Moonshot выложила триллионную MoE для программирования.",
+        "title": "Kimi K2.7 Code с открытыми весами",
+        "url": "https://huggingface.co/moonshotai/Kimi-K2.7-Code"
+      }
+    ]
+  },
+  {
+    "date": "2026-06-04",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Мультимодальная модель без отдельного энкодера под Apache 2.0.",
+        "title": "Gemma 4 12B помещается в 16 ГБ видеопамяти",
+        "url": "https://huggingface.co/google/gemma-4-12b-it"
+      },
+      {
+        "source": "NVIDIA",
+        "text": "NVIDIA открыла веса, данные и рецепты MoE с 55B активных параметров.",
+        "title": "Nemotron 3 Ultra: 550B для агентов",
+        "url": "https://research.nvidia.com/labs/nemotron/"
+      },
+      {
+        "source": "Microsoft AI",
+        "text": "Своя модель Microsoft на 1T параметров (35B активных), обученная с нуля.",
+        "title": "Microsoft MAI-Thinking-1",
+        "url": "https://microsoft.ai/news/building-a-hillclimbing-machine-launching-seven-new-mai-models/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "12B MoE для кода с 2,5B активных параметров.",
+        "title": "JetBrains открыла Mellum 2",
+        "url": "https://huggingface.co/JetBrains/Mellum2-12B-A2.5B-Thinking"
+      }
+    ]
+  },
+  {
+    "date": "2026-05-28",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Флагман стал дешёвым вариантом для агентов, кода и длинного контекста.",
+        "title": "DeepSeek навсегда снизила цену V4 Pro на 75%",
+        "url": "https://theaitrack.com/deepseek-v4-pro-price-cut/"
+      },
+      {
+        "source": "Anthropic",
+        "text": "Anthropic сообщает 69,2% на SWE-bench Pro и 83,4% на OSWorld-Verified. Появился дешёвый быстрый режим.",
+        "title": "Claude Opus 4.8",
+        "url": "https://www.anthropic.com/news/claude-opus-4-8"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "OpenBMB выпустила открытую 1B-модель для запуска на телефоне.",
+        "title": "MiniCPM5-1B для устройств",
+        "url": "https://huggingface.co/openbmb/MiniCPM5-1B"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Семейство под Apache 2.0, включая 1,8B и MoE 30B-A3B.",
+        "title": "Tencent Hy-MT2: открытые модели перевода",
+        "url": "https://huggingface.co/tencent/Hy-MT2-1.8B"
+      }
+    ]
+  },
+  {
+    "date": "2026-05-21",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Компания показала модель, чип и сервер под агентные нагрузки.",
+        "title": "Alibaba: Qwen3.7-Max и свой чип Zhenwu M890",
+        "url": "https://theaitrack.com/qwen3-7-max-zhenwu-m890-alibaba-ai-chip/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Gemini встраивается в Поиск, Chrome, Android, Workspace и очки.",
+        "title": "Google I/O 2026: Gemini как слой агентов",
+        "url": "https://theaitrack.com/google-i-o-2026-gemini-agents-search/"
+      },
+      {
+        "source": "Cohere",
+        "text": "218B MoE с 25B активных параметров под Apache 2.0.",
+        "title": "Cohere Command A+ с открытыми весами",
+        "url": "https://cohere.com/blog/command-a-plus"
+      },
+      {
+        "source": "Google DeepMind",
+        "text": "Модель доступна в Gemini, Flow и YouTube; API обещан позже.",
+        "title": "Gemini Omni редактирует видео в диалоге",
+        "url": "https://deepmind.google/models/gemini-omni/"
+      }
+    ]
+  },
+  {
+    "date": "2026-05-14",
+    "post": null,
+    "stories": [
+      {
+        "source": "Thinking Machines",
+        "text": "276B MoE (12B активных) одновременно слушает, смотрит и отвечает в реальном времени.",
+        "title": "Thinking Machines показала модели для живого диалога",
+        "url": "https://thinkingmachines.ai/blog/interaction-models"
+      },
+      {
+        "source": "GitHub",
+        "text": "Открытая модель-фильтр под Apache 2.0 для проверки запросов и ответов.",
+        "title": "GLiGuard: защитная модель на 300M",
+        "url": "https://github.com/fastino-ai/GLiGuard"
+      }
+    ]
+  },
+  {
+    "date": "2026-04-30",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Claude подключается к инструментам дизайна, 3D и видео.",
+        "title": "Коннекторы Claude для Adobe, Blender и Fusion",
+        "url": "https://theaitrack.com/claude-connectors-adobe-blender/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "V4-Pro на 1,6T параметров и V4-Flash вышли с весами.",
+        "title": "DeepSeek V4: открытые веса и 1M контекста",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Самое широкое семейство Granite: языковые, речевые, визуальные модели, эмбеддинги и Guardian.",
+        "title": "IBM Granite 4.1",
+        "url": "https://theaitrack.com/ibm-granite-4-1-enterprise-ai-models/"
+      }
+    ]
+  },
+  {
+    "date": "2026-04-23",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "OpenAI запустила Workspace Agents для бизнес-тарифов. Они постепенно заменят Custom GPTs.",
+        "title": "Агенты в ChatGPT для команд",
+        "url": "https://theaitrack.com/openai-workspace-agents-chatgpt-enterprise/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Google превратила Vertex AI в единую платформу для создания и контроля корпоративных агентов.",
+        "title": "Gemini Enterprise Agent Platform",
+        "url": "https://theaitrack.com/gemini-enterprise-agent-platform/"
+      },
+      {
+        "source": "OpenAI",
+        "text": "Модель лучше работает с контекстом, кодом и компьютером; заявлено 82,7% на Terminal-Bench 2.",
+        "title": "OpenAI выпустила GPT-5.5",
+        "url": "https://openai.com/index/introducing-gpt-5-5/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "32B активных параметров и контекст 256K под модифицированной MIT.",
+        "title": "Kimi K2.6: открытая MoE на 1T",
+        "url": "https://huggingface.co/moonshotai/Kimi-K2.6"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Плотная 27B-модель удобна для запуска на одной видеокарте.",
+        "title": "Qwen3.6-27B под Apache 2.0",
+        "url": "https://huggingface.co/Qwen/Qwen3.6-27B"
+      }
+    ]
+  },
+  {
+    "date": "2026-04-16",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "Новый уровень рассуждений и 87,6% на SWE-bench Verified, по данным Anthropic.",
+        "title": "Claude Opus 4.7 и уровень усилий xhigh",
+        "url": "https://www.anthropic.com/news/claude-opus-4-7"
+      }
+    ]
+  },
+  {
+    "date": "2026-04-09",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Z.ai сообщает 58,4% на SWE-Bench Pro и публикует статью на arXiv.",
+        "title": "GLM-5.1 с открытыми весами",
+        "url": "https://huggingface.co/zai-org/GLM-5.1"
+      },
+      {
+        "source": "Anthropic",
+        "text": "Модель доступна примерно 40 партнёрам. Anthropic ограничила доступ из-за её возможностей в кибербезопасности.",
+        "title": "Claude Mythos Preview только для киберзащиты",
+        "url": "https://www.anthropic.com/claude-mythos-preview-system-card"
+      }
+    ]
+  },
+  {
+    "date": "2026-04-02",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Семейство открытых моделей теперь под Apache 2.0.",
+        "title": "Google выпустила Gemma 4",
+        "url": "https://huggingface.co/collections/google/gemma-4"
+      }
+    ]
+  },
+  {
+    "date": "2026-03-26",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Потребительский видеогенератор закрывается, исследования продолжаются.",
+        "title": "OpenAI закрывает Sora",
+        "url": "https://theaitrack.com/sora-video-generator-shutdown-openai/"
+      },
+      {
+        "source": "Cohere",
+        "text": "2B-модель распознавания речи под Apache 2.0 с WER 5,42%.",
+        "title": "Cohere Transcribe возглавила Open ASR Leaderboard",
+        "url": "https://cohere.com/blog/transcribe"
+      },
+      {
+        "source": "Mistral AI",
+        "text": "Mistral открыла 3B-модель синтеза речи.",
+        "title": "Voxtral TTS с управлением эмоциями",
+        "url": "https://mistral.ai/news/voxtral-tts"
+      },
+      {
+        "source": "X",
+        "text": "Новый интерактивный бенчмарк проверяет агентное рассуждение.",
+        "title": "ARC-AGI-3: люди решают всё, модели меньше 1%",
+        "url": "https://x.com/arcprize/status/2036860080541589529"
+      }
+    ]
+  },
+  {
+    "date": "2026-03-19",
+    "post": null,
+    "stories": [
+      {
+        "source": "Mistral AI",
+        "text": "119B MoE с 6B активных параметров под Apache 2.0.",
+        "title": "Mistral Small 4: зрение, код и рассуждения в одной модели",
+        "url": "https://mistral.ai/news/mistral-small-4"
+      },
+      {
+        "source": "Cursor",
+        "text": "По данным ThursdAI, 61% на TerminalBench при цене $0,50 за миллион входных токенов.",
+        "title": "Cursor выпустил собственную модель Composer 2",
+        "url": "https://cursor.com/blog/composer-2"
+      },
+      {
+        "source": "MiniMax",
+        "text": "Компания сообщает 56,22% на SWE-Bench Pro.",
+        "title": "MiniMax M2.7 для агентного кода",
+        "url": "https://www.minimax.io/en/news/minimax-m2-7"
+      }
+    ]
+  },
+  {
+    "date": "2026-03-13",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Инструменты тестирования и мониторинга безопасности агентов войдут в платформу Frontier.",
+        "title": "OpenAI покупает Promptfoo",
+        "url": "https://theaitrack.com/openai-promptfoo-deal-ai-agent-security/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Компания строит модели мира для промышленности.",
+        "title": "Стартап Яна Лекуна AMI привлёк $1,03 млрд",
+        "url": "https://theaitrack.com/yann-lecun-ami-raises-1-billion/"
+      },
+      {
+        "source": "NVIDIA",
+        "text": "Гибрид Mamba-Transformer с 12B активных параметров вышел с весами и рецептом обучения.",
+        "title": "Nemotron 3 Super: 120B с контекстом 1M",
+        "url": "https://nvidianews.nvidia.com/news/nemotron-3-super"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Железо Cerebras для быстрого инференса появится в дата-центрах AWS.",
+        "title": "Cerebras приходит в AWS Bedrock",
+        "url": "https://theaitrack.com/aws-cerebras-ai-inference-bedrock/"
+      }
+    ]
+  },
+  {
+    "date": "2026-03-06",
+    "post": null,
+    "stories": [
+      {
+        "source": "X",
+        "text": "OpenAI выпустила GPT-5.4 Thinking и Pro. Для Pro заявлено 83,3% на ARC-AGI 2.",
+        "title": "GPT-5.4 с контекстом 1M токенов",
+        "url": "https://x.com/OpenAI/status/2029620619743219811"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Командная строка даёт агентам доступ к Gmail, Docs, Sheets и Drive.",
+        "title": "Google Workspace CLI для агентов",
+        "url": "https://theaitrack.com/google-workspace-cli-ai-agents/"
+      }
+    ]
+  },
+  {
+    "date": "2026-02-26",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Anthropic расширила корпоративных агентов: новые интеграции для рабочих процессов компаний.",
+        "title": "Claude подключили к Slack, DocuSign и Gmail",
+        "url": "https://theaitrack.com/anthropic-enterprise-ai-agents-expansion/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "По словам Alibaba, небольшая MoE с 3B активных параметров сильнее Qwen на 235B.",
+        "title": "Qwen3.5-35B-A3B обходит прошлый флагман",
+        "url": "https://huggingface.co/Qwen/Qwen3.5-35B-A3B"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Gemini 3.1 Flash Image быстрее и умеет опираться на поиск при создании картинок.",
+        "title": "Nano Banana 2 ищет в интернете перед генерацией",
+        "url": "https://theaitrack.com/google-nano-banana-2-gemini-3-1-flash-image/"
+      }
+    ]
+  },
+  {
+    "date": "2026-02-19",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "По данным ThursdAI, 79,6% на SWE-Bench Verified при прежней цене $3/$15.",
+        "title": "Claude Sonnet 4.6 с окном 1M в бете",
+        "url": "https://www.anthropic.com/news/claude-sonnet-4-6"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Alibaba выложила флагман нового поколения с 17B активных параметров.",
+        "title": "Qwen3.5: открытая мультимодальная MoE на 397B",
+        "url": "https://huggingface.co/Qwen/Qwen3.5-397B-A17B"
+      },
+      {
+        "source": "Google",
+        "text": "Цена не изменилась, а результаты на HLE и ARC-AGI выросли, по данным Google.",
+        "title": "Google обновила Gemini 3.1 Pro",
+        "url": "https://blog.google/technology/google-deepmind/gemini-3-1-pro-update/"
+      }
+    ]
+  },
+  {
+    "date": "2026-02-12",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Z.ai выложила веса модели с 40B активных параметров, обученной на чипах Huawei.",
+        "title": "GLM-5: открытая MoE на 744B",
+        "url": "https://huggingface.co/Zai-org/GLM-5"
+      },
+      {
+        "source": "ByteDance Seed",
+        "text": "Видео-модель ByteDance принимает референсы картинок, видео и аудио и делает 15-секундные клипы.",
+        "title": "Seedance 2.0 снимает многокадровые ролики со звуком",
+        "url": "https://seed.bytedance.com/en/blog/official-launch-of-seedance-2-0"
+      }
+    ]
+  },
+  {
+    "date": "2026-02-05",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "Первая Opus с окном в миллион токенов. В Claude Code появились команды агентов и адаптивное мышление.",
+        "title": "Claude Opus 4.6 получила контекст 1M токенов",
+        "url": "https://www.anthropic.com/news/claude-opus-4-6"
+      },
+      {
+        "source": "OpenAI",
+        "text": "Модель для агентного программирования; по данным ThursdAI, 73% на Terminal Bench 2.0.",
+        "title": "OpenAI выпустила GPT-5.3-Codex",
+        "url": "https://platform.openai.com/docs/models/gpt-5.3-codex"
+      },
+      {
+        "source": "Qwen",
+        "text": "Alibaba сообщает 70,6% на SWE-Bench Verified. Модель подходит для локального запуска.",
+        "title": "Qwen3-Coder-Next: 80B для кода с 3B активных",
+        "url": "https://qwen.ai/blog?id=qwen3-coder-next"
+      },
+      {
+        "source": "Mistral AI",
+        "text": "Mistral открыла модель распознавания речи с задержкой меньше 200 мс.",
+        "title": "Voxtral Transcribe 2 с разметкой спикеров",
+        "url": "https://mistral.ai/news/voxtral-transcribe-2/"
+      }
+    ]
+  },
+  {
+    "date": "2026-01-31",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "3-нм ускоритель с 216 ГБ HBM3e создан для обслуживания моделей в Azure.",
+        "title": "Microsoft Maia 200 удешевляет инференс",
+        "url": "https://theaitrack.com/microsoft-maia-200-ai-inference-chip/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Бесплатный редактор со встроенной GPT-5.2 помогает писать и вычитывать статьи вместе с соавторами.",
+        "title": "OpenAI Prism: среда для научных текстов",
+        "url": "https://theaitrack.com/openai-launches-prism-ai-workspace-scientists/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Moonshot выложила веса K2.5. По данным ThursdAI, модель быстро стала самой используемой на OpenRouter.",
+        "title": "Kimi K2.5 возглавила открытые модели",
+        "url": "https://huggingface.co/moonshotai/Kimi-K2.5"
+      },
+      {
+        "source": "Arcee AI",
+        "text": "13B активных параметров, 17T токенов обучения и родной контекст 512K.",
+        "title": "Arcee Trinity Large: американская открытая MoE на 400B",
+        "url": "https://arcee.ai/blog/trinity-large"
+      },
+      {
+        "source": "Google Labs",
+        "text": "Подписчики Gemini Ultra в США могут генерировать управляемые миры в реальном времени, 24 кадра в секунду.",
+        "title": "Project Genie: интерактивные 3D-миры от Genie 3",
+        "url": "https://labs.google/projectgenie"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Площадка для агентов на OpenClaw выросла за считанные дни и вызвала вопросы о безопасности.",
+        "title": "Moltbook: соцсеть, где пишут только агенты",
+        "url": "https://theaitrack.com/moltbook-ai-agents-social-network/"
+      }
+    ]
+  },
+  {
+    "date": "2026-01-22",
+    "post": null,
+    "stories": [
+      {
+        "source": "GitHub",
+        "text": "Alibaba открыла под Apache 2.0 пять моделей синтеза речи от 0,6B до 1,7B с задержкой около 97 мс.",
+        "title": "Qwen3-TTS клонирует голос по 3 секундам",
+        "url": "https://github.com/QwenLM/Qwen3-TTS"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Z.ai выпустила 30B-модель с 3B активных параметров. Компания сообщает 59% на SWE-Bench Verified.",
+        "title": "GLM-4.7-Flash: маленькая MoE для кода",
+        "url": "https://huggingface.co/zai-org/GLM-4.7-Flash"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Liquid AI выпустила 1,2B-модель с рассуждениями для запуска на телефоне.",
+        "title": "LFM2.5 Thinking рассуждает в 900 МБ памяти",
+        "url": "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Thinking"
+      }
+    ]
+  },
+  {
+    "date": "2026-01-15",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Решение принято после расследований в Великобритании, США и других странах из-за дипфейков реальных людей.",
+        "title": "X ограничивает генерацию картинок в Grok",
+        "url": "https://theaitrack.com/x-moves-to-block-grok/"
+      }
+    ]
+  },
+  {
+    "date": "2026-01-08",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Открытая MoE на 102B параметров (12B активных) обучена на 19,7T токенов.",
+        "title": "Upstage выпустила Solar Open 100B",
+        "url": "https://huggingface.co/upstage/Solar-Open-100B"
+      },
+      {
+        "source": "GitHub",
+        "text": "Lightricks открыла модель, которая делает синхронные аудио и видео, вместе с кодом обучения.",
+        "title": "LTX-2 генерирует видео со звуком",
+        "url": "https://github.com/Lightricks/LTX-Video"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "NVIDIA открыла потоковую модель распознавания речи на 600M параметров для голосовых агентов.",
+        "title": "Nemotron Speech ASR: распознавание с задержкой 24 мс",
+        "url": "https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b"
+      }
+    ]
+  },
+  {
+    "date": "2025-12-31",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Сумма сделки превышает $2 млрд. Meta хочет встроить автономных агентов в свои приложения.",
+        "title": "Meta покупает агентный стартап Manus",
+        "url": "https://theaitrack.com/meta-bets-on-agentic-ai-startup-manus/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Alibaba открыла модель для инфографики и макетов с точным текстом и контролем вёрстки.",
+        "title": "Qwen-Image-2512 рисует картинки с большим количеством текста",
+        "url": "https://theaitrack.com/qwen-image-2512-open-source-image-ai/"
+      }
+    ]
+  },
+  {
+    "date": "2025-12-24",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Сделка включает активы и технологии инференса Groq. Большая часть команды переходит в NVIDIA.",
+        "title": "NVIDIA забирает технологии Groq за $20 млрд",
+        "url": "https://theaitrack.com/nvidia-groq-20b-ai-chip-deal/"
+      }
+    ]
+  },
+  {
+    "date": "2025-12-18",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "OpenAI обновила модель изображений: точнее многошаговое редактирование и текст на картинках.",
+        "title": "GPT Image 1.5 генерирует в 4 раза быстрее",
+        "url": "https://theaitrack.com/openai-gpt-image-1-5-launch/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Навыки агентов, упакованные в папки с инструкциями и скриптами, теперь описаны открытой спецификацией. Добавлено управление навыками для компаний.",
+        "title": "Anthropic открыла Agent Skills как стандарт",
+        "url": "https://theaitrack.com/anthropic-open-agent-skills-standard/"
+      },
+      {
+        "source": "Google DeepMind",
+        "text": "Быстрая модель стоит $0,50 за миллион входных токенов и заменила прошлую в приложении Gemini и AI Mode Поиска.",
+        "title": "Gemini 3 Flash стала моделью по умолчанию",
+        "url": "https://deepmind.google/technologies/gemini/flash/"
+      },
+      {
+        "source": "OpenAI",
+        "text": "Новая модель для кода вышла в API со встроенной компакцией контекста. OpenAI сообщает 56,4% на SWE-Bench Pro.",
+        "title": "GPT-5.2-Codex сжимает контекст в долгих сессиях",
+        "url": "https://openai.com/index/gpt-5-2-codex/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Гибридная Mamba-MoE на 30B (3B активных) вышла вместе с данными и рецептами обучения.",
+        "title": "NVIDIA открыла Nemotron 3 Nano",
+        "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16"
+      },
+      {
+        "source": "Google",
+        "text": "Google выпустила 270M-модель, которая превращает запросы в вызовы функций и занимает около 500 МБ памяти.",
+        "title": "FunctionGemma: вызов функций на устройстве",
+        "url": "https://ai.google.dev/gemma/docs/functiongemma"
+      }
+    ]
+  },
+  {
+    "date": "2025-12-12",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Трёхлетняя сделка открывает Sora и ChatGPT Images доступ к 200+ персонажам Disney. Disney также инвестирует $1 млрд в OpenAI.",
+        "title": "Disney лицензировала персонажей для Sora",
+        "url": "https://theaitrack.com/disney-openai-sora-ai-video-deal/"
+      }
+    ]
+  },
+  {
+    "date": "2025-12-04",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "685B MoE-модель доступна с весами. Вариант Speciale ориентирован на математику и рассуждения.",
+        "title": "DeepSeek V3.2 вышла под MIT",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
+      },
+      {
+        "source": "Mistral AI",
+        "text": "Mistral выпустила Large 3 с контекстом 256K и маленькие Ministral 3 под открытой лицензией.",
+        "title": "Mistral 3 вернулась к Apache 2.0",
+        "url": "https://mistral.ai/news/mistral-3/"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Microsoft открыла 0,5B-модель потокового TTS для голосовых интерфейсов.",
+        "title": "VibeVoice-Realtime: синтез речи с задержкой около 300 мс",
+        "url": "https://huggingface.co/microsoft/VibeVoice-Realtime-0.5B"
+      }
+    ]
+  },
+  {
+    "date": "2025-11-27",
+    "post": null,
+    "stories": [
+      {
+        "source": "Anthropic",
+        "text": "По данным Anthropic, модель набирает 80,9% на SWE-bench Verified и стоит дешевле прошлой Opus. Добавлены инструменты для долгих агентных задач.",
+        "title": "Claude Opus 4.5: новый флагман Anthropic",
+        "url": "https://www.anthropic.com/news/claude-opus-4-5"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "32B-модель изображений умеет редактировать картинку по нескольким референсам. Версия dev доступна с весами.",
+        "title": "FLUX.2: открытые веса от Black Forest Labs",
+        "url": "https://huggingface.co/black-forest-labs/FLUX.2-dev"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Alibaba Tongyi открыла 6B-модель генерации изображений, рассчитанную на скорость.",
+        "title": "Z-Image Turbo генерирует картинку меньше чем за секунду",
+        "url": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Prime Intellect выпустила MoE на 106B (12B активных) и открыла код обучения с подкреплением.",
+        "title": "INTELLECT-3: открытая модель и весь стек обучения",
+        "url": "https://huggingface.co/PrimeIntellect/INTELLECT-3"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "7B-модель для computer use работает на устройстве. Microsoft сообщает 73,5% на WebVoyager.",
+        "title": "Microsoft Fara-7B управляет компьютером локально",
+        "url": "https://huggingface.co/microsoft/Fara-7B"
+      }
+    ]
+  },
+  {
+    "date": "2025-11-20",
+    "post": null,
+    "stories": [
+      {
+        "source": "The AI Track",
+        "text": "Gemini 3 Pro сразу встроили в Поиск и Workspace. Вместе с моделью вышла Antigravity, среда для агентной разработки.",
+        "title": "Google выпустила Gemini 3 и среду Antigravity",
+        "url": "https://theaitrack.com/google-gemini-3-launch/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Anthropic покупает мощности Azure на $30 млрд, Microsoft и NVIDIA инвестируют до $15 млрд. Claude становится доступен в Azure.",
+        "title": "Microsoft, NVIDIA и Anthropic договорились о вычислениях на $30 млрд",
+        "url": "https://theaitrack.com/microsoft-nvidia-and-anthropic-ai-partnership/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "SAM 3 сегментирует объекты по текстовому описанию, SAM 3D восстанавливает 3D-модель по одной фотографии.",
+        "title": "Meta выпустила SAM 3 и SAM 3D",
+        "url": "https://theaitrack.com/meta-sam-3d-reconstruction-launch/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Модель стала доступна разработчикам по низкой цене. xAI заявляет улучшения в рассуждениях и мультимодальности.",
+        "title": "xAI открыла API Grok 4.1 Fast",
+        "url": "https://theaitrack.com/xai-grok-4-1-release/"
+      },
+      {
+        "source": "The AI Track",
+        "text": "Модель генерации изображений на базе Gemini 3 Pro лучше пишет текст на картинках на разных языках. Изображения помечаются SynthID.",
+        "title": "Google представила Nano Banana Pro",
+        "url": "https://theaitrack.com/google-nano-banana-pro-launch/"
+      }
+    ]
+  },
+  {
+    "date": "2025-11-14",
+    "post": null,
+    "stories": [
+      {
+        "source": "Meta AI",
+        "text": "Семейство моделей распознавания речи выпущено под Apache 2.0. Покрывает больше 1600 языков, включая редкие.",
+        "title": "Meta Omnilingual ASR распознаёт речь на 1600+ языках",
+        "url": "https://ai.meta.com/blog/omnilingual-asr-advancing-automatic-speech-recognition"
+      },
+      {
+        "source": "Hugging Face",
+        "text": "Мультимодальная MoE-модель с 3B активных параметров рассуждает по картинкам. Веса под Apache 2.0.",
+        "title": "Baidu открыла ERNIE-4.5-VL Thinking",
+        "url": "https://huggingface.co/ERNIE/ERNIE-4.5-VL-28B-A3B-Thinking"
+      },
+      {
+        "source": "The AI Track",
+        "text": "По отчёту Anthropic, связанная с Китаем группа использовала Claude, чтобы автоматизировать большую часть атаки примерно на 30 организаций. Аккаунты заблокированы.",
+        "title": "Anthropic: госхакеры автоматизировали шпионаж через Claude",
+        "url": "https://theaitrack.com/anthropic-chinese-cyber-espionage-operation/"
+      }
+    ]
+  },
+  {
+    "date": "2025-11-06",
+    "post": null,
+    "stories": [
+      {
+        "source": "Hugging Face",
+        "text": "Moonshot AI выложила веса MoE-модели на триллион параметров с контекстом 256K. Модель рассчитана на длинные цепочки вызовов инструментов.",
+        "title": "Kimi K2 Thinking: открытая модель-рассуждатель на 1T параметров",
+        "url": "https://huggingface.co/moonshotai/Kimi-K2-Thinking"
+      }
+    ]
+  }
+]

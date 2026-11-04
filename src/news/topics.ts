@@ -218,15 +218,27 @@ export interface Picked {
   stories: Pick[];
 }
 
+/** How far around a post's date its widget looks first: about two months. */
+export const NEAR_DAYS = 60;
+const DAY = 86_400_000;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const distance = (a: string, b: string) =>
+  Math.abs(Date.parse(a) - Date.parse(b)) / DAY;
+
 /**
  * Stories for a widget: those that mention the topics, newest edition first
- * and the stronger match first within an edition. With no match at all, the
- * newest stories, so the widget is never empty.
+ * and the stronger match first within an edition. With `near` (a post's date),
+ * matches within NEAR_DAYS of it come first, closest first, then the other
+ * matches. With no
+ * match at all, the newest stories (near the date when there are any), so the
+ * widget is never empty.
  */
 export function pickStories(
   issues: Issue[],
   topics: TopicId[],
-  limit: number
+  limit: number,
+  near?: string
 ): Picked {
   const all = [...issues]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -239,15 +251,36 @@ export function pickStories(
     seen.add(story.url);
     return fresh;
   });
+  const close = (item: Pick) =>
+    near !== undefined &&
+    DATE.test(near) &&
+    distance(item.date, near) <= NEAR_DAYS;
   const scored = unique
     .map((item, order) => ({ item, order, points: score(item.story, topics) }))
     .filter(({ points }) => points > 0)
-    .sort((a, b) =>
-      a.item.date === b.item.date
-        ? b.points - a.points || a.order - b.order
-        : b.item.date.localeCompare(a.item.date)
+    .sort(
+      (a, b) =>
+        Number(close(b.item)) - Number(close(a.item)) ||
+        (close(a.item) && near
+          ? distance(a.item.date, near) - distance(b.item.date, near)
+          : 0) ||
+        (a.item.date === b.item.date
+          ? b.points - a.points || a.order - b.order
+          : b.item.date.localeCompare(a.item.date))
     );
-  return scored.length
-    ? { matched: true, stories: scored.slice(0, limit).map(({ item }) => item) }
-    : { matched: false, stories: unique.slice(0, limit) };
+  if (scored.length) {
+    return {
+      matched: true,
+      stories: scored.slice(0, limit).map(({ item }) => item),
+    };
+  }
+  const nearby = unique
+    .filter(close)
+    .sort((a, b) =>
+      near ? distance(a.date, near) - distance(b.date, near) : 0
+    );
+  return {
+    matched: false,
+    stories: (nearby.length ? nearby : unique).slice(0, limit),
+  };
 }

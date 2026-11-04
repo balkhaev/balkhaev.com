@@ -1,4 +1,4 @@
-import { FIRST_ISSUE, type Issue } from "./content";
+import type { Issue } from "./content";
 import {
   isTopic,
   type Picked,
@@ -107,11 +107,12 @@ export function renderWidget(
   topics: TopicId[],
   limit: number,
   lang: TopicLang,
-  issues: Issue[] = [FIRST_ISSUE]
+  near: string | undefined,
+  issues: Issue[]
 ) {
-  const picked = pickStories(issues, topics, limit);
+  const picked = pickStories(issues, topics, limit, near);
   const name = topics.map((id) => TOPICS[id].label[lang]).join(", ");
-  return `<aside aria-label="${html(`${LABELS[lang].kicker}: ${name}`)}" class="news-widget" data-lang="${lang}" data-limit="${limit}" data-topics="${topics.join(" ")}">
+  return `<aside aria-label="${html(`${LABELS[lang].kicker}: ${name}`)}" class="news-widget" data-lang="${lang}" data-limit="${limit}"${near ? ` data-near="${near}"` : ""} data-topics="${topics.join(" ")}">
 ${widgetBody(picked, topics, lang)}
 </aside>`;
 }

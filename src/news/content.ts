@@ -5,6 +5,8 @@ export interface Story {
   url: string;
 }
 
+import archive from "./archive.json";
+
 export interface Issue {
   date: string;
   post: number | null;
@@ -42,3 +44,9 @@ export const FIRST_ISSUE: Issue = {
     },
   ],
 };
+
+/**
+ * Editions from before the site's digest: real stories of the preceding year,
+ * collected from release trackers and news roundups, linked to their sources.
+ */
+export const ARCHIVE = archive as Issue[];

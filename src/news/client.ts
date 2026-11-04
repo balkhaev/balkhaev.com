@@ -32,7 +32,7 @@ async function refresh() {
       const limit = parseLimit(widget.dataset.limit);
       const lang: TopicLang = widget.dataset.lang === "en" ? "en" : "ru";
       widget.innerHTML = widgetBody(
-        pickStories(issues, topics, limit),
+        pickStories(issues, topics, limit, widget.dataset.near),
         topics,
         lang
       );
