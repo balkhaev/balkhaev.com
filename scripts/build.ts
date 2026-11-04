@@ -1,4 +1,4 @@
-import { cp, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { build } from "bun";
 import { BLOG_LANGS, loadPosts } from "../src/blog/content";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../src/blog/render";
 import { LANGS } from "../src/cv/content";
 import { CV_PATHS, renderCv } from "../src/cv/render";
+import { renderHome } from "../src/home/render";
 
 const ORIGIN = "https://balkhaev.com";
 const LEGACY_FONT = /\.(?:ttf|woff)$/;
@@ -35,7 +36,6 @@ if (!result.success) {
   throw new AggregateError(result.logs, "Browser build failed");
 }
 await cp("public", "dist", { recursive: true });
-await cp("index.html", "dist/index.html");
 
 const pages = new Map<string, string>();
 for (const lang of LANGS) {
@@ -51,6 +51,7 @@ for (const lang of BLOG_LANGS) {
 for (const post of posts) {
   pages.set(blogPath(post.lang, post.slug), renderPost(post, posts));
 }
+pages.set("/", renderHome(await readFile("index.html", "utf8"), posts));
 await Promise.all([...pages].map(([path, content]) => page(path, content)));
 await Promise.all(
   BLOG_LANGS.map((lang) =>
