@@ -1,7 +1,9 @@
 ---
-title: "Build your own agent, part 2: the agent loop and tools"
+title: The agent loop and tools
 description: Give the model tools for files and shell commands, and write the harness that turns a chat into an agent.
 date: 2026-11-04
+series: company-agent
+part: 3
 tags: [agents, practice, claude]
 ---
 
@@ -9,7 +11,7 @@ tags: [agents, practice, claude]
 An agent is a chat where the model can ask you to call a function. We describe tools with a JSON schema, the model replies with a `tool_use` block, we run the function and send back a `tool_result`. The loop runs until the model says it is done. About 150 lines get us an agent that reads a project, edits files and runs the tests.
 :::
 
-This is part 2 of the build-your-own-agent series. In [part 1](/blog/agent-1-first-call/) we wrote a terminal chat. Now we teach the model to act.
+This is part 3 of the company agent series. In [the previous part](/blog/agent-first-call/) we wrote a terminal chat. Now we teach the model to act.
 
 ## How a model calls a function
 
@@ -297,7 +299,7 @@ Give it a task in a small project: "find where the order total is computed and a
 **`MAX_STEPS` protects your wallet.** An agent can loop: fix one test, break another, fix that, break the first. Thirty steps cover ordinary tasks; beyond that, ask a human.
 
 :::warning
-Confirming `run_command` protects against accidents, not inattention. Do not run the agent in a folder with secrets, and do not turn on auto-approve until it runs in a container. Isolation is covered in part 6.
+Confirming `run_command` protects against accidents, not inattention. Do not run the agent in a folder with secrets, and do not turn on auto-approve until it runs in a container. Isolation is covered in the production part.
 :::
 
 ## How this differs from Claude Code
@@ -308,4 +310,4 @@ The bigger takeaway is this: an agent is not magic inside the model, it is a few
 
 ## Next
 
-The tools are hard-coded in the agent for now. In part 3 we connect **MCP**, the protocol that lets an agent get tools from external servers. We will plug in ready-made servers for GitHub and the file system and write our own.
+The tools are hard-coded in the agent for now. In the next part we connect **MCP**, the protocol that lets an agent get tools from external servers. Through it the agent reaches the company's internal systems: the database, the wiki, the issue tracker. We will write our own MCP server for the database.

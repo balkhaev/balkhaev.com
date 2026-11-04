@@ -1,7 +1,9 @@
 ---
-title: "Build your own agent, part 1: talking to a model"
+title: Talking to a model
 description: Take a commercial model API and write a streaming terminal chat with history in 40 lines.
 date: 2026-11-04
+series: company-agent
+part: 2
 tags: [agents, practice, claude]
 ---
 
@@ -9,16 +11,7 @@ tags: [agents, practice, claude]
 Every agent starts as a plain chat. In this part we get an API key, install the SDK and write `chat.ts`: a terminal chat that streams the reply, keeps the history and shows how many tokens each turn cost.
 :::
 
-This is the first part of a series where we build an AI agent step by step, from the first request to a model up to a service with tools, MCP and OAuth. No frameworks: TypeScript and [Bun](https://bun.sh), and every step runs.
-
-## The series
-
-1. **Talking to a model.** Key, SDK, streaming, history. *This part.*
-2. **[The agent loop](/blog/agent-2-agent-loop/).** Tools, the harness, confirming dangerous actions.
-3. **MCP.** Plug ready-made MCP servers into the agent and write one of our own.
-4. **OAuth.** Remote MCP servers that need the user to sign in.
-5. **Context and money.** Prompt caching, compacting history, limits.
-6. **Production.** The agent as an HTTP service, logs, quality checks, security.
+This is part 2 of the series on building a company AI agent. [Part 1](/blog/agent-concept/) covered what we are building and what it is made of. Now we start writing code: no frameworks, TypeScript and [Bun](https://bun.sh), and every step runs.
 
 ## What an agent is
 
@@ -80,7 +73,7 @@ bun hello.ts
 
 Three things in the reply matter.
 
-- **`content` is an array of blocks**, not a string. Besides `text` it can hold reasoning (`thinking`) and tool calls (`tool_use`). Part 2 builds the whole agent on the latter.
+- **`content` is an array of blocks**, not a string. Besides `text` it can hold reasoning (`thinking`) and tool calls (`tool_use`). The next part builds the whole agent on the latter.
 - **`stop_reason`** says why the model stopped: `end_turn` (finished), `max_tokens` (hit the limit), `tool_use` (wants a tool), `refusal` (declined to answer).
 - **`usage`** counts input and output tokens. That is what you pay for: Opus 5.5 costs 4 dollars per million input tokens and 20 per million output tokens.
 
@@ -96,7 +89,7 @@ const messages: Anthropic.MessageParam[] = [
 ];
 ```
 
-Two consequences will matter later. Each request costs more than the last, because the history keeps growing. And you fully control what the model "remembers": you can cut, compress or replace anything. Part 5 is about exactly that.
+Two consequences will matter later. Each request costs more than the last, because the history keeps growing. And you fully control what the model "remembers": you can cut, compress or replace anything. The part on context and money is about exactly that.
 
 ## Step 5. A streaming chat
 
@@ -168,4 +161,4 @@ Want to spend less while experimenting? Switch the model to `claude-haiku-5-5`: 
 
 ## Next
 
-We have a model that can only talk. In [part 2](/blog/agent-2-agent-loop/) we give it hands: tools to read files and run commands, and a loop that turns the chat into an agent.
+We have a model that can only talk. In [the next part](/blog/agent-loop/) we give it hands: tools to read files and run commands, and a loop that turns the chat into an agent.

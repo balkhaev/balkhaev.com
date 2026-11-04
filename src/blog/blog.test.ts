@@ -1,7 +1,19 @@
 import { expect, test } from "bun:test";
-import { loadPosts, parsePost } from "./content";
+import {
+  checkSeries,
+  loadPosts,
+  loadSeries,
+  parsePost,
+  parseSeries,
+} from "./content";
 import { renderMarkdown } from "./markdown";
-import { blogPath, renderFeed, renderIndex, renderPost } from "./render";
+import {
+  blogPath,
+  renderFeed,
+  renderIndex,
+  renderPost,
+  renderSeries,
+} from "./render";
 
 const post = (frontmatter: string, body = "Hello **world**.") =>
   `---\n${frontmatter}\n---\n${body}\n`;
@@ -141,4 +153,65 @@ test("the feed lists one language with escaped content", async () => {
 test("every committed post is valid", async () => {
   const posts = await loadPosts("content/blog", true);
   expect(posts.length).toBeGreaterThan(0);
+});
+
+const SERIES = `---
+title: Agents
+description: A series.
+plan: [One, Two, Three]
+---
+Intro.
+`;
+
+test("series link their parts and list the ones still to come", async () => {
+  const series = await parseSeries("s.md", SERIES, "agents", "en");
+  const one = await parsePost(
+    "1.md",
+    post(`${VALID}\nseries: agents\npart: 1`),
+    "one",
+    "en"
+  );
+  const two = await parsePost(
+    "2.md",
+    post(`${VALID}\nseries: agents\npart: 2`),
+    "two",
+    "en"
+  );
+  checkSeries([one, two], [series]);
+  const page = renderPost(one, [one, two], [series]);
+  expect(page).toContain("part 1 of 3");
+  expect(page).toContain('href="/blog/two/" rel="next"');
+  expect(page).toContain("coming soon");
+  const overview = renderSeries(series, [one, two], [series]);
+  expect(overview).toContain("2 of 3 parts out");
+  expect(overview).toContain("<span>Three</span>");
+  expect(renderIndex("en", [one, two], [series])).toContain(
+    'href="/blog/series/agents/"'
+  );
+});
+
+test("a post must name an existing series and a planned part", async () => {
+  const series = await parseSeries("s.md", SERIES, "agents", "en");
+  const lost = await parsePost(
+    "x.md",
+    post(`${VALID}\nseries: other\npart: 1`),
+    "x",
+    "en"
+  );
+  expect(() => checkSeries([lost], [series])).toThrow("no en series");
+  const late = await parsePost(
+    "y.md",
+    post(`${VALID}\nseries: agents\npart: 4`),
+    "y",
+    "en"
+  );
+  expect(() => checkSeries([late], [series])).toThrow("past the plan");
+  await expect(
+    parsePost("z.md", post(`${VALID}\nseries: agents`), "z", "en")
+  ).rejects.toThrow('"part"');
+});
+
+test("every committed series is valid", async () => {
+  const posts = await loadPosts("content/blog", true);
+  checkSeries(posts, await loadSeries("content/series"));
 });
