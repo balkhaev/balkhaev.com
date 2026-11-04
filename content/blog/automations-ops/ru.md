@@ -11,7 +11,7 @@ tags: [automation, operations, backups, monitoring, postgres]
 Каждые 5 минут воркер через очередь пингует Healthchecks, а отдельный сервис проверяет `/health` снаружи: если умрёт хоть что-то, тревога придёт из-за пределов сервера. Логи Docker ограничены по размеру. Каждую ночь `backup.sh` снимает дамп базы, шифрует его через age и кладёт в объектное хранилище другого провайдера ключом без права удаления, а раз в месяц `restore-check.sh` проверяет, что дамп восстанавливается. Каждый запрос к Claude записывается со стоимостью: расход виден в утренней сводке, а превышение дневного лимита вызывает тревогу. Секреты лежат только в `.env` на сервере, а их список ведётся в репозитории в `.env.example`.
 :::
 
-Это восьмая, последняя часть цикла про коммерческие автоматизации. В [прошлой части](/blog/ru/automations-analytics/) система научилась сама замечать проблемы в бизнесе. Теперь научим её замечать проблемы в себе самой и позаботимся о том, что будет, когда сервер однажды сгорит.
+Это восьмая, последняя часть цикла про коммерческие автоматизации. В [прошлой части](/blog/ru/automations-analytics/) система научилась сама замечать проблемы в бизнесе. Теперь научим её замечать проблемы в себе самой и позаботимся о том, что будет, когда сервер однажды сгорит. В статье только ключевые фрагменты кода, полный код серии с тестами лежит в [репозитории](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## Что может пойти не так
 
@@ -76,7 +76,7 @@ heartbeat: async () => {
 
 ## Шаг 2. Логи
 
-По умолчанию Docker хранит логи контейнеров без ограничений. Через полгода болтливый воркер займёт ими весь диск, и упадёт база. Ограничиваем все сервисы одним якорем: не больше пяти файлов по 10 МБ на контейнер.
+По умолчанию Docker хранит логи контейнеров без ограничений. Через полгода болтливый воркер займёт ими весь диск, и упадёт база. Ограничиваем все сервисы одним якорем: не больше пяти файлов по 10 МБ на контейнер. Якорь объявляется в начале `compose.yml` и подключается в общем `x-app` и в сервисах `db` и `caddy`:
 
 ```yaml
 # compose.yml
@@ -87,60 +87,8 @@ x-logging: &logging
     max-size: 10m
     max-file: "5"
 
-x-app: &app
-  image: ghcr.io/your-name/automations:${TAG:-latest}
-  restart: unless-stopped
-  logging: *logging
-  env_file: .env
-  environment:
-    DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
-    TZ: Europe/Moscow
-  depends_on:
-    db:
-      condition: service_healthy
-
-services:
-  app:
-    <<: *app
-
-  worker:
-    <<: *app
-    command: ["bun", "src/worker.ts"]
-    stop_grace_period: 60s
-
-  db:
-    image: postgres:18
-    restart: unless-stopped
-    logging: *logging
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: app
-    volumes:
-      # С Postgres 18 образ хранит данные в /var/lib/postgresql/18/docker
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      retries: 10
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    logging: *logging
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  pgdata:
-  caddy_data:
-  caddy_config:
+# и в каждом сервисе, включая db и caddy:
+#   logging: *logging
 ```
 
 Для системы такого размера стек сбора логов не нужен. Хватает `docker compose logs -f --since 1h worker` и `grep`. Ошибки задач и так видны в таблице `jobs` в поле `last_error`, а окончательные провалы приходят в чат тревог.
@@ -155,108 +103,26 @@ Docker-том на том же сервере это не бэкап. Сгори
 2. **Зашифрован.** Дампы шифруются через [age](https://age-encryption.org) открытым ключом. Закрытый ключ на сервере не лежит, он хранится в менеджере паролей. Хранилище и любой, кто получит к нему доступ, видят только шифрованные файлы.
 3. **Его нельзя стереть с сервера.** Ключ доступа к хранилищу может записывать, но не может удалять. Старые копии удаляет правило жизненного цикла на стороне хранилища, например через 30 дней. Если сервер взломают, злоумышленник не сможет уничтожить бэкапы. Если хранилище поддерживает версионирование или блокировку объектов, включите и их.
 
-Ставим на сервер age и [rclone](https://rclone.org): `apt install age rclone`. Сам `backup.sh` лежит в репозитории, и деплой из второй части копирует его на сервер вместе с `compose.yml`: в шаге `scp` добавился ещё один файл.
+Ставим на сервер age и [rclone](https://rclone.org): `apt install age rclone`. Сам `backup.sh` лежит в репозитории, и деплой из второй части копирует его на сервер вместе с `compose.yml`: в шаге `scp` добавился ещё один файл. Скрипт запускается из cron каждую ночь в 03:30. Полная версия [в репозитории](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/backup.sh), а суть в шести строках:
 
 ```bash
-#!/usr/bin/env bash
-# backup.sh: зашифрованный дамп базы в объектное хранилище в другом месте.
-# Запускается из cron на сервере, например каждую ночь в 03:30:
-#   30 3 * * * /opt/automations/backup.sh >> /var/log/automations-backup.log 2>&1
-set -euo pipefail # pipefail: упавший pg_dump должен ронять скрипт, а не загружать пустой файл
-cd "$(dirname "$0")"
-source ./backup.env
-
-# Если что-то ниже упадёт, сразу сообщаем Healthchecks, не дожидаясь тишины
+# backup.sh, главное
+set -euo pipefail # упавший pg_dump должен ронять скрипт, а не загружать пустой файл
 trap 'curl -fsS -m 10 --retry 3 "$BACKUP_PING_URL/fail" > /dev/null || true' ERR
 
-name="app-$(date +%Y-%m-%d-%H%M).dump.age"
-file="$(mktemp)"
-trap 'rm -f "$file"' EXIT
-
-# Формат custom сжат, и pg_restore умеет восстановить из него отдельную таблицу.
-# age шифрует открытым ключом: закрытый ключ на этом сервере никогда не лежит.
 docker compose exec -T db pg_dump -U app -Fc app | age -r "$BACKUP_RECIPIENT" > "$file"
-
-# Не загружаем подозрительно маленький файл: дамп живой базы не бывает размером в 1 КБ
-size=$(stat -c %s "$file")
-if [ "$size" -lt 1024 ]; then
-  echo "бэкап всего $size байт, не загружаем" >&2
-  false
-fi
-
+[ "$(stat -c %s "$file")" -ge 1024 ] # дамп живой базы не бывает меньше 1 КБ
 rclone copyto "$file" "backup:$BACKUP_BUCKET/automations/$name"
-echo "$(date -Is) загружен $name ($size байт)"
-
 curl -fsS -m 10 --retry 3 "$BACKUP_PING_URL" > /dev/null
 ```
 
 `set -o pipefail` здесь важнее всего остального. Без него в цепочке `pg_dump | age` код возврата берётся у последней команды. Если `pg_dump` упадёт, age честно зашифрует пустоту, и скрипт с успехом загрузит пустой файл. С `pipefail` скрипт остановится, пингнёт Healthchecks адресом `/fail`, а проверка размера отсечёт и более экзотические случаи.
 
-Настройки лежат рядом, в отдельном файле с правами `600`:
-
-```bash
-# backup.env.example: настройки backup.sh. Скопируйте в backup.env, chmod 600.
-
-# Открытый ключ age (age1...). Закрытый хранится в менеджере паролей.
-BACKUP_RECIPIENT=age1...
-
-# Бакет в S3-совместимом хранилище у другого провайдера, не у того, где сервер
-BACKUP_BUCKET=my-backups
-
-# rclone берёт хранилище "backup" из этих переменных, файл настроек не нужен
-export RCLONE_CONFIG_BACKUP_TYPE=s3
-export RCLONE_CONFIG_BACKUP_PROVIDER=Other
-export RCLONE_CONFIG_BACKUP_ENDPOINT=https://s3.example-storage.com
-export RCLONE_CONFIG_BACKUP_ACCESS_KEY_ID=
-export RCLONE_CONFIG_BACKUP_SECRET_ACCESS_KEY=
-# Ключ может писать, но не удалять; старые бэкапы удаляет правило жизненного цикла
-export RCLONE_CONFIG_BACKUP_NO_CHECK_BUCKET=true
-
-# Проверка в Healthchecks для бэкапов: пинг раз в 24 часа
-BACKUP_PING_URL=https://hc-ping.com/your-uuid
-```
-
-Для бэкапов заведите в Healthchecks отдельную проверку с периодом сутки. Если ночной бэкап не прошёл или cron вообще не запустился, утром придёт тревога.
+Настройки лежат рядом, в отдельном файле `backup.env` с правами `600`: открытый ключ age, имя бакета, доступ к хранилищу для rclone (через переменные `RCLONE_CONFIG_BACKUP_*`, без файла настроек) и адрес пинга Healthchecks. Шаблон лежит в репозитории как [`backup.env.example`](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/backup.env.example). Для бэкапов заведите в Healthchecks отдельную проверку с периодом сутки. Если ночной бэкап не прошёл или cron вообще не запустился, утром придёт тревога.
 
 ## Шаг 4. Проверка восстановления
 
-Бэкап, который никто ни разу не восстанавливал, это надежда, а не бэкап. Дамп может оказаться пустым, ключ может потеряться, формат может не подойти к новой версии Postgres. Узнавать об этом в день аварии поздно. Поэтому раз в месяц на своём компьютере скачиваем свежий файл из хранилища и запускаем:
-
-```bash
-#!/usr/bin/env bash
-# restore-check.sh <файл бэкапа> <файл закрытого ключа age>
-# Восстанавливает бэкап во временный Postgres и показывает число строк.
-# Запускайте раз в месяц на своём компьютере: бэкап, который никто не восстанавливал, это надежда, а не бэкап.
-set -euo pipefail
-backup="$1"
-key="$2"
-name="restore-check-$$"
-
-docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=check postgres:18 > /dev/null
-trap 'docker stop "$name" > /dev/null' EXIT
-until docker exec "$name" pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
-
-docker exec "$name" createdb -U postgres app
-age -d -i "$key" "$backup" | docker exec -i "$name" pg_restore -U postgres -d app --no-owner
-
-docker exec "$name" psql -U postgres -d app -c "
-  select 'leads' as table, count(*) as rows, max(created_at) as newest from leads
-  union all select 'orders', count(*), max(created_at) from orders
-  union all select 'tickets', count(*), max(created_at) from tickets
-  union all select 'events', count(*), max(received_at) from events"
-```
-
-Скрипт поднимает временный Postgres, восстанавливает в него дамп и показывает число строк и дату самой свежей записи по основным таблицам. Вот результат локального прогона на тестовой базе:
-
-```text
-  table  | rows |            newest
----------+------+-------------------------------
- leads   |    1 | 2026-11-04 11:36:59.329272+00
- orders  |    1 | 2026-11-04 11:36:59.329272+00
- tickets |    0 |
- events  |    0 |
-(4 rows)
-```
+Бэкап, который никто ни разу не восстанавливал, это надежда, а не бэкап. Дамп может оказаться пустым, ключ может потеряться, формат может не подойти к новой версии Postgres. Узнавать об этом в день аварии поздно. Поэтому раз в месяц на своём компьютере скачиваем свежий файл из хранилища и запускаем [`restore-check.sh`](https://github.com/balkhaev/balkhaev.com/blob/main/examples/automations/restore-check.sh) с путём к файлу и к закрытому ключу age. Скрипт поднимает временный Postgres в Docker, расшифровывает дамп, восстанавливает его через `pg_restore` и показывает число строк и дату самой свежей записи по заявкам, заказам, обращениям и событиям.
 
 Если числа похожи на правду, а самая свежая запись вчерашняя, бэкапы работают. Заодно вы потренировались в восстановлении, и в день аварии будете делать это не впервые.
 
@@ -265,48 +131,7 @@ docker exec "$name" psql -U postgres -d app -c "
 Секретов в системе уже полтора десятка: токен бота, ключи ЮKassa, почты, Claude, хранилища, секреты вебхуков. Правила простые.
 
 - **Секреты живут только в `.env` на сервере** с правами `600`. В git его нет, в образ он не попадает (он в `.dockerignore` со второй части).
-- **Список секретов живёт в репозитории** в виде `.env.example` без значений. Новый человек или новый сервер сразу видят, что нужно заполнить, а `required()` в `config.ts` не даст запуститься без обязательного.
-
-```bash
-# .env.example: все настройки, которые читает сервис. Скопируйте в .env на сервере,
-# заполните, chmod 600. Настоящий .env никогда не попадает в git.
-
-# База (compose собирает из этого DATABASE_URL)
-POSTGRES_PASSWORD=
-
-# Входящие вебхуки
-SITE_WEBHOOK_SECRET=
-TELEGRAM_WEBHOOK_SECRET=
-
-# Бот и чаты Telegram
-TELEGRAM_BOT_TOKEN=
-ALERT_CHAT_ID=
-LEADS_CHAT_ID=
-SUPPORT_CHAT_ID=
-DIGEST_CHAT_ID=
-
-# Заявки
-FORM_REDIRECT_URL=https://example.com/thanks
-CRM_WEBHOOK_URL=
-
-# Оплаты
-YOOKASSA_SHOP_ID=
-YOOKASSA_SECRET_KEY=
-PUBLIC_URL=https://auto.example.com
-ACCESS_URL=https://example.com/access/
-
-# Почта
-EMAIL_API_KEY=
-EMAIL_FROM=
-EMAIL_INBOUND_SECRET=
-
-# Claude
-ANTHROPIC_API_KEY=
-LLM_DAILY_LIMIT_USD=5
-
-# Эксплуатация
-HEARTBEAT_URL=
-```
+- **Список секретов живёт в репозитории** в виде `.env.example` без значений. Новый человек или новый сервер сразу видят, что нужно заполнить, а `required()` в `config.ts` не даст запуститься без обязательного. В нашем `.env.example` около двадцати строк, сгруппированных по частям цикла: база, вебхуки, Telegram, заявки, оплаты, почта, Claude, эксплуатация.
 
 - **В GitHub только то, что нужно для деплоя:** SSH-ключ в секретах Actions и адрес сервера в переменных. Образ публикуется встроенным `GITHUB_TOKEN`, и ни один ключ приложения GitHub не видит.
 - **У каждого ключа минимальные права.** Вебхук Bitrix24 только с правами на CRM, ключ хранилища без права удаления, для Claude отдельный workspace в Console со своим лимитом расходов. Утечка одного ключа не открывает всё остальное.
@@ -317,35 +142,9 @@ HEARTBEAT_URL=
 
 **Инфраструктура.** Для всего, что мы построили, хватает одной небольшой VPS: 2 vCPU и 2–4 ГБ памяти. Ориентир на момент написания: несколько сотен рублей или 5–10 евро в месяц. Хранилище для бэкапов стоит копейки, у Healthchecks и uptime-сервисов есть бесплатные тарифы, у почтовых сервисов тоже бесплатные объёмы для небольшой нагрузки. Проверьте актуальные условия, они меняются.
 
-**Claude.** Здесь расходы зависят от нагрузки, и их нужно не угадывать, а измерять. Каждый запрос теперь записывается в таблицу вместе со стоимостью:
-
-```sql
--- migrations/007_llm_usage.sql
--- Одна строка на запрос к модели: для чего, сколько токенов и сколько стоил
-create table llm_usage (
-  id bigint generated always as identity primary key,
-  task text not null,
-  model text not null,
-  input_tokens int not null,
-  cache_read_tokens int not null,
-  cache_write_tokens int not null,
-  output_tokens int not null,
-  cost numeric(12, 6) not null, -- в долларах
-  created_at timestamptz not null default now()
-);
-
-create index llm_usage_created on llm_usage (created_at);
-```
+**Claude.** Здесь расходы зависят от нагрузки, и их нужно не угадывать, а измерять. Каждый запрос теперь записывается в таблицу `llm_usage`: задача, модель, входные токены, прочитанные из кэша и записанные в кэш, выходные токены и стоимость в долларах. Запись делает `askJson` сразу после ответа модели, а стоимость считает по `usage` из ответа:
 
 ```ts
-// src/claude.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { sql } from "./db";
-import { PermanentError } from "./errors";
-
-const client = new Anthropic();
-const MODEL = "claude-opus-5-5";
-
 // Доллары за миллион токенов. Цены меняются: сверяйтесь с сайтом Anthropic
 const PRICE = { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 };
 
@@ -358,61 +157,6 @@ export function cost(usage: Anthropic.Beta.BetaUsage) {
       usage.output_tokens * PRICE.output) /
     1_000_000
   );
-}
-
-/**
- * Один запрос, ответ на который обязан соответствовать JSON Schema. Через эту
- * функцию идёт каждая автоматизация, которая просит модель заполнить поля.
- */
-export async function askJson<T>(request: {
-  task: string;
-  system: string | Anthropic.Beta.BetaTextBlockParam[];
-  content: string;
-  schema: Record<string, unknown>;
-  effort: "low" | "medium" | "high";
-}): Promise<T> {
-  let response: Anthropic.Beta.BetaMessage;
-  try {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      // Если модель откажется, API повторит запрос на запасной модели
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: {
-        effort: request.effort,
-        format: { type: "json_schema", schema: request.schema },
-      },
-      system: request.system,
-      messages: [{ role: "user", content: request.content }],
-    });
-  } catch (error) {
-    // 400 значит, что неправ наш запрос: повтор не поможет
-    if (error instanceof Anthropic.BadRequestError) {
-      throw new PermanentError(error.message);
-    }
-    throw error; // 429, 5xx, сеть: очередь повторит
-  }
-
-  // Каждый запрос записывается: сводка показывает расход, тревога следит за лимитом
-  const usage = response.usage;
-  await sql`
-    insert into llm_usage (task, model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost)
-    values (${request.task}, ${response.model}, ${usage.input_tokens}, ${usage.cache_read_input_tokens ?? 0},
-            ${usage.cache_creation_input_tokens ?? 0}, ${usage.output_tokens}, ${cost(usage)})
-  `;
-  console.log(
-    `claude ${request.task}: in ${usage.input_tokens}, cached ${usage.cache_read_input_tokens ?? 0}, out ${usage.output_tokens}`
-  );
-
-  if (response.stop_reason === "refusal") {
-    throw new PermanentError(`модель отказалась: ${request.task}`);
-  }
-  const text = response.content.find((block) => block.type === "text");
-  if (!text) {
-    throw new Error(`в ответе нет текста, stop_reason ${response.stop_reason}`);
-  }
-  return JSON.parse(text.text);
 }
 ```
 
@@ -462,69 +206,7 @@ docker compose up -d
 
 ## Шаг 8. Тесты
 
-Новые тесты проверяют расчёт стоимости с учётом кэша, запись каждого запроса к модели, однократную тревогу о лимите и то, что пульс пингует адрес и громко падает, если адрес недоступен. Падение здесь правильное поведение: очередь повторит задачу, а Healthchecks, не дождавшись пинга, поднимет тревогу.
-
-```ts
-// test/ops.test.ts
-import { beforeEach, expect, test } from "bun:test";
-import { evaluate, runChecks } from "../src/alerts";
-import { askJson, cost } from "../src/claude";
-import { config } from "../src/config";
-import { sql } from "../src/db";
-import { handlers } from "../src/handlers";
-import type { Job } from "../src/queue";
-import { calls, claude, reset } from "./stubs";
-
-beforeEach(async () => {
-  reset();
-  await sql`truncate llm_usage, alerts, jobs restart identity cascade`;
-});
-
-test("the cost counts cached input at the cache price", () => {
-  const usage = {
-    input_tokens: 1_000,
-    cache_read_input_tokens: 10_000,
-    cache_creation_input_tokens: 0,
-    output_tokens: 500,
-  } as any;
-  // 1000 × $4 + 10 000 × $0.20 + 500 × $20, за миллион токенов
-  expect(cost(usage)).toBeCloseTo(0.016, 6);
-});
-
-test("every model request is recorded with its tokens and cost", async () => {
-  claude.answer = { ok: true };
-  await askJson({ task: "test", system: "s", content: "c", schema: { type: "object" }, effort: "low" });
-  const [row] = await sql`select task, model, input_tokens, output_tokens, cost::float8 from llm_usage`;
-  // Заглушка отвечает 1000 входных и 100 выходных токенов
-  expect(row).toEqual({ task: "test", model: "claude-opus-5-5", input_tokens: 1000, output_tokens: 100, cost: 0.006 });
-});
-
-test("spending over the daily limit raises one alert", async () => {
-  await sql`
-    insert into llm_usage (task, model, input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, cost)
-    values ('x', 'm', 0, 0, 0, 0, ${config.llmDailyLimit + 1})
-  `;
-  await evaluate(await runChecks());
-  await evaluate(await runChecks());
-  const alerts = calls.filter((c) => c.method === "sendMessage" && String(c.body.text).includes("Claude сегодня обошёлся"));
-  expect(alerts).toHaveLength(1);
-});
-
-test("the heartbeat pings the monitoring URL and fails loudly if it can't", async () => {
-  config.heartbeatUrl = "http://localhost:3995/ping/abc"; // заглушка почты записывает любой запрос
-  await handlers.heartbeat({}, {} as Job);
-  expect(calls.filter((c) => c.api === "email" && c.method === "abc")).toHaveLength(1);
-
-  config.heartbeatUrl = "http://localhost:1/unreachable";
-  await expect(handlers.heartbeat({}, {} as Job)).rejects.toThrow();
-  config.heartbeatUrl = "";
-});
-```
-
-```text
- 34 pass
- 0 fail
-```
+Новые тесты проверяют расчёт стоимости с учётом кэша, запись каждого запроса к модели, однократную тревогу о лимите и то, что пульс пингует адрес и громко падает, если адрес недоступен. Падение здесь правильное поведение: очередь повторит задачу, а Healthchecks, не дождавшись пинга, поднимет тревогу. Например, для 1000 входных токенов, 10 000 из кэша и 500 выходных стоимость должна выйти ровно 0.016 доллара.
 
 Новых обязательных переменных нет: без `HEARTBEAT_URL` пульс просто ничего не делает, а у лимита расходов есть значение по умолчанию.
 
@@ -554,4 +236,4 @@ test("the heartbeat pings the monitoring URL and fails loudly if it can't", asyn
 
 Это около 2200 строк кода и SQL и ещё 700 строк тестов, без единого фреймворка, и каждую строку можно прочитать и понять. Через всю систему проходят несколько идей: событие сначала сохраняется и только потом обрабатывается, у каждого действия есть ключ идемпотентности, гонки решает один условный `update`, модель помогает человеку, но решает и отправляет человек, а о проблемах система сообщает сама, один раз и по делу.
 
-Все части цикла собраны на [странице серии](/blog/ru/series/automations/).
+Весь код с тестами лежит в [репозитории](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations), а все части цикла собраны на [странице серии](/blog/ru/series/automations/).

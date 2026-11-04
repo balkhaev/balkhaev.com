@@ -97,49 +97,24 @@ Two consequences will matter later. Each request costs more than the last, becau
 
 A reply can take tens of seconds to generate. Rather than stare at an empty screen, we stream: text prints as it is generated, and `finalMessage()` returns the complete reply at the end.
 
+The whole `chat.ts` is about 40 lines: a loop reads a line from the terminal, appends it to `messages` and sends the request. This is the part that matters:
+
 ```ts
-// chat.ts
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
+const stream = client.messages.stream({
+  model: "claude-opus-5-5",
+  max_tokens: 16000,
+  output_config: { effort: "low" },
+  system,
+  messages,
+});
+stream.on("text", (delta) => process.stdout.write(delta));
+const reply = await stream.finalMessage();
 
-const client = new Anthropic(); // reads the key from ANTHROPIC_API_KEY
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-const system = "You are a concise programming assistant. Get to the point.";
-const messages: Anthropic.MessageParam[] = [];
-
-while (true) {
-  const input = (await rl.question("\n> ")).trim();
-  if (!input || input === "/exit") break;
-
-  messages.push({ role: "user", content: input });
-
-  const stream = client.messages.stream({
-    model: "claude-opus-5-5",
-    max_tokens: 16000,
-    output_config: { effort: "low" },
-    system,
-    messages,
-  });
-
-  stream.on("text", (delta) => process.stdout.write(delta));
-  const reply = await stream.finalMessage();
-
-  if (reply.stop_reason === "refusal") {
-    console.log("\n[the model declined to answer]");
-    messages.pop(); // keep this question out of the history
-    continue;
-  }
-
-  // Store the whole content in the history, not just the text
-  messages.push({ role: "assistant", content: reply.content });
-
-  const { input_tokens, output_tokens } = reply.usage;
-  console.log(`\n[${input_tokens} in / ${output_tokens} out]`);
-}
-
-rl.close();
+// store the whole content in history, not just the text
+messages.push({ role: "assistant", content: reply.content });
 ```
+
+The rest is plumbing: quit on `/exit`, drop the last question from history when `stop_reason` is `"refusal"`, and print `reply.usage` after each answer.
 
 ```bash
 bun chat.ts

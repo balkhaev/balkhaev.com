@@ -40,69 +40,19 @@ MCP это стандартный способ дать агенту инстр�
 
 Чтобы всё запускалось без настоящей инфраструктуры, возьмём SQLite, который встроен в Bun. Три таблицы: сотрудники, клиенты и сделки. В реальной компании на этом месте будет Postgres или ClickHouse, код сервера поменяется минимально.
 
-```ts
-// seed.ts
-import { Database } from "bun:sqlite";
+`seed.ts` создаёт эти таблицы и заполняет их: пять сотрудников с окладами, пять клиентов из разных регионов и 60 сделок за июль–октябрь 2026 года со случайными суммами и стадиями. Важно здесь только устройство таблиц:
 
-const db = new Database("company.db");
-db.exec(`
-  DROP TABLE IF EXISTS deals; DROP TABLE IF EXISTS clients; DROP TABLE IF EXISTS employees;
-  CREATE TABLE employees (
-    id INTEGER PRIMARY KEY, name TEXT, department TEXT, position TEXT, salary INTEGER
-  );
-  CREATE TABLE clients (
-    id INTEGER PRIMARY KEY, name TEXT, region TEXT, industry TEXT
-  );
-  CREATE TABLE deals (
-    id INTEGER PRIMARY KEY,
-    client_id INTEGER REFERENCES clients(id),
-    owner_id INTEGER REFERENCES employees(id),
-    amount INTEGER,           -- в рублях
-    stage TEXT,               -- lead | negotiation | won | lost
-    closed_at TEXT            -- дата закрытия, YYYY-MM-DD, NULL если открыта
-  );
-`);
-
-const employees = [
-  ["Анна Петрова", "Продажи", "Руководитель отдела", 320000],
-  ["Игорь Смирнов", "Продажи", "Менеджер", 180000],
-  ["Олег Ким", "Продажи", "Менеджер", 170000],
-  ["Мария Орлова", "Разработка", "Тимлид", 380000],
-  ["Денис Волков", "Разработка", "Backend-разработчик", 290000],
-];
-for (const e of employees) {
-  db.run("INSERT INTO employees (name, department, position, salary) VALUES (?, ?, ?, ?)", e);
-}
-
-const clients = [
-  ["Северсталь-Сервис", "Северо-Запад", "Промышленность"],
-  ["Вкусно и рядом", "Москва", "Ритейл"],
-  ["ТрансЛогистик", "Урал", "Логистика"],
-  ["МедТех", "Москва", "Медицина"],
-  ["Байкал Тур", "Сибирь", "Туризм"],
-];
-for (const c of clients) {
-  db.run("INSERT INTO clients (name, region, industry) VALUES (?, ?, ?)", c);
-}
-
-// Детерминированный генератор, чтобы у всех получились одинаковые данные
-let seed = 42;
-const rand = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
-const stages = ["lead", "negotiation", "won", "won", "lost"];
-for (let i = 0; i < 60; i++) {
-  const stage = stages[Math.floor(rand() * stages.length)];
-  const month = 7 + Math.floor(rand() * 4); // июль–октябрь
-  const day = 1 + Math.floor(rand() * 28);
-  const closed =
-    stage === "won" || stage === "lost"
-      ? `2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-      : null;
-  db.run(
-    "INSERT INTO deals (client_id, owner_id, amount, stage, closed_at) VALUES (?, ?, ?, ?, ?)",
-    [1 + Math.floor(rand() * 5), 1 + Math.floor(rand() * 3), 100_000 * (1 + Math.floor(rand() * 40)), stage, closed],
-  );
-}
-console.log("company.db готова");
+```sql
+CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT, department TEXT, position TEXT, salary INTEGER);
+CREATE TABLE clients   (id INTEGER PRIMARY KEY, name TEXT, region TEXT, industry TEXT);
+CREATE TABLE deals (
+  id INTEGER PRIMARY KEY,
+  client_id INTEGER REFERENCES clients(id),
+  owner_id  INTEGER REFERENCES employees(id),
+  amount INTEGER,  -- в рублях
+  stage TEXT,      -- lead | negotiation | won | lost
+  closed_at TEXT   -- YYYY-MM-DD, NULL у открытых
+);
 ```
 
 ```bash
@@ -114,72 +64,30 @@ bun seed.ts
 
 Сервер даёт два инструмента: `describe_schema` возвращает описание таблиц, `query` выполняет один `SELECT`.
 
+Почти весь `db-server.ts` это регистрация инструмента `query`:
+
 ```ts
-// db-server.ts
-import { McpServer } from "@modelcontextprotocol/server";
-import { serveStdio } from "@modelcontextprotocol/server/stdio";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
+const db = new Database("company.db", { readonly: true });
 
-// Только чтение: даже если модель пришлёт DELETE, база его не выполнит
-const db = new Database(process.env.DB_PATH ?? "company.db", { readonly: true });
-const MAX_ROWS = 200;
-
-// Описания колонок важнее самих названий: по ним модель понимает данные
-const DOCS = `Таблицы базы компании:
-
-employees — сотрудники: id, name, department (отдел), position, salary (оклад в рублях)
-clients — клиенты: id, name, region, industry (отрасль)
-deals — сделки: id, client_id → clients.id, owner_id → employees.id (менеджер),
-  amount (сумма в рублях), stage (lead | negotiation | won | lost),
-  closed_at (дата закрытия YYYY-MM-DD, NULL у открытых сделок)
-
-Диалект SQLite. Месяц из даты: strftime('%Y-%m', closed_at).`;
-
-function buildServer() {
-  const server = new McpServer({ name: "company-db", version: "1.0.0" });
-
-  server.registerTool(
-    "describe_schema",
-    {
-      description: "Описание таблиц и колонок базы компании. Вызывай перед первым запросом.",
-      annotations: { readOnlyHint: true },
-    },
-    async () => ({ content: [{ type: "text", text: DOCS }] }),
-  );
-
-  server.registerTool(
-    "query",
-    {
-      description: `Выполнить один SELECT к базе компании (SQLite, только чтение). Вернёт до ${MAX_ROWS} строк в JSON.`,
-      inputSchema: z.object({ sql: z.string().describe("Один запрос SELECT или WITH ... SELECT") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ sql }) => {
-      const text = sql.trim().replace(/;$/, "");
-      if (!/^(select|with)\b/i.test(text) || text.includes(";")) {
-        return {
-          isError: true,
-          content: [{ type: "text", text: "Разрешён только один запрос SELECT" }],
-        };
-      }
-      try {
-        const rows = db.query(text).all();
-        const shown = rows.slice(0, MAX_ROWS);
-        const note = rows.length > MAX_ROWS ? `\n(показано ${MAX_ROWS} из ${rows.length})` : "";
-        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: String(err) }] };
-      }
-    },
-  );
-
-  return server;
-}
-
-// Фабрика сервера: serveStdio вызывает её на каждое подключение агента
-serveStdio(buildServer);
+server.registerTool(
+  "query",
+  {
+    description: "Выполнить один SELECT к базе компании (SQLite, только чтение). Вернёт до 200 строк в JSON.",
+    inputSchema: z.object({ sql: z.string() }),
+    annotations: { readOnlyHint: true },
+  },
+  async ({ sql }) => {
+    try {
+      const rows = db.query(sql).all();
+      return { content: [{ type: "text", text: JSON.stringify(rows.slice(0, 200)) }] };
+    } catch (err) {
+      return { isError: true, content: [{ type: "text", text: String(err) }] };
+    }
+  },
+);
 ```
+
+`describe_schema` регистрируется так же и возвращает текст, написанный руками: что значит каждая колонка, в каких единицах суммы, какие бывают стадии. Сервер собирается в функции `buildServer()`, а запускается одной строкой `serveStdio(buildServer)`.
 
 Почему именно так.
 
@@ -217,81 +125,28 @@ npx @modelcontextprotocol/inspector bun db-server.ts
 
 Клиент подключается к каждому серверу, забирает список инструментов и превращает их в тот же формат `Tool`, что был у наших локальных инструментов. Тип `Tool` из `tools.ts` прошлой части нужно экспортировать.
 
+Главное в `mcp.ts` вот эти несколько строк на каждый сервер из конфига:
+
 ```ts
-// mcp.ts
-import type Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@modelcontextprotocol/client";
-import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { z } from "zod";
-import type { Tool } from "./tools";
+const client = new Client({ name: "company-agent", version: "1.0.0" }, { versionNegotiation: { mode: "auto" } });
+await client.connect(new StdioClientTransport(params));
 
-type ServerConfig = { command: string; args?: string[]; env?: Record<string, string> };
-
-// Подключается к каждому серверу из конфига и превращает его инструменты
-// в тот же формат, что и наши локальные инструменты из прошлой части
-export async function connectMcp(config: Record<string, ServerConfig>) {
-  const tools: Record<string, Tool> = {};
-  const clients: Client[] = [];
-
-  for (const [serverName, params] of Object.entries(config)) {
-    // auto: говорим по ревизии 2026-07-28, а со старыми серверами по протоколу 2025 года
-    const client = new Client(
-      { name: "company-agent", version: "1.0.0" },
-      { versionNegotiation: { mode: "auto" } },
-    );
-    await client.connect(new StdioClientTransport({ ...params, stderr: "inherit" }));
-    clients.push(client);
-
-    const { tools: list } = await client.listTools();
-    for (const tool of list) {
-      const name = `${serverName}__${tool.name}`; // db__query, wiki__search
-      tools[name] = {
-        definition: {
-          name,
-          description: tool.description ?? "",
-          input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
-        },
-        // Аргументы проверяет сам сервер по своей схеме
-        schema: z.record(z.string(), z.unknown()),
-        // Всё, что сервер не пометил как «только чтение», требует подтверждения
-        dangerous: tool.annotations?.readOnlyHint !== true,
-        async run(input) {
-          const result = await client.callTool({ name: tool.name, arguments: input });
-          const text = (result.content as { type: string; text?: string }[])
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("\n");
-          if (result.isError) throw new Error(text);
-          return text;
-        },
-      };
-    }
-    console.log(`MCP ${serverName}: ${list.map((t) => t.name).join(", ")}`);
-  }
-
-  return { tools, close: () => Promise.all(clients.map((c) => c.close())) };
+const { tools: list } = await client.listTools();
+for (const tool of list) {
+  tools[`${serverName}__${tool.name}`] = {
+    definition: { name: `${serverName}__${tool.name}`, description: tool.description, input_schema: tool.inputSchema },
+    dangerous: tool.annotations?.readOnlyHint !== true,
+    run: (input) => client.callTool({ name: tool.name, arguments: input }),
+  };
 }
 ```
 
+В настоящем файле `run` ещё склеивает текстовые части ответа в строку и бросает ошибку, если сервер вернул `isError`, а `runTool` из прошлой части превращает её в `tool_result` с ошибкой.
+
 Имена инструментов получают префикс сервера: `db__query`, `wiki__search`. Без префикса два сервера с инструментом `search` перепутаются.
 
-В `agent.ts` меняется только начало: вместо локальных инструментов берём инструменты из MCP, а системный промпт теперь про компанию. Функции `runTool` и `agentTurn` остаются как в прошлой части. В конце файла добавьте `await mcp.close()`, чтобы дочерние процессы серверов завершились вместе с агентом.
+В `agent.ts` меняется только начало: инструменты теперь берутся из `connectMcp(mcp.json)`, а системный промпт про компанию: отвечать по данным из инструментов, не выдумывать цифры, а если данных не хватает, так и сказать, и в конце указать источник. Функции `runTool` и `agentTurn` остаются как в прошлой части. В конце файла добавьте `await mcp.close()`, чтобы дочерние процессы серверов завершились вместе с агентом.
 
-```ts
-// agent.ts, начало
-import Anthropic from "@anthropic-ai/sdk";
-import { createInterface } from "node:readline/promises";
-import { connectMcp } from "./mcp";
-
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json());
-const tools = mcp.tools;
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-
-const system = `Ты ассистент сотрудников компании. Отвечаешь на вопросы по данным компании,
-используя инструменты. Не выдумывай цифры: всё, что называешь, должно прийти из инструментов.
-Если данных не хватает, так и скажи. Отвечай кратко, в конце укажи, откуда данные.`;
-```
 
 Файловые инструменты из прошлой части корпоративному агенту не нужны. Если понадобятся, их тоже можно подключить как MCP-сервер: есть официальный `@modelcontextprotocol/server-filesystem`, и это одна строка в `mcp.json`.
 

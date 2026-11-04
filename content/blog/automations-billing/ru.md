@@ -11,7 +11,7 @@ tags: [automation, payments, yookassa, idempotency]
 Менеджер пишет в чат `/invoice anna@example.com 15000 Лендинг`, клиент получает письмо со ссылкой на оплату. Ссылка ведёт в наш сервис, а он отправляет клиента на живой платёж ЮKassa. Когда приходит уведомление об оплате, мы не верим ему на слово, а спрашиваем ЮKassa сами, переводим заказ в «оплачен» ровно один раз, выдаём доступ и пишем в чат «💰». Раз в час сверяем неоплаченные заказы с ЮKassa, а должникам на 3, 7 и 14 день уходят напоминания, которые прекращаются, как только клиент заплатил.
 :::
 
-Это пятая часть цикла про коммерческие автоматизации и вторая из серии «Заменяем …». В [прошлой части](/blog/ru/automations-sales/) мы забрали у продажника разбор заявок. Теперь сделка состоялась, и начинается работа с деньгами.
+Это пятая часть цикла про коммерческие автоматизации и вторая из серии «Заменяем …». В [прошлой части](/blog/ru/automations-sales/) мы забрали у продажника разбор заявок. Теперь сделка состоялась, и начинается работа с деньгами. В статье только ключевые фрагменты кода, полный код серии с тестами лежит в [репозитории](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## Что именно мы заменяем
 
@@ -108,67 +108,23 @@ create table accesses (
 
 Регистрируем магазин в [ЮKassa](https://yookassa.ru), в настройках берём `shopId` и секретный ключ. Для тестов есть тестовый магазин с тестовыми картами, начинайте с него.
 
+Клиент ЮKassa это две функции. `getPayment(id)` спрашивает `GET /payments/<id>` и возвращает платёж или `undefined`, если его нет. `createPayment` создаёт платёж с редиректом на страницу оплаты и с id заказа в `metadata`:
+
 ```ts
-// src/yookassa.ts
-import { config } from "./config";
-import { check } from "./errors";
-
-export interface Payment {
-  id: string;
-  status: "pending" | "waiting_for_capture" | "succeeded" | "canceled";
-  amount: { value: string; currency: string };
-  confirmation?: { confirmation_url?: string };
-  metadata?: { order_id?: string };
-}
-
-const auth = `Basic ${btoa(`${config.yookassaShopId}:${config.yookassaSecretKey}`)}`;
-
-/** Копейки в строку "15000.00", которую ждёт API. */
-export const rubles = (kopecks: number) => (kopecks / 100).toFixed(2);
-
-/** Платёж, каким его видит ЮKassa, или undefined, если такого платежа нет. */
-export async function getPayment(id: string): Promise<Payment | undefined> {
-  const response = await fetch(`${config.yookassaApi}/payments/${encodeURIComponent(id)}`, {
-    headers: { authorization: auth },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (response.status === 404) {
-    return undefined;
-  }
-  await check(response, "yookassa get payment");
-  return response.json();
-}
-
-/**
- * Создаёт платёж. Благодаря Idempotence-Key повторный запрос с тем же ключом
- * вернёт тот же платёж, а не создаст второй.
- */
-export async function createPayment(params: {
-  idempotenceKey: string;
-  orderId: string;
-  amount: number;
-  description: string;
-  returnUrl: string;
-}): Promise<Payment> {
-  const response = await fetch(`${config.yookassaApi}/payments`, {
-    method: "POST",
-    headers: {
-      authorization: auth,
-      "content-type": "application/json",
-      "idempotence-key": params.idempotenceKey,
-    },
-    body: JSON.stringify({
-      amount: { value: rubles(params.amount), currency: "RUB" },
-      capture: true,
-      confirmation: { type: "redirect", return_url: params.returnUrl },
-      description: params.description.slice(0, 128),
-      metadata: { order_id: params.orderId },
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  await check(response, "yookassa create payment");
-  return response.json();
-}
+const response = await fetch(`${config.yookassaApi}/payments`, {
+  method: "POST",
+  headers: {
+    authorization: auth, // Basic shopId:secretKey
+    "content-type": "application/json",
+    "idempotence-key": params.idempotenceKey,
+  },
+  body: JSON.stringify({
+    amount: { value: rubles(params.amount), currency: "RUB" }, // "15000.00"
+    capture: true,
+    confirmation: { type: "redirect", return_url: params.returnUrl },
+    metadata: { order_id: params.orderId },
+  }),
+});
 ```
 
 Две важные вещи.
@@ -183,128 +139,19 @@ export async function createPayment(params: {
 
 ## Шаг 3. Заказы и ссылка, которая не протухает
 
+Модуль `orders.ts` отвечает за жизнь заказа. `parseInvoice` разбирает команду `/invoice email сумма описание` и переводит сумму в копейки. `createOrder` вставляет заказ с `on conflict (id) do nothing` и ставит задачу отправить счёт. `payRedirect(id)` обслуживает ссылку из письма: если заказ оплачен, ведёт на страницу «Спасибо»; если у заказа есть живой платёж, ведёт на него; если платёж успел пройти, а уведомление ещё не дошло, засчитывает оплату; иначе создаёт новый платёж с ключом `<заказ>:<id прошлого платежа или first>`. А `markPaid` засчитывает оплату, сначала сверив сумму платежа с суммой заказа:
+
 ```ts
-// src/orders.ts
-import { config } from "./config";
-import { sql } from "./db";
-import { enqueue } from "./queue";
-import { alert } from "./telegram";
-import { createPayment, getPayment, type Payment } from "./yookassa";
-
-export interface Order {
-  id: string;
-  email: string;
-  description: string;
-  amount: number;
-  status: "pending" | "paid";
-  payment_id: string | null;
-  paid_payment_id: string | null;
-  reminders: number;
-  created_at: Date;
-}
-
-export async function getOrder(id: string): Promise<Order | undefined> {
-  const [order] = await sql`select * from orders where id = ${id}`;
-  return order;
-}
-
-export const payLink = (order: { id: string }) => `${config.publicUrl}/pay/${order.id}`;
-
-/** "15 000 ₽" для сообщений. */
-export const money = (kopecks: number) =>
-  `${(kopecks / 100).toLocaleString("ru-RU")} ₽`;
-
-/** `/invoice anna@example.com 15000 Лендинг` из чата менеджеров. */
-export function parseInvoice(text: string) {
-  const match = /^\/invoice(?:@\w+)?\s+(\S+@\S+)\s+(\d+(?:[.,]\d{1,2})?)\s+(.+)$/s.exec(
-    text.trim()
-  );
-  if (!match) {
-    return undefined;
-  }
-  const amount = Math.round(Number(match[2].replace(",", ".")) * 100);
-  return { email: match[1], amount, description: match[3].trim() };
-}
-
-/** `id` передаёт вызывающий код, чтобы повтор задачи создал тот же заказ. */
-export async function createOrder(input: {
-  id: string;
-  email: string;
-  amount: number;
-  description: string;
-  createdBy: string;
-}) {
-  const { id } = input;
-  await sql`
-    insert into orders (id, email, amount, description, created_by)
-    values (${id}, ${input.email}, ${input.amount}, ${input.description}, ${input.createdBy})
-    on conflict (id) do nothing
-  `;
-  await enqueue({ kind: "order.invoice", payload: { id }, key: `order.invoice:${id}` });
-  return id;
-}
-
-/**
- * Ссылка из каждого письма. Она не протухает: при каждом клике мы находим
- * живой платёж или создаём новый, так что напоминание через две недели работает.
- */
-export async function payRedirect(id: string): Promise<string | undefined> {
-  const order = await getOrder(id);
-  if (!order) {
-    return undefined;
-  }
-  const thanks = `${config.publicUrl}/paid`;
-  if (order.status === "paid") {
-    return thanks;
-  }
-  if (order.payment_id) {
-    const payment = await getPayment(order.payment_id);
-    if (payment?.status === "succeeded") {
-      await markPaid(order.id, payment); // вебхук ещё не дошёл
-      return thanks;
-    }
-    if (payment?.status === "pending" && payment.confirmation?.confirmation_url) {
-      return payment.confirmation.confirmation_url;
-    }
-  }
-  // Платежа ещё нет или прошлый отменён. Два одновременных клика вычислят
-  // один и тот же ключ, и ЮKassa вернёт обоим один платёж.
-  const payment = await createPayment({
-    idempotenceKey: `${order.id}:${order.payment_id ?? "first"}`,
-    orderId: order.id,
-    amount: order.amount,
-    description: order.description,
-    returnUrl: thanks,
-  });
-  await sql`update orders set payment_id = ${payment.id} where id = ${order.id}`;
-  return payment.confirmation!.confirmation_url!;
-}
-
-/**
- * Единственное место, где заказ становится оплаченным. "where status = 'pending'"
- * делает это один раз, сколько бы вебхуков, сверок и кликов об этом ни сообщили.
- */
-export async function markPaid(orderId: string, payment: Payment) {
-  const order = await getOrder(orderId);
-  if (!order) {
-    await alert(`Платёж ${payment.id} для неизвестного заказа ${orderId}`);
-    return;
-  }
-  if (Math.round(Number(payment.amount.value) * 100) !== order.amount) {
-    await alert(`Платёж ${payment.id}: сумма ${payment.amount.value} не совпадает с заказом ${orderId}`);
-    return;
-  }
-  const [won] = await sql`
-    update orders set status = 'paid', paid_at = now(), paid_payment_id = ${payment.id}
-    where id = ${orderId} and status = 'pending'
-    returning id
-  `;
-  if (won) {
-    await enqueue({ kind: "order.fulfill", payload: { id: orderId }, key: `order.fulfill:${orderId}` });
-  } else if (order.paid_payment_id !== payment.id) {
-    // Оплачено дважды разными платежами: о возврате решает человек
-    await alert(`Заказ ${orderId} оплачен дважды: ${order.paid_payment_id} и ${payment.id}. Верните один платёж.`);
-  }
+// markPaid: единственное место, где заказ становится оплаченным
+const [won] = await sql`
+  update orders set status = 'paid', paid_at = now(), paid_payment_id = ${payment.id}
+  where id = ${orderId} and status = 'pending'
+  returning id
+`;
+if (won) {
+  await enqueue({ kind: "order.fulfill", payload: { id: orderId }, key: `order.fulfill:${orderId}` });
+} else if (order.paid_payment_id !== payment.id) {
+  await alert(`Заказ ${orderId} оплачен дважды: ${order.paid_payment_id} и ${payment.id}`);
 }
 ```
 
@@ -316,53 +163,24 @@ export async function markPaid(orderId: string, payment: Payment) {
 
 **`markPaid` единственное место, где заказ становится оплаченным.** Перед этим проверяем, что сумма платежа совпадает с суммой заказа. Затем `update ... where status = 'pending' returning id`: Postgres гарантирует, что строку вернёт только первый запрос. Он и ставит задачу выдачи. Все последующие подтверждения того же платежа ничего не делают. А если заказ оплачен двумя разными платежами (клиент открыл две вкладки и заплатил в обеих), система не возвращает деньги сама, а пишет в чат тревог: возврат это решение человека.
 
-Ссылка обслуживается новым маршрутом:
-
-```ts
-// src/pay.ts
-import { payRedirect } from "./orders";
-
-/** GET /pay/:id, ссылка из счетов и напоминаний. */
-export async function pay(req: Request & { params: { id: string } }) {
-  try {
-    const url = await payRedirect(req.params.id);
-    if (!url) {
-      return new Response("Счёт не найден", { status: 404 });
-    }
-    return Response.redirect(url, 303);
-  } catch (error) {
-    // ЮKassa лежит или тормозит: просим клиента повторить, заказ никуда не денется
-    console.error("pay link failed", error);
-    return new Response("Оплата временно недоступна, попробуйте через минуту", {
-      status: 503,
-    });
-  }
-}
-```
-
-Если ЮKassa недоступна, клиент видит «попробуйте через минуту», а заказ остаётся в базе. Ничего не теряется.
+Ссылка обслуживается новым маршрутом `GET /pay/:id`, который отвечает редиректом 303 туда, куда указал `payRedirect`. Если ЮKassa недоступна, клиент видит «попробуйте через минуту», а заказ остаётся в базе. Ничего не теряется.
 
 ## Шаг 4. Уведомления без подписи
 
 В части про ядро мы обещали вернуться к платёжкам, которые не подписывают уведомления. ЮKassa как раз такая: в уведомлении нет HMAC. Можно проверять IP-адреса отправителя по списку из документации, но есть способ надёжнее и проще: **не верить уведомлению вообще**. Из него мы берём только id платежа и спрашиваем ЮKassa, что с этим платежом на самом деле.
 
 ```ts
-// src/sources.ts
-// Уведомления ЮKassa не подписаны. Берём из них только id платежа
-// и спрашиваем API о самом платеже, поэтому подделка ничего не изменит.
+// src/sources.ts: уведомления ЮKassa не подписаны,
+// поэтому берём из них только id платежа
 yookassa: {
   verify: () => true,
   dedupKey: (body) => {
     const note = JSON.parse(body);
     return `${note.event}:${note.object.id}`;
   },
-  route: (body) => {
-    const note = JSON.parse(body);
-    if (typeof note.object?.id !== "string") {
-      return [];
-    }
-    return [{ kind: "payment.check", payload: { paymentId: note.object.id } }];
-  },
+  route: (body) => [
+    { kind: "payment.check", payload: { paymentId: JSON.parse(body).object.id } },
+  ],
 },
 ```
 
@@ -376,209 +194,33 @@ yookassa: {
 
 ## Шаг 5. Почта
 
-Для писем клиентам нужен сервис транзакционной почты. Отправлять письма с собственного сервера плохая идея: они почти наверняка попадут в спам. В примере [Resend](https://resend.com), но подойдёт любой сервис с HTTP API: Postmark, Unisender, Amazon SES. Меняется одна функция.
-
-```ts
-// src/email.ts
-import { config } from "./config";
-import { check } from "./errors";
-
-export async function sendEmail(to: string, subject: string, text: string) {
-  const response = await fetch(`${config.emailApi}/emails`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${config.emailApiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ from: config.emailFrom, to, subject, text }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  await check(response, "email");
-}
-```
+Для писем клиентам нужен сервис транзакционной почты. Отправлять письма с собственного сервера плохая идея: они почти наверняка попадут в спам. В примере [Resend](https://resend.com), но подойдёт любой сервис с HTTP API: Postmark, Unisender, Amazon SES. Меняется одна функция: `sendEmail(to, subject, text)` делает POST на `/emails` с ключом в заголовке `authorization` и адресом отправителя из настроек.
 
 Домен отправителя нужно подтвердить в сервисе (записи SPF и DKIM в DNS), иначе письма будут уходить в спам.
 
 ## Шаг 6. Обработчики
 
-Вся логика оплат в отдельном файле:
+Вся логика оплат в отдельном файле `billing.ts`, а общий список обработчиков просто подключает его и передаёт сообщения, начинающиеся с `/invoice`, в `invoiceCommand`. Задачи такие:
+
+- `order.invoice` отправляет клиенту письмо со ссылкой `/pay/<id>`;
+- `payment.check` спрашивает ЮKassa о платеже и, если он `succeeded`, вызывает `markPaid` для заказа из `metadata`;
+- `order.fulfill` выдаёт доступ и ставит две задачи: письмо клиенту и «💰» в чат;
+- `invoices.remind` каждое утро выбирает неоплаченные заказы, которым исполнилось 3, 7 или 14 дней, и ставит `order.remind` с ключом `order.remind:<заказ>:<номер>`;
+- `order.remind` проверяет, что заказ ещё не оплачен, шлёт письмо, а после последнего напоминания пишет в чат «📞 Стоит позвонить»;
+- `payments.reconcile` раз в час ставит `payment.check` для неоплаченных заказов за 30 дней.
+
+Выдача доступа целиком:
 
 ```ts
-// src/billing.ts
-import { config } from "./config";
-import { sql } from "./db";
-import { sendEmail } from "./email";
-import {
-  createOrder,
-  getOrder,
-  markPaid,
-  money,
-  parseInvoice,
-  payLink,
-} from "./orders";
-import { enqueue, type Job } from "./queue";
-import { sendMessage } from "./telegram";
-import { getPayment } from "./yookassa";
-
-type Handler = (payload: any, job: Job) => Promise<void>;
-
-const DAY = 24 * 60 * 60 * 1000;
-const REMIND_AFTER_DAYS = [3, 7, 14];
-
-/** `/invoice email сумма описание`, только из чата менеджеров. */
-export async function invoiceCommand(message: any) {
-  if (String(message.chat.id) !== String(config.leadsChatId)) {
-    return;
-  }
-  const input = parseInvoice(message.text);
-  if (!input) {
-    await sendMessage(message.chat.id, "Формат: /invoice client@example.com 15000 За что счёт");
-    return;
-  }
-  const who = message.from.username ? `@${message.from.username}` : message.from.first_name;
-  // Id берётся из сообщения, поэтому повтор задачи не создаст второй заказ
-  const id = await createOrder({
-    ...input,
-    id: `tg-${message.chat.id}-${message.message_id}`,
-    createdBy: who,
-  });
-  await sendMessage(
-    message.chat.id,
-    `Счёт на ${money(input.amount)} отправлен на ${input.email}.\nСсылка на оплату: ${payLink({ id })}`
-  );
-}
-
-export const billingHandlers: Record<string, Handler> = {
-  "order.invoice": async ({ id }) => {
-    const order = await getOrder(id);
-    if (!order || order.status !== "pending") {
-      return;
-    }
-    await sendEmail(
-      order.email,
-      `Счёт: ${order.description}`,
-      `Здравствуйте!\n\nВыставляем счёт за «${order.description}» на ${money(order.amount)}.\n` +
-        `Оплатить картой: ${payLink(order)}\n\nСсылка бессрочная.`
-    );
-  },
-
-  // Из уведомления или сверки: спрашиваем ЮKassa, что произошло на самом деле
-  "payment.check": async ({ paymentId }) => {
-    const payment = await getPayment(paymentId);
-    if (!payment) {
-      console.warn(`payment ${paymentId} does not exist`); // поддельное уведомление
-      return;
-    }
-    if (payment.status === "succeeded" && payment.metadata?.order_id) {
-      await markPaid(payment.metadata.order_id, payment);
-    }
-    // canceled: делать нечего, ссылка /pay создаст новый платёж при следующем клике
-  },
-
-  // Оплачено: выдаём доступ один раз, потом сообщаем клиенту и команде
-  "order.fulfill": async ({ id }) => {
-    const token = crypto.randomUUID();
-    await sql`
-      insert into accesses (order_id, token) values (${id}, ${token})
-      on conflict (order_id) do nothing
-    `;
-    await enqueue({ kind: "order.access_email", payload: { id }, key: `order.access_email:${id}` });
-    await enqueue({ kind: "order.paid_notice", payload: { id }, key: `order.paid_notice:${id}` });
-  },
-
-  "order.access_email": async ({ id }) => {
-    const order = await getOrder(id);
-    const [access] = await sql`select token from accesses where order_id = ${id}`;
-    await sendEmail(
-      order!.email,
-      `Оплата получена: ${order!.description}`,
-      `Спасибо! Мы получили ${money(order!.amount)}.\n` +
-        `Ваш доступ: ${config.accessUrl}${access.token}`
-    );
-  },
-
-  "order.paid_notice": async ({ id }) => {
-    const order = await getOrder(id);
-    await sendMessage(
-      config.leadsChatId,
-      `💰 Оплачено ${money(order!.amount)}: ${order!.description} (${order!.email})`
-    );
-  },
-
-  // Каждое утро: кому сегодня напомнить
-  "invoices.remind": async () => {
-    const orders = await sql`
-      select id, reminders, created_at from orders where status = 'pending'
-    `;
-    for (const order of orders) {
-      const step = order.reminders;
-      const age = Date.now() - new Date(order.created_at).getTime();
-      if (step < REMIND_AFTER_DAYS.length && age >= REMIND_AFTER_DAYS[step] * DAY) {
-        const n = step + 1;
-        await enqueue({
-          kind: "order.remind",
-          payload: { id: order.id, n },
-          key: `order.remind:${order.id}:${n}`,
-        });
-      }
-    }
-  },
-
-  "order.remind": async ({ id, n }) => {
-    const order = await getOrder(id);
-    if (!order || order.status !== "pending") {
-      return; // уже оплатили: цепочка останавливается сама
-    }
-    await sendEmail(
-      order.email,
-      `Напоминание: счёт за ${order.description}`,
-      `Здравствуйте! Напоминаем о счёте за «${order.description}» ` +
-        `на ${money(order.amount)}.\nОплатить: ${payLink(order)}\n\n` +
-        "Если вы уже оплатили или что-то не так, просто ответьте на это письмо."
-    );
-    await sql`update orders set reminders = greatest(reminders, ${n}) where id = ${id}`;
-    if (n === REMIND_AFTER_DAYS.length) {
-      await sendMessage(
-        config.leadsChatId,
-        `📞 ${order.email} не оплачивает «${order.description}» уже ${REMIND_AFTER_DAYS.at(-1)} дней. Стоит позвонить.`
-      );
-    }
-  },
-
-  // Каждый час: ловим платежи, уведомление о которых не дошло
-  "payments.reconcile": async () => {
-    const orders = await sql`
-      select payment_id from orders
-      where status = 'pending' and payment_id is not null
-        and created_at > now() - interval '30 days'
-    `;
-    for (const order of orders) {
-      await enqueue({ kind: "payment.check", payload: { paymentId: order.payment_id } });
-    }
-  },
-};
-```
-
-Подключаем их в общий список обработчиков и учим команду `/invoice`:
-
-```ts
-// src/handlers.ts
-import { billingHandlers, invoiceCommand } from "./billing";
-
-export const handlers: Record<string, Handler> = {
-  // ... обработчики лидов из прошлой части
-
-  "telegram.message": async (message) => {
-    if (message.text === "/ping") {
-      await sendMessage(message.chat.id, "pong");
-    }
-    if (message.text.startsWith("/invoice")) {
-      await invoiceCommand(message);
-    }
-  },
-
-  ...billingHandlers,
-};
+// Оплачено: выдаём доступ один раз, потом сообщаем клиенту и команде
+"order.fulfill": async ({ id }) => {
+  await sql`
+    insert into accesses (order_id, token) values (${id}, ${crypto.randomUUID()})
+    on conflict (order_id) do nothing
+  `;
+  await enqueue({ kind: "order.access_email", payload: { id }, key: `order.access_email:${id}` });
+  await enqueue({ kind: "order.paid_notice", payload: { id }, key: `order.paid_notice:${id}` });
+},
 ```
 
 На что обратить внимание:
@@ -596,186 +238,18 @@ export const handlers: Record<string, Handler> = {
 В расписание из части про ядро добавляем две задачи:
 
 ```ts
-// src/schedule.ts
-import { enqueue } from "./queue";
-
-export type Schedule =
-  | { kind: string; everyMinutes: number }
-  | { kind: string; dailyAt: string }; // "09:00" в часовом поясе сервера
-
 export const schedules: Schedule[] = [
   { kind: "heartbeat", everyMinutes: 60 },
   { kind: "invoices.remind", dailyAt: "10:00" },
   { kind: "payments.reconcile", everyMinutes: 60 },
 ];
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-/**
- * Текущий слот расписания или null, если время ещё не пришло.
- * Слот становится ключом задачи, поэтому каждый слот выполняется один раз,
- * сколько бы воркеров его ни проверяли и как бы часто.
- */
-export function slot(schedule: Schedule, now: Date): string | null {
-  if ("everyMinutes" in schedule) {
-    const ms = schedule.everyMinutes * 60_000;
-    return new Date(Math.floor(now.getTime() / ms) * ms).toISOString();
-  }
-  const [hours, minutes] = schedule.dailyAt.split(":").map(Number);
-  if (now.getHours() * 60 + now.getMinutes() < hours * 60 + minutes) {
-    return null;
-  }
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
-export async function enqueueDue(now = new Date()) {
-  for (const schedule of schedules) {
-    const current = slot(schedule, now);
-    if (current) {
-      await enqueue({ kind: schedule.kind, key: `${schedule.kind}:${current}` });
-    }
-  }
-}
 ```
 
 ## Шаг 8. Тесты
 
 Для оплат тесты особенно важны: проверяем, что многократное подтверждение одного платежа выдаёт доступ один раз, что двойная оплата вызывает тревогу, что платёж с чужой суммой не засчитывается, что ссылка переиспользует живой платёж и что напоминания уходят по графику и прекращаются после оплаты.
 
-Заглушки внешних API вынесены в общий файл `test/stubs.ts`: заглушка ЮKassa, как настоящая, запоминает платежи по Idempotence-Key. Сами тесты:
-
-```ts
-// test/billing.test.ts
-import { beforeEach, expect, test } from "bun:test";
-import { config } from "../src/config";
-import { sql } from "../src/db";
-import { handlers } from "../src/handlers";
-import { markPaid, parseInvoice, payRedirect } from "../src/orders";
-import type { Job } from "../src/queue";
-import { calls, payments, reset } from "./stubs";
-
-const job = {} as Job;
-const DAY = 24 * 60 * 60 * 1000;
-const sent = (api: string) => calls.filter((c) => c.api === api);
-
-async function invoice(messageId = 1, text = "/invoice anna@example.com 15000 Лендинг") {
-  await handlers["telegram.message"](
-    { message_id: messageId, chat: { id: Number(config.leadsChatId) }, from: { username: "ivan" }, text },
-    job
-  );
-  return `tg-${config.leadsChatId}-${messageId}`;
-}
-
-beforeEach(async () => {
-  reset();
-  await sql`truncate accesses, orders, jobs restart identity cascade`;
-});
-
-test("the invoice command is parsed in rubles and kopecks", () => {
-  expect(parseInvoice("/invoice a@b.co 15000 Сайт")).toEqual({
-    email: "a@b.co",
-    amount: 1_500_000,
-    description: "Сайт",
-  });
-  expect(parseInvoice("/invoice@MyBot a@b.co 99,90 Fix")?.amount).toBe(9990);
-  expect(parseInvoice("/invoice nonsense")).toBeUndefined();
-});
-
-test("a retried command creates one order, and only the managers' chat may invoice", async () => {
-  await invoice(1);
-  await invoice(1);
-  await handlers["telegram.message"](
-    { message_id: 2, chat: { id: 555 }, from: { username: "x" }, text: "/invoice a@b.co 1 X" },
-    job
-  );
-  const orders = await sql`select id, amount, status from orders`;
-  expect(orders).toEqual([{ id: `tg-${config.leadsChatId}-1`, amount: 1_500_000, status: "pending" }]);
-});
-
-test("the pay link reuses a live payment and replaces a canceled one", async () => {
-  const id = await invoice();
-  const first = await payRedirect(id);
-  expect(await payRedirect(id)).toBe(first); // второй клик получает тот же платёж
-  expect(sent("yookassa").filter((c) => c.method === "payments")).toHaveLength(1);
-
-  payments.get("pay-1").status = "canceled";
-  const second = await payRedirect(id);
-  expect(second).not.toBe(first);
-  const [order] = await sql`select payment_id from orders where id = ${id}`;
-  expect(order.payment_id).toBe("pay-2");
-});
-
-test("a payment confirmed many times fulfils the order once", async () => {
-  const id = await invoice();
-  await payRedirect(id);
-  payments.get("pay-1").status = "succeeded";
-
-  // Вебхук, его повтор и сверка сообщают об одном и том же платеже
-  await handlers["payment.check"]({ paymentId: "pay-1" }, job);
-  await handlers["payment.check"]({ paymentId: "pay-1" }, job);
-  await handlers["payment.check"]({ paymentId: "pay-1" }, job);
-
-  const fulfil = await sql`select count(*)::int as n from jobs where kind = 'order.fulfill'`;
-  expect(fulfil[0].n).toBe(1);
-  await handlers["order.fulfill"]({ id }, job);
-  await handlers["order.fulfill"]({ id }, job);
-  const [{ n }] = await sql`select count(*)::int as n from accesses`;
-  expect(n).toBe(1);
-});
-
-test("a second, different payment for a paid order raises an alert", async () => {
-  const id = await invoice();
-  const payment = (pid: string) => ({
-    id: pid,
-    status: "succeeded" as const,
-    amount: { value: "15000.00", currency: "RUB" },
-    metadata: { order_id: id },
-  });
-  await markPaid(id, payment("pay-a"));
-  await markPaid(id, payment("pay-b"));
-  const alerts = sent("telegram").filter((c) => String(c.body.text).includes("оплачен дважды"));
-  expect(alerts).toHaveLength(1);
-});
-
-test("a payment with the wrong amount does not mark the order paid", async () => {
-  const id = await invoice();
-  await markPaid(id, {
-    id: "pay-x",
-    status: "succeeded",
-    amount: { value: "1.00", currency: "RUB" },
-    metadata: { order_id: id },
-  });
-  const [order] = await sql`select status from orders where id = ${id}`;
-  expect(order.status).toBe("pending");
-});
-
-test("reminders go out on days 3, 7 and 14 and stop after payment", async () => {
-  const id = await invoice();
-  const age = async (days: number) => {
-    await sql`update orders set created_at = ${new Date(Date.now() - days * DAY)} where id = ${id}`;
-    await handlers["invoices.remind"]({}, job);
-    const due = await sql`select payload from jobs where kind = 'order.remind' and status = 'pending'`;
-    for (const { payload } of due) {
-      await handlers["order.remind"](payload, job);
-      await sql`update jobs set status = 'done' where kind = 'order.remind'`;
-    }
-  };
-  await age(1);
-  await age(3);
-  await age(3); // снова тот же день: второго напоминания нет
-  await age(8);
-  expect(sent("email").filter((c) => c.body.subject.startsWith("Напоминание"))).toHaveLength(2);
-
-  await sql`update orders set status = 'paid' where id = ${id}`;
-  await age(15);
-  expect(sent("email").filter((c) => c.body.subject.startsWith("Напоминание"))).toHaveLength(2);
-});
-```
-
-```text
- 19 pass
- 0 fail
-```
+Заглушки внешних API вынесены в общий файл `test/stubs.ts`: заглушка ЮKassa, как настоящая, запоминает платежи по Idempotence-Key. Тесты вызывают обработчики напрямую: трижды `payment.check` для одного платежа дают одну задачу `order.fulfill`, два разных платежа для одного заказа дают тревогу, а для напоминаний тест «состаривает» заказ, меняя `created_at`.
 
 В CI добавляем в шаг `Tests` адреса заглушек: `YOOKASSA_API: http://localhost:3996/v3`, `EMAIL_API: http://localhost:3995` и тестовые значения остальных новых переменных.
 

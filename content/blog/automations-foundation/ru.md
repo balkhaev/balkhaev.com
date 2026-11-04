@@ -11,7 +11,7 @@ tags: [automation, devops, docker, postgres]
 Один VPS, Docker Compose с тремя контейнерами (наш сервис, Postgres, Caddy), образ в GitHub Container Registry и деплой по пушу в main через GitHub Actions. К концу части у нас есть адрес с HTTPS, который принимает события, складывает их в базу и обновляется сам после каждого коммита.
 :::
 
-Это вторая часть цикла про коммерческие автоматизации. В [первой](/blog/ru/automations-concept/) мы выбрали, что автоматизировать, и нарисовали архитектуру. Теперь строим фундамент, на котором будут жить все автоматизации цикла. Его стоит сделать один раз и хорошо: дальше мы будем только добавлять код, а не думать, как он попадает на сервер.
+Это вторая часть цикла про коммерческие автоматизации. В [первой](/blog/ru/automations-concept/) мы выбрали, что автоматизировать, и нарисовали архитектуру. Теперь строим фундамент, на котором будут жить все автоматизации цикла. Его стоит сделать один раз и хорошо: дальше мы будем только добавлять код, а не думать, как он попадает на сервер. В статье только ключевые фрагменты кода, полный код серии с тестами лежит в [репозитории](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## Что получится
 
@@ -28,23 +28,6 @@ flowchart TD
     db[("<b>db</b><br/>Postgres, том pgdata")]
     caddy --> app --> db
   end
-```
-
-Структура репозитория к концу части:
-
-```text
-automations/
-  .github/workflows/deploy.yml
-  migrations/001_events.sql
-  src/config.ts
-  src/db.ts
-  src/migrate.ts
-  src/server.ts
-  Caddyfile
-  compose.yml
-  deploy.sh
-  Dockerfile
-  package.json
 ```
 
 ::news{topic="automation"}
@@ -107,42 +90,9 @@ bun init -y
 bun add -d typescript @types/bun
 ```
 
-Зависимостей во время работы у нас нет: HTTP-сервер и клиент Postgres встроены в Bun. TypeScript нужен только для проверки типов, и с седьмой версии его компилятор `tsc` переписан на Go и работает в разы быстрее прежнего. В `package.json` добавим скрипты:
+Зависимостей во время работы у нас нет: HTTP-сервер и клиент Postgres встроены в Bun. TypeScript нужен только для проверки типов, и с седьмой версии его компилятор `tsc` переписан на Go и работает в разы быстрее прежнего. В `package.json` добавим скрипты `dev` (`bun --watch src/server.ts`), `migrate` и `check` (`tsc --noEmit`).
 
-```json
-{
-  "name": "automations",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "bun --watch src/server.ts",
-    "migrate": "bun src/migrate.ts",
-    "check": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^7"
-  }
-}
-```
-
-Конфигурация только из переменных окружения, и если чего-то не хватает, сервис падает сразу при старте, а не через час на первом событии:
-
-```ts
-// src/config.ts
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Environment variable ${name} is not set`);
-  }
-  return value;
-}
-
-export const config = {
-  port: Number(process.env.PORT ?? 3000),
-  databaseUrl: required("DATABASE_URL"),
-};
-```
+Конфигурация только из переменных окружения. В `config.ts` функция `required(name)` читает переменную и бросает ошибку, если её нет, поэтому без нужной настройки сервис падает сразу при старте, а не через час на первом событии.
 
 Подключение к базе, один пул на всё приложение:
 
@@ -156,40 +106,14 @@ export const sql = new SQL(config.databaseUrl);
 
 ## Шаг 4. Миграции
 
-Схему базы будем менять в каждой части, поэтому сразу заводим миграции. Отдельная библиотека для этого не нужна: SQL-файлы в папке `migrations`, таблица с именами применённых и двадцать строк кода.
+Схему базы будем менять в каждой части, поэтому сразу заводим миграции. Отдельная библиотека для этого не нужна: SQL-файлы в папке `migrations`, таблица `schema_migrations` с именами применённых и двадцать строк кода в `migrate.ts`: прочитать список файлов, отсортировать, пропустить применённые, а каждый новый выполнить так:
 
 ```ts
-// src/migrate.ts
-import { readdir } from "node:fs/promises";
-import { sql } from "./db";
-
-await sql`
-  create table if not exists schema_migrations (
-    name text primary key,
-    applied_at timestamptz not null default now()
-  )
-`;
-
-const rows: { name: string }[] = await sql`select name from schema_migrations`;
-const applied = new Set(rows.map((row) => row.name));
-const files = (await readdir("migrations"))
-  .filter((file) => file.endsWith(".sql"))
-  .sort();
-
-for (const file of files) {
-  if (applied.has(file)) {
-    continue;
-  }
-  const text = await Bun.file(`migrations/${file}`).text();
-  // Миграция и запись о ней в одной транзакции: либо обе, либо ни одной
-  await sql.begin(async (tx) => {
-    await tx.unsafe(text);
-    await tx`insert into schema_migrations (name) values (${file})`;
-  });
-  console.log(`applied ${file}`);
-}
-
-await sql.close();
+// Миграция и запись о ней в одной транзакции: либо обе, либо ни одной
+await sql.begin(async (tx) => {
+  await tx.unsafe(text);
+  await tx`insert into schema_migrations (name) values (${file})`;
+});
 ```
 
 Файлы сортируются по имени, поэтому называем их с номером: `001_`, `002_` и так далее. Применённую миграцию никогда не редактируем, только добавляем новую.
@@ -211,55 +135,19 @@ create index events_source_received_at on events (source, received_at desc);
 
 ## Шаг 5. HTTP-сервер
 
-Два маршрута: `/health` для проверки, что сервис жив и видит базу, и `/hooks/:source` для приёма событий. Принцип из первой части: сначала сохранить, потом обработать. Пока обрабатывать нечем, поэтому только сохраняем.
+Два маршрута: `/health` для проверки, что сервис жив и видит базу, и `/hooks/:source` для приёма событий. Принцип из первой части: сначала сохранить, потом обработать. Пока обрабатывать нечем, поэтому только сохраняем. `/health` делает `select 1` и отвечает `{ ok: true }`, а приём события это одна вставка:
 
 ```ts
-// src/server.ts
-import { config } from "./config";
-import { sql } from "./db";
-
-// Источники, от которых принимаем события. Остальным 404.
-const SOURCES = new Set(["site", "payments", "telegram"]);
-
-const server = Bun.serve({
-  port: config.port,
-  maxRequestBodySize: 1024 * 1024, // вебхуку хватит мегабайта
-  routes: {
-    "/health": async () => {
-      await sql`select 1`;
-      return Response.json({ ok: true });
-    },
-    "/hooks/:source": {
-      POST: async (req) => {
-        const { source } = req.params;
-        if (!SOURCES.has(source)) {
-          return new Response("Unknown source", { status: 404 });
-        }
-        const headers = Object.fromEntries(req.headers);
-        const body = await req.text();
-        const [event] = await sql`
-          insert into events (source, headers, body)
-          values (${source}, ${headers}, ${body})
-          returning id
-        `;
-        return Response.json({ id: event.id }, { status: 202 });
-      },
-    },
-  },
-  fetch: () => new Response("Not found", { status: 404 }),
-});
-
-console.log(`listening on :${server.port}`);
-
-// При деплое Docker шлёт SIGTERM: дожидаемся текущих запросов и выходим
-process.on("SIGTERM", async () => {
-  await server.stop();
-  await sql.close();
-  process.exit(0);
-});
+const body = await req.text();
+const [event] = await sql`
+  insert into events (source, headers, body)
+  values (${source}, ${Object.fromEntries(req.headers)}, ${body})
+  returning id
+`;
+return Response.json({ id: event.id }, { status: 202 });
 ```
 
-Пара деталей. Bun сам превращает объект `headers` в `jsonb`, вручную вызывать `JSON.stringify` не нужно (если вызвать, в базу ляжет JSON-строка вместо объекта). Тело храним как текст, а не разобранный JSON: для проверки подписи вебхука нужны ровно те байты, что пришли.
+Неизвестный источник, которого нет в списке `SOURCES`, получает 404. На SIGTERM сервер дожидается текущих запросов и закрывает пул, чтобы деплой не обрывал запросы на середине. И пара деталей. Bun сам превращает объект `headers` в `jsonb`, вручную вызывать `JSON.stringify` не нужно (если вызвать, в базу ляжет JSON-строка вместо объекта). Тело храним как текст, а не разобранный JSON: для проверки подписи вебхука нужны ровно те байты, что пришли.
 
 :::note
 Сейчас любой, кто знает адрес, может записать событие в базу. В следующей части у каждого источника появится проверка подписи или секрета, а пока список `SOURCES` хотя бы отсекает случайные запросы.
@@ -287,11 +175,7 @@ curl -X POST localhost:3000/hooks/site \
 # {"id":"1"}
 ```
 
-Событие лежит в базе:
-
-```bash
-docker exec pg psql -U postgres -c "select id, source, body from events"
-```
+Событие лежит в таблице `events`, проверить можно через `psql` в контейнере `pg`.
 
 ## Шаг 6. Docker
 
@@ -314,52 +198,19 @@ CMD ["bun", "src/server.ts"]
 
 ## Шаг 7. Compose и Caddy
 
-Весь сервис на сервере описан одним файлом:
+Весь сервис на сервере описан одним файлом `compose.yml` с тремя сервисами. Кроме приложения в нём `db` (образ `postgres:18`, именованный том `pgdata`, проверка здоровья через `pg_isready`) и `caddy` (образ `caddy:2`, единственный, кто публикует порты 80 и 443). Приложение выглядит так:
 
 ```yaml
-# compose.yml
-services:
-  app:
-    image: ghcr.io/your-name/automations:${TAG:-latest}
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: postgres:18
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: app
-    volumes:
-      # С Postgres 18 образ хранит данные в /var/lib/postgresql/18/docker
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      retries: 10
-
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  pgdata:
-  caddy_data:
-  caddy_config:
+# compose.yml, сервис приложения
+app:
+  image: ghcr.io/your-name/automations:${TAG:-latest}
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+  depends_on:
+    db:
+      condition: service_healthy
 ```
 
 Что здесь важно:
@@ -448,67 +299,22 @@ ssh-keyscan -t ed25519 auto.example.com
 Секреты окружения доступны только джобам, которые явно указали это окружение, и для него можно включить ручное подтверждение, если когда-нибудь понадобится.
 
 ```yaml
-# .github/workflows/deploy.yml
-name: deploy
-
+# .github/workflows/deploy.yml, сокращённо
 on:
   push:
     branches: [main]
-
-permissions:
-  contents: read
-  packages: write
-
 concurrency: deploy
-
-env:
-  IMAGE: ghcr.io/your-name/automations
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: oven-sh/setup-bun@v2
-      - run: bun install --frozen-lockfile
-      - run: bun run check
-
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.IMAGE }}:latest
-
+      # checkout, bun install, bun run check
+      # docker/login-action и docker/build-push-action: образ в ghcr.io
       - name: Ship to the server
-        env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          HOST: ${{ vars.DEPLOY_HOST }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_ed25519
-          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519
           scp compose.yml Caddyfile deploy.sh "deploy@$HOST:/opt/automations/"
           ssh "deploy@$HOST" "/opt/automations/deploy.sh ${{ github.sha }}"
-
-      - name: Smoke test
-        run: |
-          for i in 1 2 3 4 5 6; do
-            curl -fsS https://auto.example.com/health && exit 0
-            sleep 5
-          done
-          exit 1
+      # smoke test: curl /health несколько раз с паузой
 ```
 
 По шагам:
@@ -522,13 +328,7 @@ jobs:
 
 ## Первый деплой
 
-```bash
-git init
-git add .
-git commit -m "Foundation: service, database, deploy"
-git remote add origin git@github.com:your-name/automations.git
-git push -u origin main
-```
+Создаём репозиторий на GitHub, коммитим всё и пушим в `main`.
 
 Через пару минут джоба зелёная, и сервис отвечает снаружи:
 

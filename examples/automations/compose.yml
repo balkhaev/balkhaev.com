@@ -1,0 +1,61 @@
+# Docker keeps container logs forever by default; cap them so the disk never fills
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+x-app: &app
+  image: ghcr.io/your-name/automations:${TAG:-latest}
+  restart: unless-stopped
+  logging: *logging
+  env_file: .env
+  environment:
+    DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+    TZ: Europe/Moscow
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *app
+
+  worker:
+    <<: *app
+    command: ["bun", "src/worker.ts"]
+    stop_grace_period: 60s
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: app
+    volumes:
+      # Since Postgres 18 the image keeps data in /var/lib/postgresql/18/docker
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

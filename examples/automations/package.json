@@ -1,0 +1,19 @@
+{
+  "name": "automations",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "migrate": "bun src/migrate.ts",
+    "check": "tsc --noEmit",
+    "worker": "bun src/worker.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^7"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0"
+  }
+}

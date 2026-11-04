@@ -50,85 +50,26 @@ Next we write each piece. The code continues [part 4](/blog/agent-mcp/): the sam
 
 ## A teaching SSO
 
-Your company already has a sign-in provider: Keycloak, Microsoft Entra ID, Okta, Google Workspace. They all speak OAuth 2.0 and OpenID Connect and issue tokens as JWTs. To make the example run without them, we write a tiny 70-line provider with the [jose](https://github.com/panva/jose) library. It does three things: publishes the key for checking signatures, issues a token by user name, and exchanges tokens.
+Your company already has a sign-in provider: Keycloak, Microsoft Entra ID, Okta, Google Workspace. They all speak OAuth 2.0 and OpenID Connect and issue tokens as JWTs. To make the example run without them, we write a tiny 70-line provider with the [jose](https://github.com/panva/jose) library.
 
 ```bash
 bun add jose @modelcontextprotocol/server @modelcontextprotocol/client zod @anthropic-ai/sdk
 ```
 
+`idp.ts` holds an RS256 key pair and three test employees: Igor from sales, Maria from engineering and Olga from HR and management. It has three endpoints:
+
+- `/jwks` publishes the public key the servers use to check signatures;
+- `/dev-login?user=igor` issues an 8-hour agent token, standing in for a real browser sign-in;
+- `/token` takes the agent's token and issues a 5-minute token for `wiki` or `db` in its place.
+
+The token itself is signed with one jose call chain:
+
 ```ts
-// idp.ts — a teaching sign-in provider. In a company, Keycloak, Entra ID or Okta goes here
-import { SignJWT, exportJWK, generateKeyPair, jwtVerify } from "jose";
-
-const ISSUER = "http://localhost:4000";
-const { publicKey, privateKey } = await generateKeyPair("RS256");
-const jwk = { ...(await exportJWK(publicKey)), kid: "demo", alg: "RS256" };
-
-// Groups usually come from the employee directory (AD, LDAP, Google Groups)
-const USERS: Record<string, { name: string; groups: string[] }> = {
-  igor: { name: "Igor Smirnov", groups: ["sales"] },
-  maria: { name: "Maria Orlova", groups: ["engineering"] },
-  olga: { name: "Olga Belova", groups: ["hr", "management"] },
-};
-// Which services may receive tokens
-const AUDIENCES = ["wiki", "db"];
-
-function issue(sub: string, audience: string, ttl: string) {
-  const user = USERS[sub];
-  return new SignJWT({ name: user.name, groups: user.groups })
-    .setProtectedHeader({ alg: "RS256", kid: "demo" })
-    .setIssuer(ISSUER)
-    .setSubject(sub)
-    .setAudience(audience)
-    .setIssuedAt()
-    .setExpirationTime(ttl)
-    .sign(privateKey);
-}
-
-Bun.serve({
-  port: 4000,
-  async fetch(req) {
-    const url = new URL(req.url);
-
-    if (url.pathname === "/jwks") return Response.json({ keys: [jwk] });
-
-    // Instead of a real browser sign-in: issue an agent token by user name
-    if (url.pathname === "/dev-login") {
-      const user = url.searchParams.get("user") ?? "";
-      if (!USERS[user]) return new Response("unknown user", { status: 404 });
-      return new Response(await issue(user, "company-agent", "8h"));
-    }
-
-    // Token exchange (RFC 8693): the agent token is swapped for a token for one service
-    if (url.pathname === "/token" && req.method === "POST") {
-      const form = await req.formData();
-      if (form.get("grant_type") !== "urn:ietf:params:oauth:grant-type:token-exchange") {
-        return Response.json({ error: "unsupported_grant_type" }, { status: 400 });
-      }
-      const audience = String(form.get("audience"));
-      if (!AUDIENCES.includes(audience)) {
-        return Response.json({ error: "invalid_target" }, { status: 400 });
-      }
-      try {
-        const { payload } = await jwtVerify(String(form.get("subject_token")), publicKey, {
-          issuer: ISSUER,
-          audience: "company-agent",
-        });
-        return Response.json({
-          access_token: await issue(payload.sub as string, audience, "5m"),
-          issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
-          token_type: "Bearer",
-          expires_in: 300,
-        });
-      } catch {
-        return Response.json({ error: "invalid_grant" }, { status: 400 });
-      }
-    }
-
-    return new Response("not found", { status: 404 });
-  },
-});
-console.log(`IdP at ${ISSUER}`);
+new SignJWT({ name: user.name, groups: user.groups })
+  .setProtectedHeader({ alg: "RS256", kid: "demo" })
+  .setIssuer(ISSUER).setSubject(sub).setAudience(audience)
+  .setIssuedAt().setExpirationTime(ttl)
+  .sign(privateKey);
 ```
 
 The token has three fields that everything else rests on:
@@ -160,66 +101,29 @@ In [part 4](/blog/agent-mcp/) MCP servers ran as child processes over stdio. Ser
 }
 ```
 
-`mcp.ts` gains two functions. The first exchanges the token and caches the result until it is about to expire:
+`mcp.ts` gains two functions. The first, `tokenFor`, exchanges the token with the provider and caches the result until it is about to expire. The exchange itself is one POST request:
 
 ```ts
-const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
-
-// Exchanges the employee's token for a short token for one service and caches it
-function tokenFor(userToken: string, audience: string) {
-  let cached: { token: string; expires: number } | undefined;
-  return async () => {
-    if (cached && cached.expires > Date.now() + 30_000) return cached.token;
-    const res = await fetch(`${ISSUER}/token`, {
-      method: "POST",
-      body: new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-        subject_token: userToken,
-        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
-        audience,
-      }),
-    });
-    if (!res.ok) throw new Error(`token exchange for ${audience}: ${res.status}`);
-    const body = (await res.json()) as { access_token: string; expires_in: number };
-    cached = { token: body.access_token, expires: Date.now() + body.expires_in * 1000 };
-    return cached.token;
-  };
-}
+const res = await fetch(`${ISSUER}/token`, {
+  method: "POST",
+  body: new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+    subject_token: userToken,
+    subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+    audience, // "wiki" or "db"
+  }),
+});
+const { access_token, expires_in } = await res.json();
 ```
 
 The second picks the transport. For HTTP servers we pass an `authProvider`: the transport calls it before every request and puts the token into the `Authorization` header:
 
 ```ts
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-
-type StdioConfig = { command: string; args?: string[]; env?: Record<string, string> };
-type HttpConfig = { url: string; audience: string };
-type ServerConfig = StdioConfig | HttpConfig;
-
-function transportFor(params: ServerConfig, userToken: string) {
-  if ("command" in params) return new StdioClientTransport({ ...params, stderr: "inherit" });
-  const getToken = tokenFor(userToken, params.audience);
-  // The transport asks for a token before every request, so it stays fresh even if the agent session lasts for hours
-  return new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: getToken } });
-}
+new StreamableHTTPClientTransport(new URL(params.url), { authProvider: { token: tokenFor(userToken, params.audience) } });
 ```
 
-`connectMcp` from part 4 barely changes: it takes the employee's token as a second argument and creates the transport through `transportFor`:
+`connectMcp` from part 4 barely changes: it takes the employee's token as a second argument and creates the transport through `transportFor`.
 
-```ts
-export async function connectMcp(config: Record<string, ServerConfig>, userToken: string) {
-  // ...
-  for (const [serverName, params] of Object.entries(config)) {
-    // auto: speak the 2026-07-28 revision, fall back to the 2025 protocol for older servers
-    const client = new Client(
-      { name: "company-agent", version: "1.0.0" },
-      { versionNegotiation: { mode: "auto" } },
-    );
-    await client.connect(transportFor(params, userToken));
-    // ... the rest as before: listTools and wrappers for the model
-  }
-}
-```
 
 Stdio servers remain for local tools that touch no company data. Anything that returns data under permissions goes over HTTP with a token.
 
@@ -228,57 +132,22 @@ Stdio servers remain for local tools that touch no company data. Anything that r
 Both servers need the same thing: take the token from the header and check the signature against the provider's public key, the issuer, the expiry and the audience. We move this into `auth.ts`:
 
 ```ts
-// auth.ts
-import { type AuthInfo, OAuthError, OAuthErrorCode, requireBearerAuth } from "@modelcontextprotocol/server";
-import { createRemoteJWKSet, jwtVerify } from "jose";
-
-const ISSUER = process.env.ISSUER ?? "http://localhost:4000";
-const jwks = createRemoteJWKSet(new URL(`${ISSUER}/jwks`));
-
-export type User = { id: string; groups: string[] };
-
-// Protects an MCP server as an OAuth resource: token check and resource metadata (RFC 9728)
-export function protectedResource(origin: string, audience: string) {
-  const resource = `${origin}/mcp`;
-  const metadataPath = "/.well-known/oauth-protected-resource/mcp";
-
-  // Checks the signature, issuer, expiry and, above all, the audience: the token was issued for this service
-  const gate = requireBearerAuth({
-    resourceMetadataUrl: `${origin}${metadataPath}`,
-    verifier: {
-      async verifyAccessToken(token): Promise<AuthInfo> {
-        try {
-          const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
-          return {
-            token,
-            clientId: payload.sub as string,
-            scopes: [],
-            expiresAt: payload.exp,
-            extra: { groups: (payload.groups as string[]) ?? [] },
-          };
-        } catch {
-          throw new OAuthError(OAuthErrorCode.InvalidToken, "the token is not valid for this service");
-        }
-      },
+const gate = requireBearerAuth({
+  resourceMetadataUrl: `${origin}/.well-known/oauth-protected-resource/mcp`,
+  verifier: {
+    async verifyAccessToken(token) {
+      try {
+        const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER, audience });
+        return { token, clientId: payload.sub, scopes: [], expiresAt: payload.exp, extra: { groups: payload.groups } };
+      } catch {
+        throw new OAuthError(OAuthErrorCode.InvalidToken, "token is not valid for this service");
+      }
     },
-  });
-
-  return {
-    gate,
-    metadataPath,
-    metadata: () => Response.json({ resource, authorization_servers: [ISSUER] }),
-  };
-}
-
-export function userOf(auth: AuthInfo | undefined): User {
-  if (!auth) throw new Error("request without a verified token");
-  return { id: auth.clientId, groups: (auth.extra?.groups as string[]) ?? [] };
-}
-
-export function auditLog(user: User, tool: string, args: unknown) {
-  console.error(`[audit] ${new Date().toISOString()} ${user.id} ${tool} ${JSON.stringify(args)}`);
-}
+  },
+});
 ```
+
+Besides `gate`, `auth.ts` has two small functions: `userOf` pulls the login and groups out of a verified token, and `auditLog` writes who called which tool to stderr.
 
 `createRemoteJWKSet` downloads and caches the provider's keys by itself, so rotating keys in the SSO does not require restarting the servers.
 
@@ -290,80 +159,23 @@ The metadata is there for automatic connection. Under the MCP specification, a s
 
 The wiki server from [part 5](/blog/agent-search/) already stores an `access` field with a list of groups on every document. Now we use it. The main change: the MCP server is built anew for every request, and the user lives in a closure.
 
+The `search` query from part 5 gains one extra condition: a document is visible if at least one of its access groups belongs to the user.
+
+```sql
+WHERE chunks MATCH ?
+  AND EXISTS (SELECT 1 FROM json_each(docs.access)
+              WHERE json_each.value IN (SELECT value FROM json_each(?)))  -- the user's groups plus "all"
+```
+
+The same condition goes into `read`. The HTTP handler builds a server for the user from the verified token:
+
 ```ts
-// wiki-server.ts
-import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
-import { Database } from "bun:sqlite";
-import { z } from "zod";
-import { type User, auditLog, protectedResource, userOf } from "./auth";
-
-const PORT = 3001;
-const db = new Database(process.env.WIKI_DB ?? "wiki.db", { readonly: true });
-const resource = protectedResource(`http://localhost:${PORT}`, "wiki");
-
-// A document is visible if at least one of its access groups belongs to the user
-const VISIBLE = `EXISTS (SELECT 1 FROM json_each(docs.access)
-  WHERE json_each.value IN (SELECT value FROM json_each(?)))`;
-
-// The server is built per request and the user lives in a closure:
-// the tools physically cannot return someone else's documents
-function buildServer(user: User) {
-  const groups = JSON.stringify(["all", ...user.groups]);
-  const server = new McpServer({ name: "wiki", version: "2.0.0" });
-
-  server.registerTool(
-    "search",
-    { /* description and schema as in part 5 */ },
-    async ({ query, limit }) => {
-      auditLog(user, "search", { query });
-      // ... the same FTS5 query, now with the visibility condition
-      const rows = db
-        .query(
-          `SELECT chunks.path, chunks.title, chunks.heading,
-                  snippet(chunks, 3, '«', '»', '…', 32) AS snippet
-           FROM chunks JOIN docs ON docs.path = chunks.path
-           WHERE chunks MATCH ? AND ${VISIBLE}
-           ORDER BY bm25(chunks, 0, 5, 3, 1) LIMIT ?`,
-        )
-        .all(toFtsQuery(query), groups, limit);
-      // ... formatting as before
-    },
-  );
-
-  server.registerTool(
-    "read",
-    { /* as in part 5 */ },
-    async ({ path }) => {
-      auditLog(user, "read", { path });
-      const doc = db
-        .query(`SELECT title, body FROM docs WHERE path = ? AND ${VISIBLE}`)
-        .get(path, groups) as { title: string; body: string } | null;
-      // The same answer for "no such document" and "no access": do not reveal that it exists
-      if (!doc) return { isError: true, content: [{ type: "text", text: `No document ${path}` }] };
-      return { content: [{ type: "text", text: `# ${doc.title}\n\n${doc.body}` }] };
-    },
-  );
-
-  return server;
-}
-
-// The server is built per request from whoever came with the token
 const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
 
-Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === resource.metadataPath) return resource.metadata();
-    if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-
-    // No valid token: 401 with a link to the metadata, where the client learns where to get one
-    const auth = await resource.gate(req);
-    if (auth instanceof Response) return auth;
-    return handler.fetch(req, { authInfo: auth });
-  },
-});
-console.error(`wiki MCP at http://localhost:${PORT}/mcp`);
+// inside Bun.serve, on /mcp
+const auth = await resource.gate(req);
+if (auth instanceof Response) return auth; // 401 without a suitable token
+return handler.fetch(req, { authInfo: auth });
 ```
 
 Three details here matter more than they seem to.
@@ -382,21 +194,11 @@ The database is harder. The model writes the SQL itself, and any attempt to appe
 
 The demo rules: a manager sees their own deals, management and HR see all of them. Only HR sees the `salary` column.
 
-```sql
--- rls.sql
--- Tables as in the demo database, but employees and deals carry the SSO login
-CREATE TABLE employees (
-  id serial PRIMARY KEY, login text UNIQUE, name text,
-  department text, position text, salary integer
-);
-CREATE TABLE deals (
-  id serial PRIMARY KEY, client text, owner_login text REFERENCES employees(login),
-  amount integer, stage text, closed_at date
-);
+The tables are the same as in the demo database, except employees and deals carry an SSO login. What matters in `rls.sql` is the roles and the policy:
 
--- Read roles. The agent connects as agent or agent_hr and for the duration of a
--- request switches to reader or hr_reader. INHERIT FALSE: no privileges without SET ROLE.
--- Each login can become only "its own" role and no other
+```sql
+-- Read roles. The agent switches into them for the duration of a query.
+-- INHERIT FALSE: no privileges without SET ROLE
 CREATE ROLE reader NOLOGIN;
 CREATE ROLE hr_reader NOLOGIN IN ROLE reader;
 GRANT reader TO agent WITH INHERIT FALSE;
@@ -407,27 +209,14 @@ GRANT SELECT (id, login, name, department, position) ON employees TO reader;
 GRANT SELECT ON employees TO hr_reader;
 GRANT SELECT ON deals TO reader;
 
--- Who is asking. Only the agent logins can write here, nobody can read
-CREATE TABLE request_context (
-  tx xid8 PRIMARY KEY, login text NOT NULL, groups text[] NOT NULL
-);
-REVOKE ALL ON request_context FROM PUBLIC;
-GRANT INSERT ON request_context TO agent, agent_hr;
-
--- Policies read the current transaction's context through functions running as the owner
-CREATE FUNCTION app_user() RETURNS text
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-  AS $$ SELECT login FROM request_context WHERE tx = pg_current_xact_id() $$;
-CREATE FUNCTION app_groups() RETURNS text[]
-  LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-  AS $$ SELECT groups FROM request_context WHERE tx = pg_current_xact_id() $$;
-
--- Rows: a manager sees their own deals, management and HR see all
+-- A manager sees their own deals, management and HR see all of them
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY deals_visible ON deals FOR SELECT USING (
   owner_login = app_user() OR app_groups() && ARRAY['management', 'hr']
 );
 ```
+
+`app_user()` and `app_groups()` read who is asking from the `request_context` table. Why a table is explained below.
 
 The `agent` and `agent_hr` logins are created in advance, with passwords and no privileges on any table. Why there are two is explained below: it is the second hole we found.
 
@@ -443,36 +232,19 @@ This query rewrote the groups mid-execution, and a manager saw every deal in the
 Now the code that runs the model's query:
 
 ```ts
-// pg.ts
-import { SQL } from "bun";
-import type { User } from "./auth";
-
-// Two pools: regular and HR. The agent login can become only reader,
-// so an employee's query cannot switch to hr_reader
-const pools = {
-  reader: new SQL(process.env.DATABASE_URL ?? "postgres://agent:agent@localhost/company"),
-  hr_reader: new SQL(process.env.DATABASE_URL_HR ?? "postgres://agent_hr:agent_hr@localhost/company"),
-};
-
-export async function queryAs(user: User, query: string) {
-  const role = user.groups.includes("hr") ? "hr_reader" : "reader";
-  const conn = await pools[role].reserve();
-  try {
-    await conn`BEGIN`;
-    // Record who is asking while we still have the agent login's privileges
-    await conn`INSERT INTO request_context (tx, login, groups)
-      VALUES (pg_current_xact_id(), ${user.id}, string_to_array(${user.groups.join(",")}, ','))`;
-    // From here on: read-only, with the employee's privileges only
-    await conn`SET TRANSACTION READ ONLY`;
-    await conn.unsafe(`SET LOCAL ROLE ${role}`);
-    await conn`SET LOCAL statement_timeout = '5s'`;
-    // An empty parameter array forces the extended protocol: exactly one statement
-    return await conn.unsafe(query, []);
-  } finally {
-    // Nothing is committed: the context row disappears with the transaction
-    await conn`ROLLBACK`;
-    conn.release();
-  }
+// the pool is picked by groups: the agent login for everyone, agent_hr for HR
+const conn = await pool.reserve();
+try {
+  await conn`BEGIN`;
+  await conn`INSERT INTO request_context (tx, login, groups)
+    VALUES (pg_current_xact_id(), ${user.id}, ${user.groups})`;
+  await conn`SET TRANSACTION READ ONLY`;
+  await conn.unsafe(`SET LOCAL ROLE ${role}`);
+  await conn`SET LOCAL statement_timeout = '5s'`;
+  return await conn.unsafe(query, []); // empty params: exactly one statement
+} finally {
+  await conn`ROLLBACK`; // the context disappears with the transaction
+  conn.release();
 }
 ```
 
@@ -504,80 +276,7 @@ We found two holes out of six, both in code that looked correct. If you build th
 
 The database server is built like the wiki: HTTP, a token check with audience `db`, a server per request.
 
-```ts
-// db-server.ts
-import { McpServer, createMcpHandler } from "@modelcontextprotocol/server";
-import { z } from "zod";
-import { type User, auditLog, protectedResource, userOf } from "./auth";
-import { queryAs } from "./pg";
-
-const PORT = 3002;
-const MAX_ROWS = 200;
-const resource = protectedResource(`http://localhost:${PORT}`, "db");
-
-const DOCS = `Company database tables (PostgreSQL):
-
-employees: id, login, name, department, position,
-  salary (monthly salary in roubles, HR only)
-deals: id, client, owner_login → employees.login (manager),
-  amount (in roubles), stage (lead | negotiation | won | lost), closed_at (date)
-
-The database enforces permissions: rows and columns the employee may not see
-come back empty or with a permission denied error. That is an answer, not a failure.`;
-
-function buildServer(user: User) {
-  const server = new McpServer({ name: "company-db", version: "2.0.0" });
-
-  server.registerTool(
-    "describe_schema",
-    {
-      description: "Describes the company database tables and columns. Call before the first query.",
-      annotations: { readOnlyHint: true },
-    },
-    async () => ({ content: [{ type: "text", text: DOCS }] }),
-  );
-
-  server.registerTool(
-    "query",
-    {
-      description: `Run one SELECT against the company database with the current employee's permissions. Returns up to ${MAX_ROWS} rows as JSON.`,
-      inputSchema: z.object({ sql: z.string().describe("One SELECT or WITH ... SELECT query") }),
-      annotations: { readOnlyHint: true },
-    },
-    async ({ sql }) => {
-      auditLog(user, "query", { sql });
-      try {
-        const rows = await queryAs(user, sql);
-        const shown = rows.slice(0, MAX_ROWS);
-        const note = rows.length > MAX_ROWS ? `\n(showing ${MAX_ROWS} of ${rows.length})` : "";
-        return { content: [{ type: "text", text: JSON.stringify(shown) + note }] };
-      } catch (err) {
-        return { isError: true, content: [{ type: "text", text: String(err) }] };
-      }
-    },
-  );
-
-  return server;
-}
-
-// The server is built per request from whoever came with the token
-const handler = createMcpHandler(({ authInfo }) => buildServer(userOf(authInfo)));
-
-Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === resource.metadataPath) return resource.metadata();
-    if (url.pathname !== "/mcp") return new Response("not found", { status: 404 });
-
-    // No valid token: 401 with a link to the metadata, where the client learns where to get one
-    const auth = await resource.gate(req);
-    if (auth instanceof Response) return auth;
-    return handler.fetch(req, { authInfo: auth });
-  },
-});
-console.error(`db MCP at http://localhost:${PORT}/mcp`);
-```
+The tools are the same two, `describe_schema` and `query`; `query` now calls `queryAs(user, sql)`. The schema description gains a last sentence: "The database enforces permissions: rows and columns the employee may not see come back empty or as permission denied. This is not a failure, it is the answer."
 
 Note the last sentence of the schema description. Without it, a model that receives permission denied starts trying query variations to "fix the error". With it, the model understands this is the answer and tells the employee the data is not available to them.
 
@@ -587,26 +286,7 @@ The regular expression that checked in part 4 that the query starts with SELECT 
 
 The beginning of `agent.ts` changes: the agent gets the employee's token and passes it to `connectMcp`. For now the token comes from an environment variable; in the interface part the chat bot or web chat will pass it after SSO sign-in.
 
-```ts
-import Anthropic from "@anthropic-ai/sdk";
-import { decodeJwt } from "jose";
-import { connectMcp } from "./mcp";
-
-// The employee's token after SSO sign-in. For now it comes from an environment variable;
-// in the interface part the bot or web chat will pass it
-const userToken = process.env.USER_TOKEN;
-if (!userToken) throw new Error("no USER_TOKEN: sign in through SSO");
-const me = decodeJwt(userToken) as { sub: string; name: string };
-
-const client = new Anthropic();
-const mcp = await connectMcp(await Bun.file("mcp.json").json(), userToken);
-
-const system = `You are an assistant for the company's employees. You answer questions about
-company data using tools. Do not make up numbers: everything you state must come from tools.
-If data is missing, say so. Answer briefly and name your sources at the end.
-You are talking to ${me.name} (login ${me.sub}). Tools run with their permissions:
-if something is not found or access is denied, say so plainly and do not try to work around it.`;
-```
+The agent takes the employee's name from the same token with `decodeJwt`, and the system prompt gains two lines: "You are talking to Igor Smirnov (login igor). The tools run with his permissions: if something is not found or access is denied, say so plainly and do not try to work around it."
 
 `decodeJwt` does not verify the signature, and that is fine here: the name is only for politeness in the prompt. The servers check permissions, each with its own key. If someone slips the agent a forged token with another person's name, the exchange for service tokens will fail.
 
