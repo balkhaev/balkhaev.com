@@ -864,4 +864,4 @@ The interesting part: making sure the system survives the things we built it for
 - A schedule on the same queue: exactly one run per slot, catching up on missed ones.
 - Queue tests against a real database in CI, before every deploy.
 
-The foundation is done. In the next part we build the first real automation: a form submission turns into a card for a manager in Telegram within a minute, the model pulls out of free text what the client needs, and if nobody takes the lead, the bot sends a reminder.
+The foundation is done. In the [next part](/blog/automations-sales/) we build the first real automation: a form submission turns into a card for a manager in Telegram within a minute, the model pulls out of free text what the client needs, and if nobody takes the lead, the bot sends a reminder.
