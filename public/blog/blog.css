@@ -514,7 +514,7 @@ summary:focus-visible {
   grid-row: 1;
   grid-column: 4 / span 7;
   min-width: 0;
-  max-width: 740px;
+  max-width: 700px;
 }
 .side-block ol {
   padding: 0;
@@ -601,7 +601,6 @@ summary:focus-visible {
   line-height: 1.65;
   color: var(--ink-2);
   overflow-wrap: break-word;
-  counter-reset: section;
 }
 .prose > :first-child {
   margin-top: 0;
@@ -621,28 +620,29 @@ summary:focus-visible {
   color: var(--ink);
 }
 .prose :is(h2, h3, h4) {
-  margin: 2.2em 0 0.6em;
+  margin: 2em 0 0.55em;
   line-height: 1.15;
   color: var(--ink);
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
 .prose h2 {
-  padding-top: 12px;
+  padding-top: 18px;
+  margin-top: 2.6em;
   font-size: clamp(26px, 2.4vw, 34px);
   font-weight: 700;
-  counter-increment: section;
   border-top: 2px solid var(--line);
 }
 .prose h2::before {
   display: block;
-  margin-bottom: 10px;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--signal);
-  letter-spacing: 0.06em;
-  content: counter(section, decimal-leading-zero);
+  width: 28px;
+  height: 6px;
+  margin-bottom: 14px;
+  content: "";
+  background: var(--signal);
+}
+.prose :is(h2, h3, h4) + :is(h3, h4) {
+  margin-top: 0.8em;
 }
 .prose h3 {
   font-size: 22px;
@@ -652,8 +652,8 @@ summary:focus-visible {
   font-size: 18px;
   font-weight: 650;
 }
-.prose :is(p, ul, ol, pre, table, blockquote) {
-  margin: 0 0 1.1em;
+.prose :is(p, ul, ol, table, blockquote) {
+  margin: 0 0 1.15em;
 }
 .prose :is(ul, ol) {
   padding-left: 1.4em;
@@ -666,6 +666,12 @@ summary:focus-visible {
   font-size: 0.85em;
   color: var(--signal);
 }
+.prose li > :is(ul, ol) {
+  margin: 0.35em 0 0;
+}
+.prose li > p {
+  margin: 0 0 0.4em;
+}
 .prose code {
   padding: 0.1em 0.35em;
   font-family: var(--mono);
@@ -675,14 +681,114 @@ summary:focus-visible {
   border-radius: 3px;
 }
 .prose pre {
-  padding: 18px 20px;
+  padding: 16px 20px;
+  margin: 1.5em 0 1.6em;
   overflow-x: auto;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: #e8e4dc;
+  scrollbar-color: #555 transparent;
   scrollbar-width: thin;
   background: var(--code);
   border-radius: 0;
+}
+
+/* Code blocks: a file tab, and long blocks folded to their first lines */
+.code {
+  position: relative;
+  margin: 1.5em 0 1.6em;
+  background: var(--code);
+}
+.prose .code pre {
+  margin: 0;
+}
+.code-head {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 9px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #a8a29a;
+  border-bottom: 1px solid #ffffff1a;
+}
+.code-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f2efe9;
+  white-space: nowrap;
+}
+.code-file::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 10px;
+  vertical-align: 1px;
+  content: "";
+  background: var(--signal);
+  border-radius: 50%;
+}
+.code-lang {
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.code-toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  clip-path: inset(50%);
+}
+.folds .code-toggle:not(:checked) + pre {
+  /* PREVIEW lines of code plus the top padding */
+  max-height: calc(10 * 1.6em + 16px);
+  overflow: hidden;
+  mask-image: linear-gradient(#000 45%, transparent);
+}
+.code-more {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: #f2efe9;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  user-select: none;
+  border-top: 1px solid #ffffff1a;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.code-more::after {
+  content: "↓";
+  transition: transform 0.25s var(--ease);
+}
+.code-more:hover {
+  color: #fff;
+  background: var(--signal);
+}
+.code-toggle:focus-visible ~ .code-more {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+.code-toggle:checked ~ .code-more::after {
+  transform: rotate(180deg);
+}
+.code-more-close,
+.code-toggle:checked ~ .code-more .code-more-open {
+  display: none;
+}
+.code-toggle:checked ~ .code-more .code-more-close {
+  display: inline;
 }
 .prose pre code {
   padding: 0;
@@ -702,6 +808,7 @@ summary:focus-visible {
 .prose table {
   display: block;
   max-width: 100%;
+  margin: 1.5em 0 1.6em;
   overflow-x: auto;
   font-size: 15px;
   line-height: 1.45;
@@ -753,14 +860,46 @@ summary:focus-visible {
 
 /* Callouts */
 .callout {
-  padding: 16px 20px;
-  margin: 0 0 1.2em;
+  padding: 16px 20px 18px;
+  margin: 1.5em 0;
   font-size: 17px;
+  line-height: 1.6;
   background: var(--paper-2);
   border-left: 3px solid var(--ink);
 }
 .callout > :last-child {
   margin-bottom: 0;
+}
+.callout:is(.note, .warning, .tldr)::before {
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.callout.tldr::before {
+  content: "TL;DR";
+}
+.callout.note::before {
+  content: "Note";
+}
+.callout.warning::before {
+  content: "Careful";
+}
+:lang(ru) .callout.tldr::before {
+  content: "Коротко";
+}
+:lang(ru) .callout.note::before {
+  content: "Заметка";
+}
+:lang(ru) .callout.warning::before {
+  content: "Осторожно";
+}
+.prose > .callout.tldr:first-child {
+  margin-top: 0;
 }
 .callout.note {
   border-left-color: #2f5fd0;
@@ -921,9 +1060,19 @@ summary:focus-visible {
   .prose {
     font-size: 17px;
   }
-  .prose pre {
+  .prose > pre,
+  .code {
     margin-right: calc(-1 * var(--gutter));
     margin-left: calc(-1 * var(--gutter));
+  }
+  .prose pre,
+  .code-head,
+  .code-more {
+    padding-right: var(--gutter);
+    padding-left: var(--gutter);
+  }
+  .prose pre {
+    font-size: 13px;
   }
   .row {
     flex-direction: column;
@@ -947,7 +1096,7 @@ summary:focus-visible {
 
 /* Diagrams: ```mermaid rendered to inline SVG at build time. */
 .prose .diagram {
-  margin: 1.6em 0;
+  margin: 2em 0;
   overflow-x: auto;
   text-align: center;
 }
