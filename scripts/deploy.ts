@@ -6,6 +6,7 @@ import { file, sleep, spawn } from "bun";
 const API = "https://deploy.balkhaev.com/api/v1";
 const HOST = "root@49.13.216.63";
 const IMAGE = "127.0.0.1:5000/balkhaev-site";
+const VIDEO_DIR = "/srv/balkhaev-video";
 const token = process.env.COOLIFY_ACCESS_TOKEN;
 if (!token) {
   throw new Error("Set COOLIFY_ACCESS_TOKEN before deploying");
@@ -61,6 +62,9 @@ try {
   );
   const script = [
     "set -eu",
+    // Post videos are rendered by CI straight to the server (see the deploy
+    // workflow) and baked into the image from there.
+    `if [ -d ${VIDEO_DIR} ]; then cp -r ${VIDEO_DIR} ${buildDir}/video; fi`,
     `docker build -t ${IMAGE}:${commit} ${buildDir}`,
     `docker push ${IMAGE}:${commit}`,
     `docker tag ${IMAGE}:${commit} ${IMAGE}:prod`,

@@ -1,0 +1,118 @@
+context: Company AI agent · 1/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 1
+    title: "Concept: an agent that *knows the company*"
+    subtitle: What agent we are building and what parts it is made of.
+
+  - type: list
+    label: The problem
+    heading: The answers exist. Finding them takes ages.
+    items:
+      - "Payment terms in a contract: somewhere in the *wiki* or on a drive"
+      - "Why payments went down yesterday: in the *tracker* and the on-call chat"
+      - "October sales by region: in the *database*"
+    say: You need to know where to look, have access, and spend half an hour. Or take half an hour from a colleague.
+
+  - type: statement
+    label: The goal
+    text: Ask in plain language, get an answer *with links to the sources*.
+    say: And a developer must not see salaries, nor an intern a contract they have no access to.
+
+  - type: compare
+    label: Three paths
+    heading: Why not a chat bot, why not fine-tuning
+    columns:
+      - title: Plain chat bot
+        points:
+          - Doesn't know your data
+          - Knowledge goes stale
+          - Tells everyone everything
+      - title: Fine-tuning
+        points:
+          - Mixes up facts and numbers
+          - Knowledge freezes
+          - Permissions impossible
+          - No source for answers
+      - title: Agent with tools
+        pick: true
+        points:
+          - Searches at question time
+          - Data is always fresh
+          - Permissions on every call
+          - Answers cite sources
+    say: The third path works. The model knows nothing up front, but it knows how to search.
+
+  - type: diagram
+    label: Architecture
+    heading: What the agent is made of
+    nodes:
+      - { id: user, label: Employee, sub: "Slack, web chat", col: 0, row: 0, w: 3, step: 0 }
+      - { id: harness, label: Our service, sub: "history, loop, log", col: 4, row: 0, w: 4, step: 1, accent: true }
+      - { id: model, label: Model via API, sub: Claude, col: 9, row: 0, w: 3, step: 2 }
+      - { id: docs, label: Documents, sub: wiki search, col: 0, row: 4, w: 3, step: 3 }
+      - { id: db, label: Database, sub: read-only, col: 3, row: 4, w: 2, step: 3 }
+      - { id: tracker, label: Tracker, sub: tasks, col: 5, row: 4, w: 2, step: 3 }
+      - { id: crm, label: CRM, sub: customers, col: 7, row: 4, w: 2, step: 3 }
+      - { id: git, label: Git, sub: code, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: user, to: harness, label: question }
+      - { from: harness, to: model, both: true }
+      - { from: harness, to: docs }
+      - { from: harness, to: db }
+      - { from: harness, to: tracker, label: MCP + employee token }
+      - { from: harness, to: crm }
+      - { from: harness, to: git }
+    say: The service runs the conversation and the loop. The model picks tools. Each system plugs in through its own MCP server.
+
+  - type: list
+    label: Layers
+    heading: What each part is responsible for
+    items:
+      - "*Model*: understands the question, picks tools, writes the answer. Easy to swap"
+      - "*Service*: history, the agent loop, step and cost limits, the log"
+      - "*MCP*: every system plugs in as a separate server"
+      - "*Search*: the only place we copy data, together with permissions"
+      - "*Identity*: SSO login, the agent calls systems as the employee"
+      - "*Interface*: a chat bot and a web chat, a thin layer"
+
+  - type: statement
+    label: The key part
+    text: The agent sees *exactly what the person asking sees*. No more.
+    say: No service account with access to everything. If a person can't open a document, neither can the agent.
+
+  - type: list
+    label: Principles
+    heading: Six rules we stick to
+    numbered: true
+    items:
+      - Buy the model, feed knowledge through tools
+      - Data stays where it lives
+      - The agent acts on behalf of a person
+      - Read-only by default
+      - Every answer cites its sources
+      - Log everything
+
+  - type: statement
+    label: Data at the provider
+    text: Questions and found fragments *go to the model provider*.
+    say: Commercial APIs don't train on customer requests by default, but read the terms. Need a specific region? Use Bedrock or Vertex AI.
+
+  - type: list
+    label: The plan
+    heading: Nine parts, each built on the previous one
+    numbered: true
+    items:
+      - Concept
+      - Talking to a model
+      - The agent loop and tools
+      - MCP
+      - Company knowledge
+      - Permissions
+      - Context and money
+      - The interface
+      - Production
+
+  - type: end
+    text: Next we write code. Layer by layer, *all the way to production*.
+    url: balkhaev.com/blog/agent-concept

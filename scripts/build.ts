@@ -1,5 +1,5 @@
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { build } from "bun";
+import { build, file } from "bun";
 import {
   BLOG_LANGS,
   checkSeries,
@@ -63,9 +63,24 @@ pages.set("/news/", renderNews());
 for (const lang of LANGS) {
   pages.set(CV_PATHS[lang], renderCv(lang));
 }
-const posts = await loadPosts(
+const loaded = await loadPosts(
   "content/blog",
   process.argv.includes("--drafts")
+);
+// Videos are rendered by scripts/video.ts into video/<slug>/<lang>.mp4 (in
+// production they come from the server, see scripts/deploy.ts). A post shows
+// its player only when its video file is actually here.
+const posts = await Promise.all(
+  loaded.map(async (post) => {
+    const base = `video/${post.slug}/${post.lang}`;
+    if (!(post.video && (await file(`${base}.mp4`).exists()))) {
+      return { ...post, video: undefined };
+    }
+    await mkdir(`dist/video/${post.slug}`, { recursive: true });
+    await cp(`${base}.mp4`, `dist/${base}.mp4`);
+    await cp(`${base}.jpg`, `dist/${base}.jpg`);
+    return post;
+  })
 );
 const series = await loadSeries("content/series");
 checkSeries(posts, series);
