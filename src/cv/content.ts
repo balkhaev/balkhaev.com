@@ -49,7 +49,7 @@ export interface Resume {
 }
 
 const HEADLINE = "ML Engineer / Generative AI Engineer / Product Developer";
-const AIGF_SITES = ["luv.club", "adorely.co", "sinly.io"];
+const OWN_SITES = ["luv.club", "adorely.co", "sinly.io"];
 
 export const RESUMES: Record<Lang, Resume> = {
   en: {
@@ -87,10 +87,10 @@ export const RESUMES: Record<Lang, Resume> = {
     headline: HEADLINE,
     jobs: [
       {
-        company: "AIGF",
+        company: "Independent products",
         period: "Mar 2026 – present",
         points: [
-          "AI companion platforms (18+) with image, video and 3D generation, chat and voice: a multi-tenant Hono backend, Redis/BullMQ workers and RunPod GPU jobs with idempotent submission.",
+          "Founded and built my own AI companion platforms (18+) with image, video and 3D generation, chat and voice: a multi-tenant Hono backend, Redis/BullMQ workers and RunPod GPU jobs with idempotent submission.",
           "Identity-consistent photos with Qwen Image 2.1: an edit-consistency LoRA, up to four reference images and an automatic redraw when the face drifts.",
           "Video: text- and image-to-video with two-pass sampling and RIFE interpolation to 48 fps; face and full-character swap with MiniMax H3 and swap LoRAs.",
           "3D stage to video: the reference render conditions only the first 5 of 20 sampling steps, which keeps the camera and composition while the model produces natural motion.",
@@ -99,8 +99,8 @@ export const RESUMES: Record<Lang, Resume> = {
           "Tool-using Grok agents: a studio director that sets up shoots and reviews results, and a 3D scene editor with validated, revision-checked edits; REST and MCP API with OAuth 2.1.",
           "Voice: self-hosted Kokoro-82M TTS on CPU (ONNX, 54 voices) and Whisper recognition.",
         ],
-        role: "Generative AI Engineer",
-        sites: AIGF_SITES,
+        role: "Founder, Generative AI Engineer",
+        sites: OWN_SITES,
       },
       {
         company: "Funcorp",
@@ -232,7 +232,7 @@ export const RESUMES: Record<Lang, Resume> = {
       },
     ],
     summary:
-      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents, search and the GPU infrastructure behind them. I take products from the model pipeline and quality evaluation to the backend, the interface and production. Embeddings and vector search (Qdrant, pgvector) with hybrid retrieval and reranking run through most of my projects: companion memory at AIGF, RAG at Funcorp, game search on ggpick.club, the Polywin research platform and a sales CRM. Before that, 13 years of web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
+      "ML engineer working on generative AI: image and video diffusion, speech, LLM agents, search and the GPU infrastructure behind them. I take products from the model pipeline and quality evaluation to the backend, the interface and production. Embeddings and vector search (Qdrant, pgvector) with hybrid retrieval and reranking run through most of my projects: companion memory in my own platforms, RAG at Funcorp, game search on ggpick.club, the Polywin research platform and a sales CRM. Before that, 13 years of web development, including VK (Delivery Club) and Yandex (Yandex Eats).",
     title: "Mikhail Balkhaev — CV",
     web: [
       {
@@ -311,10 +311,10 @@ export const RESUMES: Record<Lang, Resume> = {
     headline: HEADLINE,
     jobs: [
       {
-        company: "AIGF",
+        company: "Собственные продукты",
         period: "Март 2026 – сейчас",
         points: [
-          "Платформы AI-компаньонов (18+) с генерацией фото, видео и 3D, чатом и голосом: мультитенантный бэкенд на Hono, воркеры Redis/BullMQ, GPU-задачи на RunPod.",
+          "Основал и разработал собственные платформы AI-компаньонов (18+) с генерацией фото, видео и 3D, чатом и голосом: мультитенантный бэкенд на Hono, воркеры Redis/BullMQ, GPU-задачи на RunPod.",
           "Фото с сохранением внешности на Qwen Image 2.1: LoRA для согласованных правок, до четырёх референсов и автоматическая перерисовка, если лицо «уплыло».",
           "Видео: text-to-video и image-to-video с двухпроходным сэмплированием и интерполяцией RIFE до 48 fps; замена лица и всего персонажа на MiniMax H3 со swap-LoRA.",
           "3D-сцена в видео: референсный рендер задаёт только первые 5 из 20 шагов сэмплирования, так что камера и композиция сохраняются, а движение остаётся естественным.",
@@ -323,8 +323,8 @@ export const RESUMES: Record<Lang, Resume> = {
           "Агенты на Grok с инструментами: режиссёр студии настраивает съёмки и проверяет результат, 3D-редактор правит сцены с валидацией и контролем ревизий; REST и MCP API с OAuth 2.1.",
           "Голос: свой TTS на CPU (Kokoro-82M в ONNX, 54 голоса) и распознавание на Whisper.",
         ],
-        role: "Generative AI Engineer",
-        sites: AIGF_SITES,
+        role: "Основатель, Generative AI Engineer",
+        sites: OWN_SITES,
       },
       {
         company: "Funcorp",
@@ -456,7 +456,7 @@ export const RESUMES: Record<Lang, Resume> = {
       },
     ],
     summary:
-      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты, поиск и GPU-инфраструктура под них. Довожу продукты от пайплайна моделей и оценки качества до бэкенда, интерфейса и продакшена. Эмбеддинги и векторный поиск (Qdrant, pgvector) с гибридным поиском и переранжированием есть в большинстве моих проектов: память компаньонов в AIGF, RAG в Funcorp, поиск игр на ggpick.club, исследовательская платформа Polywin и CRM отдела продаж. До этого 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
+      "ML-инженер в генеративном AI: диффузия для фото и видео, синтез речи, LLM-агенты, поиск и GPU-инфраструктура под них. Довожу продукты от пайплайна моделей и оценки качества до бэкенда, интерфейса и продакшена. Эмбеддинги и векторный поиск (Qdrant, pgvector) с гибридным поиском и переранжированием есть в большинстве моих проектов: память компаньонов в моих платформах, RAG в Funcorp, поиск игр на ggpick.club, исследовательская платформа Polywin и CRM отдела продаж. До этого 13 лет в веб-разработке, в том числе в VK (Delivery Club) и Яндексе (Яндекс Еда).",
     title: "Михаил Бальхаев — резюме",
     web: [
       {
