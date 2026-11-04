@@ -919,4 +919,4 @@ A run over HTTP with Telegram, email and Claude stubbed:
 - The knowledge base lives in the repository, and caching makes every request cheaper.
 - `draft_used` shows how good the drafts are and where to automate further.
 
-Next is "Replacing the analyst": a morning digest of leads, payments and support, and alerts when something goes differently from usual.
+Next is ["Replacing the analyst"](/blog/automations-analytics/): a morning digest of leads, payments and support, and alerts when something goes differently from usual.
