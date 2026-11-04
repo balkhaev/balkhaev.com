@@ -44,47 +44,15 @@
     </header>
     <main class="home">
       <section aria-labelledby="hero-title" class="hero">
-        <div class="hero-text">
-          <p class="eyebrow reveal" style="--i: 0">
-            <span>Михаил Бальхаев</span><span>ML-инженер · Москва</span>
-          </p>
-          <h1 class="reveal" id="hero-title" style="--i: 1">
-            Делаю продукты на <em>генеративных</em> моделях&nbsp;—
-            от&nbsp;диффузии до&nbsp;интерфейса
-          </h1>
-          <p class="lead reveal" style="--i: 2">
-            Пайплайны для фото, видео и речи, LLM-агенты и GPU-инфраструктура
-            под них. До этого 13 лет в вебе, в том числе в VK и Яндексе. В блоге
-            пишу, как это устроено на практике.
-          </p>
-          <p class="actions reveal" style="--i: 3">
-            <a class="action primary" href="/blog/ru/"
-              >Читать блог <span aria-hidden="true">→</span></a
-            >
-            <a class="action" href="/cv/ru/">Резюме</a>
-          </p>
+        <canvas aria-hidden="true" class="lens" id="lens"></canvas>
+        <div aria-hidden="true" class="poster-fallback">
+          <span>МИХАИЛ</span><span>БАЛЬХАЕВ</span><em>генеративный ai</em>
         </div>
-        <figure class="portal reveal" style="--i: 2">
+        <h1 class="visually-hidden" id="hero-title">
+          Михаил Бальхаев, ML-инженер в генеративном AI
+        </h1>
+        <div class="hole-anchor" id="hole-anchor">
           <div class="portal-frame">
-            <svg aria-hidden="true" class="portal-ring" viewBox="0 0 200 200">
-              <defs>
-                <path
-                  d="M100 100m-94 0a94 94 0 1 1 188 0a94 94 0 1 1-188 0"
-                  id="ring-path"
-                ></path>
-              </defs>
-              <text>
-                <textPath
-                  href="#ring-path"
-                  lengthAdjust="spacing"
-                  textLength="588"
-                >
-                  ШВАРЦШИЛЬД · r = 12.5 rₛ · ГЕОДЕЗИЧЕСКИЕ ПЕНЛЕВЕ —
-                  ГУЛЛЬСТРАНДА · ТРАССИРОВКА ЛУЧЕЙ · ДОПЛЕРОВСКИЙ СДВИГ ·
-                  ФОТОННАЯ СФЕРА 1.5 rₛ ·
-                </textPath>
-              </text>
-            </svg>
             <section
               aria-label="Падение в чёрную дыру"
               class="scene"
@@ -477,18 +445,47 @@
               </button>
             </section>
           </div>
-          <figcaption>
-            <span class="fig">Рис. 1</span>
-            <span class="fig-text"
-              >Падение в чёрную дыру Шварцшильда. Трассировка лучей в
-              браузере.</span
+          <span aria-hidden="true" class="hole-hint">нажми, чтобы упасть</span>
+        </div>
+        <div class="hero-bottom">
+          <p class="hero-copy reveal" style="--i: 1">
+            <span class="hero-kicker">ML-инженер · Москва</span>
+            Делаю продукты на генеративных моделях: диффузия для фото и видео,
+            синтез речи, LLM-агенты и GPU-инфраструктура под них.
+          </p>
+          <p class="actions reveal" style="--i: 2">
+            <a class="action primary" href="/blog/ru/"
+              >Читать блог <span aria-hidden="true">→</span></a
             >
-            <button class="fig-open" data-open-scene type="button">
-              Открыть <span aria-hidden="true" class="fig-arrow">↗</span>
+            <button class="action" data-open-scene type="button">
+              Упасть в дыру <span aria-hidden="true">↘</span>
             </button>
-          </figcaption>
-        </figure>
+          </p>
+        </div>
       </section>
+
+      <div aria-hidden="true" class="marquee">
+        <div class="marquee-track">
+          <span
+            >Диффузия ✦ LLM-агенты ✦ Синтез речи ✦ GPU-инференс ✦ LoRA ✦ RAG ✦
+            ComfyUI ✦ vLLM ✦ MCP ✦&nbsp;</span
+          >
+          <span
+            >Диффузия ✦ LLM-агенты ✦ Синтез речи ✦ GPU-инференс ✦ LoRA ✦ RAG ✦
+            ComfyUI ✦ vLLM ✦ MCP ✦&nbsp;</span
+          >
+        </div>
+        <div class="marquee-track reverse">
+          <span
+            >Qwen Image ✦ Wan 2.2 ✦ Whisper ✦ Kokoro ✦ Claude ✦ Grok ✦ Three.js
+            ✦ WebGL ✦ Unreal ✦&nbsp;</span
+          >
+          <span
+            >Qwen Image ✦ Wan 2.2 ✦ Whisper ✦ Kokoro ✦ Claude ✦ Grok ✦ Three.js
+            ✦ WebGL ✦ Unreal ✦&nbsp;</span
+          >
+        </div>
+      </div>
 
       <section aria-labelledby="blog-title" class="block">
         <header class="block-head">
