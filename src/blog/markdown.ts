@@ -13,6 +13,7 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { visit } from "unist-util-visit";
+import { rehypeCodeBlocks } from "./code";
 import { rehypeDiagrams } from "./diagram";
 
 export interface Heading {
@@ -131,6 +132,7 @@ export async function renderMarkdown(
     })
     .use(rehypeKatex)
     .use(rehypeDiagrams)
+    .use(rehypeCodeBlocks(lang))
     .use(rehypeShiki, {
       defaultColor: false,
       fallbackLanguage: "text",
