@@ -1,0 +1,72 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'deploy-production' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run test
+      - run: bun run build
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://balkhaev.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          COOLIFY_ACCESS_TOKEN: ${{ secrets.COOLIFY_ACCESS_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$SSH_PRIVATE_KEY" ] || missing="$missing DEPLOY_SSH_KEY"
+          [ -n "$COOLIFY_ACCESS_TOKEN" ] || missing="$missing COOLIFY_ACCESS_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::Add repository secrets:$missing (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf 'Host 49.13.216.63\n  User root\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n' > ~/.ssh/config
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -T 15 49.13.216.63 > ~/.ssh/known_hosts
+          fi
+      - name: Deploy
+        env:
+          COOLIFY_ACCESS_TOKEN: ${{ secrets.COOLIFY_ACCESS_TOKEN }}
+        run: bun run deploy
+      - name: Smoke test
+        run: |
+          for path in / /cv/ /blog/ /blog/ru/ /sitemap.xml; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://balkhaev.com$path")
+            echo "$path $code"
+            [ "$code" = 200 ] || exit 1
+          done
+          curl -sf https://balkhaev.com/ | grep -q 'href="/blog/ru/"'
