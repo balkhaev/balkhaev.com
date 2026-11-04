@@ -161,4 +161,4 @@ vLLM's defaults are sensible, and most people won't need anything else. If you h
 
 ## What's next
 
-The language model is running. In the next part we bring up ComfyUI for images and video on the same platform: which generation models are worth using now, how much memory they need, and how to turn a ComfyUI pipeline into an API for your product.
+The language model is running. In the [next part](/blog/inference-media/) we bring up ComfyUI for images and video on the same platform: which generation models are worth using now, how much memory they need, and how to turn a ComfyUI pipeline into an API for your product.
