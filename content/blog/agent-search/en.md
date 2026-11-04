@@ -250,4 +250,4 @@ Start with full-text search and record the questions the agent failed to answer 
 
 ## Next
 
-The agent knows the database and the wiki, but it answers everyone the same way and shows everything. The next part adds what matters most for a company agent: sign-in through the company SSO, OAuth, and an agent that calls systems on behalf of a specific employee and sees only what that employee sees.
+The agent knows the database and the wiki, but it answers everyone the same way and shows everything. The [next part](/blog/agent-auth/) adds what matters most for a company agent: sign-in through the company SSO, OAuth, and an agent that calls systems on behalf of a specific employee and sees only what that employee sees.

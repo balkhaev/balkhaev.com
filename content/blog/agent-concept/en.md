@@ -88,9 +88,9 @@ The order of the parts follows the order in which it makes sense to build such a
 1. **Concept.** This part.
 2. **[Talking to a model](/blog/agent-first-call/).** API key, SDK, streaming, history.
 3. **[The agent loop and tools](/blog/agent-loop/).** The harness, tool calls, confirming dangerous actions.
-4. **MCP.** Moving tools into separate servers and writing our own server for the database.
-5. **Company knowledge.** Indexing documents and teaching the agent to search them.
-6. **Permissions.** SSO, OAuth and an agent that acts on behalf of an employee.
+4. **[MCP](/blog/agent-mcp/).** Moving tools into separate servers and writing our own server for the database.
+5. **[Company knowledge](/blog/agent-search/).** Indexing documents and teaching the agent to search them.
+6. **[Permissions](/blog/agent-auth/).** SSO, OAuth and an agent that acts on behalf of an employee.
 7. **Context and money.** Caching, compacting history, limits.
 8. **The interface.** A chat bot and a web chat.
 9. **Production.** Deploying inside the perimeter, audit, quality checks and prompt-injection defence.
