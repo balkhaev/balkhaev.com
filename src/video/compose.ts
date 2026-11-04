@@ -458,8 +458,12 @@ html, body { margin: 0; width: ${WIDTH}px; height: ${HEIGHT}px; overflow: hidden
 `;
 
 /** The full composition HTML for a storyboard. */
-export function compose(board: Storyboard, lang: string): string {
-  const timed = timeline(board);
+export function compose(
+  board: Storyboard,
+  lang: string,
+  minimum: number[] = []
+): string {
+  const timed = timeline(board, minimum);
   const last = timed.at(-1);
   const total = last ? last.start + last.duration : 0;
   const motion = new Motion();

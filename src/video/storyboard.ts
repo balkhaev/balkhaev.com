@@ -9,29 +9,33 @@ import { YAML } from "bun";
  * In any text field `*word*` is drawn in the accent colour.
  */
 
-export interface TitleScene {
+interface SceneBase {
+  /** Caption under the scene, also spoken. */
+  say?: string;
+  /** What the narrator says instead of the line built from the scene's text. */
+  voice?: string;
+}
+
+export interface TitleScene extends SceneBase {
   /** Small line above the title, e.g. the series and part. */
   kicker?: string;
-  say?: string;
   subtitle?: string;
   title: string;
   type: "title";
 }
 
-export interface StatementScene {
+export interface StatementScene extends SceneBase {
   label?: string;
-  say?: string;
   text: string;
   type: "statement";
 }
 
-export interface ListScene {
+export interface ListScene extends SceneBase {
   heading: string;
   items: string[];
   label?: string;
   /** Numbered rows (01, 02, …) instead of dashes. */
   numbered?: boolean;
-  say?: string;
   type: "list";
 }
 
@@ -42,11 +46,10 @@ export interface CompareColumn {
   title: string;
 }
 
-export interface CompareScene {
+export interface CompareScene extends SceneBase {
   columns: CompareColumn[];
   heading: string;
   label?: string;
-  say?: string;
   type: "compare";
 }
 
@@ -74,17 +77,15 @@ export interface DiagramEdge {
   to: string;
 }
 
-export interface DiagramScene {
+export interface DiagramScene extends SceneBase {
   edges: DiagramEdge[];
   heading: string;
   label?: string;
   nodes: DiagramNode[];
-  say?: string;
   type: "diagram";
 }
 
-export interface EndScene {
-  say?: string;
+export interface EndScene extends SceneBase {
   text: string;
   type: "end";
   /** Shown under the text, e.g. the post URL. */
@@ -279,11 +280,20 @@ export function sceneDuration(scene: Scene): number {
   return Math.round(Math.max(MIN_SECONDS, seconds) * 10) / 10;
 }
 
-/** Places the scenes one after another. */
-export function timeline(board: Storyboard): TimedScene[] {
+/**
+ * Places the scenes one after another. `minimum` gives a scene more time,
+ * e.g. to fit its voiceover.
+ */
+export function timeline(
+  board: Storyboard,
+  minimum: number[] = []
+): TimedScene[] {
   let start = 0;
-  return board.scenes.map((scene) => {
-    const duration = sceneDuration(scene);
+  return board.scenes.map((scene, index) => {
+    const duration = Math.max(
+      sceneDuration(scene),
+      Math.ceil((minimum[index] ?? 0) * 10) / 10
+    );
     const timed = { duration, scene, start };
     start = Math.round((start + duration) * 10) / 10;
     return timed;
