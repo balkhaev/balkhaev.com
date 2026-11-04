@@ -139,4 +139,4 @@ For experiments any platform will do: take whichever has the GPU you need cheape
 
 ## What's next
 
-The GPU is rented and the weights are on disk. In the next part we run vLLM with the chosen model on it, go through the key settings, measure real speed under load and close the endpoint with an access key.
+The GPU is rented and the weights are on disk. In the [next part](/blog/inference-serve/) we run vLLM with the chosen model on it, go through the key settings, measure real speed under load and close the endpoint with an access key.
