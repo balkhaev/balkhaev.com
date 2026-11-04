@@ -11,6 +11,14 @@
     "test": "bun test src",
     "worktree": "node .devhub/worktree.cjs"
   },
+  "dependencies": {
+    "rehype-slug": "6",
+    "rehype-stringify": "10",
+    "remark-gfm": "4",
+    "remark-parse": "11",
+    "remark-rehype": "11",
+    "unified": "11"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.12",
     "@types/bun": "1.4.2",

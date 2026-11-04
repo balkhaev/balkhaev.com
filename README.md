@@ -73,6 +73,20 @@ The display loop is capped at 60 fps, including the idle scene, and pauses in hi
 
 The PDFs (`balkhaev-cv-en.pdf`, `balkhaev-cv-ru.pdf`) are committed: after editing the content or styles, run `bun scripts/cv-pdf.ts`, which prints both with a local Chrome or Edge (`CHROME_PATH` overrides the browser). Nginx redirects `/cv` and `/cv/ru` to their trailing-slash URLs.
 
+## Blog
+
+`/blog/` (English) and `/blog/ru/` (Russian) are generated at build time from `content/blog/<slug>/en.md` and `ru.md`. A post can exist in one language or both; the same folder name links the two versions with `hreflang` and the language switcher. Each file starts with YAML frontmatter:
+
+```yaml
+title: The blog is open
+description: One line for the list and for search results.
+date: 2026-11-04
+tags: [meta]
+draft: false # optional; drafts are built only with `bun scripts/build.ts --drafts`
+```
+
+`src/blog/content.ts` reads and validates posts (the build fails with the file name on a bad field), `src/blog/markdown.ts` renders GitHub-flavoured Markdown with heading anchors and drops raw HTML, and `src/blog/render.ts` writes the list and post pages. The build also generates `sitemap.xml` from every page. Styles are in `public/blog/blog.css` and reuse the resume's self-hosted IBM Plex Sans; the theme follows `prefers-color-scheme`.
+
 ## Production
 
 Coolify serves an Nginx image on `https://balkhaev.com`. DNS points to `49.13.216.63`. The Docker image listens on port 8080; TLS is handled by Coolify.

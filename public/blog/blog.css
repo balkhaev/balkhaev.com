@@ -1,0 +1,229 @@
+@font-face {
+  font-display: swap;
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  src: url("/cv/fonts/plex-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-display: swap;
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  src: url("/cv/fonts/plex-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --bg: #0b0a09;
+  --ink: #e8e4dc;
+  --muted: #9a938a;
+  --rule: #2a2724;
+  --code-bg: #151311;
+  --accent: #d6b68b;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+  color: var(--ink);
+  color-scheme: dark;
+  background: var(--bg);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fff;
+    --ink: #1b1b1b;
+    --muted: #5f5f5f;
+    --rule: #e2e0dc;
+    --code-bg: #f5f3ef;
+    --accent: #8a6438;
+    color-scheme: light;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  min-width: 300px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.65;
+}
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 0.18em;
+}
+a:hover {
+  color: var(--accent);
+  text-decoration-color: currentcolor;
+}
+a:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.bar {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  max-width: 760px;
+  padding: 24px 16px;
+  margin: 0 auto;
+  font-size: 15px;
+}
+.bar a {
+  text-decoration: none;
+}
+.bar .home {
+  font-size: 19px;
+  font-weight: 450;
+  letter-spacing: -0.025em;
+}
+.bar .home span {
+  color: #ba9670;
+}
+.langs {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  color: var(--muted);
+}
+.langs [aria-current] {
+  color: var(--ink);
+}
+
+main {
+  max-width: 760px;
+  padding: 24px 16px 96px;
+  margin: 0 auto;
+}
+h1 {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 5vw, 40px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.intro {
+  margin-bottom: 48px;
+}
+.intro p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.posts {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.posts li {
+  padding: 24px 0;
+  border-top: 1px solid var(--rule);
+}
+.posts h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 550;
+  line-height: 1.3;
+}
+.posts h2 a {
+  text-decoration: none;
+}
+.posts p {
+  margin: 0;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.tag::before {
+  content: "#";
+}
+article > header {
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.prose {
+  overflow-wrap: break-word;
+}
+.prose :is(h2, h3, h4) {
+  margin: 2em 0 0.6em;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.prose h2 {
+  font-size: 26px;
+  font-weight: 600;
+}
+.prose h3 {
+  font-size: 21px;
+  font-weight: 600;
+}
+.prose :is(p, ul, ol, pre, table, blockquote) {
+  margin: 0 0 1.1em;
+}
+.prose li + li {
+  margin-top: 0.3em;
+}
+.prose code {
+  padding: 0.1em 0.3em;
+  font-family:
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.prose pre {
+  padding: 16px 18px;
+  overflow-x: auto;
+  line-height: 1.5;
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+.prose pre code {
+  padding: 0;
+  font-size: 14px;
+  background: none;
+}
+.prose blockquote {
+  padding-left: 16px;
+  margin-left: 0;
+  color: var(--muted);
+  border-left: 2px solid var(--accent);
+}
+.prose table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 15px;
+  border-collapse: collapse;
+}
+.prose :is(th, td) {
+  padding: 6px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+.prose img {
+  max-width: 100%;
+  height: auto;
+}
+.prose hr {
+  margin: 2.5em 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
