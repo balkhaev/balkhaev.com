@@ -1,0 +1,95 @@
+context: Commercial automations · 1/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 1
+    title: "Concept: which automations *pay off*"
+    subtitle: How to find the processes where a business loses money, and decide what to automate first.
+
+  - type: list
+    label: The example
+    heading: A typical small company
+    items:
+      - A website with a lead form
+      - Managers and a CRM
+      - Payments through a payment provider
+      - Support by email and Telegram
+      - A boss who wants the numbers
+
+  - type: list
+    label: Where money leaks
+    heading: Five places a business loses
+    items:
+      - "*Leads wait*: sent in the evening, seen in the morning"
+      - "*Payments get lost*: a card failed, an invoice forgotten"
+      - "*Manual delivery*: paid at night, got access in the morning"
+      - "*Support drowns* in identical questions"
+      - "*Reports are built by hand*, and a dip is noticed late"
+
+  - type: list
+    label: How to choose
+    heading: Four questions for any idea
+    numbered: true
+    items:
+      - How often does it happen?
+      - How long does it take a person?
+      - What does a delay cost?
+      - What does a mistake cost?
+    say: The first three tell you what the automation brings. The fourth tells you how carefully to build it.
+
+  - type: list
+    label: What we'll build
+    heading: Each part takes routine off one role
+    items:
+      - "*Replacing the salesperson*: a lead reaches a manager in a minute, analysed"
+      - "*Replacing the accountant*: payment, access and receipt exactly once"
+      - "*Replacing support*: the model drafts, a person sends"
+      - "*Replacing the analyst*: a morning digest and alerts"
+
+  - type: compare
+    label: The tool
+    heading: No-code or your own code
+    columns:
+      - title: Zapier, Make, n8n
+        points:
+          - Short chains
+          - Simple logic
+          - Cheap mistakes
+      - title: Your own code
+        pick: true
+        points:
+          - Branches and waits
+          - Money exactly once
+          - Tests and git
+          - A model with your prompts
+
+  - type: diagram
+    label: Architecture
+    heading: One service for everything
+    nodes:
+      - { id: src, label: Sources, sub: "site, payments, mail, schedule", col: 0, row: 0, w: 4, step: 0 }
+      - { id: intake, label: Intake, sub: "verify, store, 200", col: 0, row: 3, w: 4, step: 1 }
+      - { id: db, label: Postgres, sub: events and queue, col: 5, row: 3, w: 3, step: 2, accent: true }
+      - { id: worker, label: Worker, sub: runs and retries, col: 9, row: 3, w: 3, step: 3 }
+      - { id: out, label: "Telegram, CRM, model", col: 9, row: 0, w: 3, step: 4 }
+    edges:
+      - { from: src, to: intake }
+      - { from: intake, to: db }
+      - { from: db, to: worker }
+      - { from: worker, to: out }
+    say: The intake only stores. Postgres is both the database and the queue. The worker does the work and retries on failure.
+
+  - type: list
+    label: Principles
+    heading: Six rules for the series
+    numbered: true
+    items:
+      - Store first, process later
+      - Every action is idempotent
+      - Failures are normal
+      - A human where mistakes are expensive
+      - Everything is logged
+      - Cheap and boring
+
+  - type: end
+    text: "Next we build *the foundation*: a server, a database and deploy on push."
+    url: balkhaev.com/blog/automations-concept

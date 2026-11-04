@@ -1,0 +1,73 @@
+context: Company AI agent · 6/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 6
+    title: "Permissions: an agent acting *as the employee*"
+    subtitle: SSO, token exchange, and a wiki and database that cut off what isn't allowed.
+
+  - type: list
+    label: Why not a service account
+    heading: "“Don't show salaries” in a prompt doesn't work"
+    items:
+      - "*A prompt is not a security boundary*: the model can be talked into things"
+      - "*Prompt injection*: anyone can write a document"
+      - "*Audit*: every request comes from one account, you can't tell who asked"
+    say: Permissions are checked where the data lives, not in the model. The model may ask for anything; the system returns only what's allowed.
+
+  - type: diagram
+    label: The scheme
+    heading: The employee's token reaches the data
+    nodes:
+      - { id: emp, label: Employee, col: 0, row: 0, w: 3, step: 0 }
+      - { id: sso, label: SSO, sub: "Keycloak, Entra ID, Okta", col: 0, row: 3, w: 3, step: 1 }
+      - { id: agent, label: Agent, sub: exchanges the token, col: 5, row: 0, w: 3, step: 2, accent: true }
+      - { id: wiki, label: Wiki MCP, sub: filters by group, col: 9, row: 2, w: 3, step: 3 }
+      - { id: db, label: Database MCP, sub: Postgres roles and RLS, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: emp, to: sso, label: login }
+      - { from: sso, to: agent, both: true, label: token exchange }
+      - { from: agent, to: wiki, label: aud=wiki }
+      - { from: agent, to: db }
+    say: The employee logs in through SSO. Before calling a server the agent swaps its token for a new one, issued only for that server and living five minutes.
+
+  - type: list
+    label: The token
+    heading: Three fields everything rests on
+    items:
+      - "*sub*: who it is, whose data to show, who goes in the log"
+      - "*groups*: which groups the person is in, the basis of permissions"
+      - "*aud*: who the token is for, another server won't accept it"
+    say: Forwarding one token to every server is dangerous. Leaking one token would open every system at once.
+
+  - type: list
+    label: The wiki
+    heading: Three details of the group filter
+    items:
+      - "*Filter inside the search*, not after: otherwise allowed hits disappear"
+      - "*Same answer for “missing” and “forbidden”*: a title can be a secret"
+      - "*A server per request*: Igor's rights never mix with Olga's"
+
+  - type: statement
+    label: The database
+    text: The model writes SQL itself, so *Postgres itself* checks permissions, not the code around the query.
+    say: Roles, column grants and row-level security. A manager sees their own deals; only HR sees the salary column.
+
+  - type: list
+    label: The attack
+    heading: We attacked our own defence with model queries
+    items:
+      - "Read salaries directly: *no column grant*"
+      - "Reset the role: *one statement and INHERIT FALSE*"
+      - "Switch role inside a SELECT: *a separate login per level*"
+      - "Spoof groups in a session setting: *context in a table*"
+      - "Change data: *read-only transaction*"
+    say: Two holes out of six were in code that looked right. Keep the attack queries as a test.
+
+  - type: statement
+    label: Result
+    text: One agent codebase. The difference between Igor and Olga is *only the token*.
+    say: In a real company the learning SSO is swapped for the corporate one, and almost all the code stays.
+
+  - type: end
+    text: Permissions done. Next, *context and money*.
+    url: balkhaev.com/blog/agent-auth

@@ -1,0 +1,70 @@
+context: Commercial automations · 2/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 2
+    title: "Foundation: a server, a database and *deploy on push*"
+    subtitle: A VPS, Postgres with migrations, HTTPS and GitHub Actions.
+
+  - type: diagram
+    label: The result
+    heading: From a push to a running service
+    nodes:
+      - { id: push, label: Push to main, col: 0, row: 0, w: 3, step: 0 }
+      - { id: ci, label: GitHub Actions, sub: "types, image, ghcr.io", col: 4, row: 0, w: 4, step: 1 }
+      - { id: caddy, label: caddy, sub: "HTTPS, :443", col: 0, row: 3, w: 3, step: 2 }
+      - { id: app, label: app, sub: "Bun, :3000", col: 4, row: 3, w: 4, step: 2, accent: true }
+      - { id: db, label: db, sub: "Postgres, pgdata volume", col: 9, row: 3, w: 3, step: 2 }
+    edges:
+      - { from: push, to: ci }
+      - { from: ci, to: app, label: ssh + deploy.sh }
+      - { from: caddy, to: app }
+      - { from: app, to: db }
+    say: One VPS and Docker Compose with three containers. CI builds the image; the server only pulls and restarts.
+
+  - type: list
+    label: The server
+    heading: Basic VPS setup
+    items:
+      - Ubuntu, two cores, 2–4 GB RAM, a few euros a month
+      - "*Key-only login*, passwords off"
+      - "*Only SSH and web* open to the world"
+      - "*Don't publish database ports*: Docker bypasses ufw"
+      - A domain with an A record, Caddy gets the certificate itself
+
+  - type: list
+    label: The service
+    heading: A minimal Bun service
+    items:
+      - "*Config only from the environment*, fail on a missing variable"
+      - "*Migrations* are numbered SQL files, never edit an applied one"
+      - "*/health* checks the service can see the database"
+      - "*/hooks/:source* stores the event first, everything else later"
+
+  - type: list
+    label: Compose
+    heading: What matters in the compose file
+    items:
+      - "*image, not build*: nothing is built on the server"
+      - "*The tag is the commit hash*: rollback is deploying an old hash"
+      - "*service_healthy*: the app starts when the database is ready"
+      - "*Named volumes*: data survives re-creation"
+      - "*Postgres version pinned*"
+
+  - type: list
+    label: Deploy
+    heading: Four steps on every push
+    numbered: true
+    items:
+      - Check types
+      - Build the image and push it to the registry
+      - Pull the image, run migrations, restart
+      - Check /health
+
+  - type: statement
+    label: Backup
+    text: From the first day there is *real data* in the database, you need at least a nightly dump.
+    say: Proper backups with an offsite copy come in the operations part.
+
+  - type: end
+    text: "The foundation is ready. Next, *the heart of the system*: a queue and retries."
+    url: balkhaev.com/blog/automations-foundation

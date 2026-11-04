@@ -1,0 +1,75 @@
+context: Commercial automations · 3/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 3
+    title: "The heart: *events, a queue and retries*"
+    subtitle: The core every automation will run on.
+
+  - type: list
+    label: What can go wrong
+    heading: It will all happen in the first month
+    items:
+      - "*Foreign requests*: a fake \"payment\" to the webhook URL"
+      - "*Duplicate delivery* of one event"
+      - "*An external service is down*, a minute later it's fine"
+      - "*The worker died* mid-job"
+      - "*A bug*: the job fails on every attempt"
+      - "*Nobody noticed*, and the automation is silent for a week"
+
+  - type: diagram
+    label: How it works
+    heading: The intake only writes
+    nodes:
+      - { id: hook, label: Webhook, sub: POST /hooks/:source, col: 0, row: 0, w: 3, step: 0 }
+      - { id: tx, label: One transaction, sub: event + jobs, col: 4, row: 0, w: 4, step: 1, accent: true }
+      - { id: worker, label: Worker, sub: claims a job, col: 4, row: 3, w: 4, step: 2 }
+      - { id: done, label: done, col: 9, row: 2, w: 3, step: 3 }
+      - { id: failed, label: failed + alert, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: hook, to: tx, label: signature ok }
+      - { from: tx, to: worker }
+      - { from: worker, to: done }
+      - { from: worker, to: failed, label: out of attempts }
+    say: The HTTP handler is fast and almost never fails. All external work happens in the worker, and a failed job waits and tries again.
+
+  - type: list
+    label: The jobs table
+    heading: Fields reliability rests on
+    items:
+      - "*status*: pending, running, done, failed"
+      - "*run_at*: not before this moment"
+      - "*locked_until*: a dead worker lets the job go"
+      - "*key*: idempotency key, no duplicates"
+      - "*event_id*: why this happened"
+
+  - type: statement
+    label: A Postgres queue
+    text: "*FOR UPDATE SKIP LOCKED*: each worker takes its own job, no message broker."
+    say: Pauses between attempts double, from ten seconds up to an hour, with random jitter. Permanent errors aren't retried pointlessly.
+
+  - type: list
+    label: Signatures
+    heading: How to know a request is real
+    items:
+      - "*HMAC*: the body signed with a shared secret"
+      - "*A secret in a header*: simpler, that's how Telegram works"
+      - "Compare with *timingSafeEqual*, not ==="
+
+  - type: statement
+    label: Schedule
+    text: "Scheduling through the same queue: the job key is *a time slot*."
+    say: However many workers run, there is one job per slot. If the worker was down at nine and came back at nine forty, the job still runs.
+
+  - type: list
+    label: Verified
+    heading: The system survives failures
+    items:
+      - "Same event twice: *one job*"
+      - "Wrong secret: *401*, nothing stored"
+      - "Telegram returned 502: *second attempt passed*"
+      - "Unknown job type: *alert in the chat*"
+      - "Stopped during deploy: *finished the current job*"
+
+  - type: end
+    text: The core is ready. Next, the first automation, *replacing the salesperson*.
+    url: balkhaev.com/blog/automations-queue

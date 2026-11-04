@@ -1,0 +1,71 @@
+context: Company AI agent · 5/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 5
+    title: "Company knowledge: *searching documents*"
+    subtitle: Indexing the wiki and teaching the agent to search the way a person does.
+
+  - type: statement
+    label: RAG
+    text: "RAG means one thing: before answering, *find the right documents* and give them to the model."
+    say: How to search is not part of the definition. Vectors are only one way, and not always the best one.
+
+  - type: compare
+    label: Two approaches
+    heading: Classic RAG or search as a tool
+    columns:
+      - title: One vector search
+        points:
+          - One shot, no second try
+          - Bad at numbers and names
+          - Re-embed on every edit
+      - title: Search in the agent loop
+        pick: true
+        points:
+          - The model writes the query
+          - Rephrases if nothing found
+          - Opens the whole document
+          - BM25 is cheap and transparent
+
+  - type: diagram
+    label: How it works
+    heading: From the wiki to an answer with a link
+    nodes:
+      - { id: wiki, label: Wiki, sub: "markdown, access field", col: 0, row: 1, w: 3, step: 0 }
+      - { id: index, label: Index, sub: chunks by heading, col: 4, row: 1, w: 4, step: 1 }
+      - { id: server, label: MCP server, sub: search and read, col: 4, row: 4, w: 4, step: 2, accent: true }
+      - { id: agent, label: Agent, sub: answer with a link, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: wiki, to: index }
+      - { from: index, to: server, label: FTS5 + BM25 }
+      - { from: server, to: agent, both: true }
+    say: Documents are cut by headings into a full-text index. The server gives two tools, find chunks and read a whole document.
+
+  - type: list
+    label: Decisions
+    heading: What makes search good
+    items:
+      - "*Chunk = section*: the document title is stored alongside"
+      - "*BM25 weights*: a match in the title beats one in the text"
+      - "*Word forms*: trim endings and search by prefix"
+      - "*OR, not AND*: an empty result is worse than extra hits"
+      - "*The description teaches searching*: short queries, rephrase"
+
+  - type: statement
+    label: Trying it
+    text: "“Payment terms with a client, and how much did we earn from them?” The agent takes *the contract from the wiki and numbers from the database*."
+    say: But it will also show the salary policy that only HR and management may see. Permissions are only stored for now; we enforce them next.
+
+  - type: list
+    label: Vectors
+    heading: What to try before a vector index
+    items:
+      - A dictionary of company synonyms
+      - Ask the model to search with two or three phrasings
+      - Context attached to every chunk
+      - "If misses remain: vectors *next to* full text, not instead"
+    say: Decide by measurements, not fashion. Log questions where the agent missed a document that existed.
+
+  - type: end
+    text: "Next, the key part: an agent acting *on behalf of the employee*."
+    url: balkhaev.com/blog/agent-search

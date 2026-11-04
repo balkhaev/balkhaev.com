@@ -1,0 +1,77 @@
+context: Company AI agent · 9/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 9
+    title: "Production: *perimeter, audit and checks*"
+    subtitle: The last part of the series. The agent inside the company perimeter.
+
+  - type: list
+    label: Security questions
+    heading: What to answer before launch
+    items:
+      - "*Where does the data go?*"
+      - "*What happened?* Find the conversation and where a number came from"
+      - "*Who commands the agent?* Not a document"
+      - "*Did it get worse* after a prompt or model change?"
+      - "*Did permissions break* after a migration edit?"
+
+  - type: diagram
+    label: Perimeter
+    heading: A network with no way out, and three doors
+    nodes:
+      - { id: users, label: Employees and Slack, col: 0, row: 0, w: 3, step: 0 }
+      - { id: ingress, label: ingress, sub: nginx, col: 0, row: 3, w: 3, step: 1 }
+      - { id: agent, label: Agent, sub: "web chat, bot, loop", col: 4, row: 3, w: 4, step: 2, accent: true }
+      - { id: egress, label: egress, sub: "squid, domain list", col: 9, row: 1, w: 3, step: 3 }
+      - { id: pg, label: pg-gateway, sub: one database replica, col: 9, row: 4, w: 3, step: 3 }
+    edges:
+      - { from: users, to: ingress }
+      - { from: ingress, to: agent }
+      - { from: agent, to: egress, label: "model API, SSO" }
+      - { from: agent, to: pg }
+    say: Even if something goes wrong in the code or the model, data can only leave to addresses known in advance.
+
+  - type: statement
+    label: Audit log
+    text: Every question gets its own *turn*, and the whole chain of calls hangs off it.
+    say: The log holds the same data the employee saw, so only the security team may read it.
+
+  - type: list
+    label: Prompt injection
+    heading: Defence in layers
+    numbered: true
+    items:
+      - "*Permissions*: the agent sees only what the asker sees, read-only"
+      - "*Frame and prompt*: documents in a tag, data is not commands"
+      - "*No leaks through the answer*: strip external links and images"
+      - "*Perimeter*: squid won't let a request out to a foreign domain"
+      - "*Notice it*: a test question and daily monitoring"
+    say: There is no reliable way to make a model ignore what it reads. So the key layers are the ones that don't depend on the model.
+
+  - type: list
+    label: Checks
+    heading: Every change goes through tests
+    items:
+      - "*Test questions*: required facts present, forbidden ones absent"
+      - "*Several runs*: the model answers differently each time"
+      - "*Database attacks as tests* in CI on every push"
+      - "*Every complaint* becomes a new question"
+
+  - type: list
+    label: Before launch
+    heading: Checklist
+    items:
+      - Security and legal approved the data
+      - Learning login off, corporate SSO on
+      - Secrets in a vault, with a rotation plan
+      - Attack tests green, test questions run
+      - Limits set, and there is an off switch
+
+  - type: statement
+    label: Series takeaway
+    text: The model is *the simplest part* here.
+    say: The real work is making the agent see exactly what the person may see, and making every action it takes verifiable.
+
+  - type: end
+    text: Nine parts, from one API call *to production*.
+    url: balkhaev.com/blog/agent-prod

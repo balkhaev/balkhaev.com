@@ -1,0 +1,72 @@
+context: Commercial automations · 4/8
+scenes:
+  - type: title
+    kicker: Commercial automations · part 4
+    title: "Replacing the salesperson: *a lead in a minute*"
+    subtitle: A website lead, analysis by a model, the CRM, and a manager who won't forget.
+
+  - type: list
+    label: What we replace
+    heading: Routine the system takes over
+    items:
+      - "Notice the lead: *a card in the chat within seconds*"
+      - "Understand the need: *the model writes summary, budget, deadline*"
+      - "Decide if it's hot: *a temperature and spam mark*"
+      - "Create the CRM lead: *after two minutes, with the analysis*"
+      - "Agree who takes it: *a \"Mine\" button*"
+      - "Don't forget it: *a reminder after 15 minutes*"
+    say: Calling and selling stays with a person. But they start a minute after the lead, not the next morning.
+
+  - type: diagram
+    label: How it works
+    heading: One lead, four jobs
+    nodes:
+      - { id: form, label: Website form, col: 0, row: 0, w: 3, step: 0 }
+      - { id: job, label: site.form, sub: store the lead, col: 4, row: 0, w: 4, step: 1, accent: true }
+      - { id: card, label: Card, sub: "Telegram, right away", col: 0, row: 3, w: 3, step: 2 }
+      - { id: claude, label: Claude, sub: summary and temperature, col: 4, row: 3, w: 4, step: 2 }
+      - { id: crm, label: CRM, sub: after 2 minutes, col: 9, row: 3, w: 3, step: 2 }
+    edges:
+      - { from: form, to: job }
+      - { from: job, to: card }
+      - { from: job, to: claude }
+      - { from: job, to: crm }
+      - { from: claude, to: card, label: updates }
+    say: The card goes out before the model. The model may not answer, and the lead must not wait because of that.
+
+  - type: list
+    label: The form
+    heading: A public form without a captcha
+    items:
+      - "*A honeypot field*: bots fill in everything"
+      - "*A per-IP limit*: five leads per ten minutes"
+      - "*A length cap* on every field"
+      - A plain HTML form, no JavaScript, no CORS
+
+  - type: list
+    label: Qualification
+    heading: The model reads a lead like a salesperson
+    items:
+      - "*Structured output*: summary, service, budget, deadline, temperature, spam"
+      - "*The business in the prompt*: what a hot lead means for you"
+      - "*Lead text is data*, not instructions"
+      - "*Low effort*: sorting into fields is fast and cheap"
+
+  - type: statement
+    label: The race
+    text: Two people pressed "Mine" at once. *One conditional UPDATE* gives the lead to one.
+    say: The other sees "Someone was faster". The reminder does nothing if the lead is taken, so it never needs cancelling.
+
+  - type: list
+    label: Verified
+    heading: What the manager sees
+    items:
+      - Form sent, a "New lead" card in the chat
+      - A second later the card says "Hot", with budget and deadline
+      - A bot in the honeypot never learns it was caught
+      - Two minutes later the lead is in the CRM with the analysis
+      - Pressed "Mine", the buttons are gone
+
+  - type: end
+    text: About 400 lines on top of the core. Next, *replacing the accountant*.
+    url: balkhaev.com/blog/automations-sales

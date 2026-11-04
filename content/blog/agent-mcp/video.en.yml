@@ -1,0 +1,72 @@
+context: Company AI agent · 4/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 4
+    title: "MCP: connecting *internal systems*"
+    subtitle: Moving tools into separate servers and writing our own server for the company database.
+
+  - type: diagram
+    label: What MCP is
+    heading: An open protocol between agents and tools
+    nodes:
+      - { id: agent, label: Agent, sub: MCP client inside, col: 0, row: 1, w: 3, step: 0, accent: true }
+      - { id: db, label: Database server, sub: "query, describe_schema", col: 6, row: 0, w: 5, step: 1 }
+      - { id: wiki, label: Wiki server, sub: search, col: 6, row: 2, w: 5, step: 1 }
+      - { id: tracker, label: Tracker server, sub: issues, col: 6, row: 4, w: 5, step: 1 }
+    edges:
+      - { from: agent, to: db, both: true }
+      - { from: agent, to: wiki, both: true, label: stdio or HTTP }
+      - { from: agent, to: tracker, both: true }
+    say: A server knows one system, lists its tools and runs them. The client in the agent gathers tools from every server and shows them to the model.
+
+  - type: list
+    label: Why
+    heading: What MCP gives us
+    items:
+      - "*Separation*: the team that knows the database writes its server"
+      - "*Ready servers*: GitHub, Jira, Confluence, Slack, Postgres"
+      - "*Reuse*: the same server works in Claude Desktop and Cursor"
+      - "*Isolation*: only the server knows the database password, not the model"
+
+  - type: list
+    label: Database server
+    heading: Two tools and four decisions
+    items:
+      - "*Hand-written schema*: what each column means, what units amounts are in"
+      - "*Read-only twice*: a SELECT check and a readonly database"
+      - "*Row limit*: the model needs aggregates, not a hundred thousand rows"
+      - "*Errors are returned*: the model reads the error and fixes the query"
+
+  - type: statement
+    label: Agent as a client
+    text: Servers are listed in *mcp.json*, the same format Claude Desktop and Cursor use.
+    say: The agent connects to each, collects the tools and prefixes them with the server name, so two search tools don't collide.
+
+  - type: statement
+    label: Trying it
+    text: "“October revenue by region?” The model reads the schema, writes *JOIN and GROUP BY*, fixes its mistakes."
+    say: It will also tell you a colleague's salary. The table is open in full, and that's the problem we solve in the permissions part.
+
+  - type: compare
+    label: The choice
+    heading: Free-form SQL or narrow functions
+    columns:
+      - title: Free-form SQL
+        points:
+          - Answers the unforeseen
+          - May write a heavy query
+          - Needs a replica and timeouts
+      - title: Narrow tools
+        points:
+          - Predictable and fast
+          - Easy to verify
+          - Every question needs code
+      - title: A mix
+        pick: true
+        points:
+          - Narrow for key metrics
+          - SQL for everything else
+
+  - type: end
+    text: "Tables are done. Next, *knowledge in text*: wiki, policies, contracts."
+    url: balkhaev.com/blog/agent-mcp

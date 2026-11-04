@@ -1,0 +1,73 @@
+context: Company AI agent · 7/9
+scenes:
+  - type: title
+    kicker: Company AI agent · part 7
+    title: "Context and money: *cache, compaction, limits*"
+    subtitle: Pricing every question and cutting the bill threefold.
+
+  - type: statement
+    label: Where the money goes
+    text: Every loop step resends *the prompt, the tools and the whole history*.
+    say: The first tool result is paid for on step two, step three and onwards, on every step of every later question.
+
+  - type: compare
+    label: A conversation's cost
+    heading: Ten questions in a row
+    columns:
+      - title: No cache
+        points:
+          - About 6.8 dollars
+          - 80 thousand tokens per step by question ten
+          - You mostly pay for input
+      - title: With cache
+        pick: true
+        points:
+          - About 1.1 dollars
+          - Cache reads are 20 times cheaper than input
+          - Same answer
+
+  - type: list
+    label: Measure first
+    heading: A spending log
+    items:
+      - "Every API response has *usage*: input, output, cache write and read"
+      - Store time, login, the four numbers and the cost
+      - One query shows what an employee spent today
+      - Reconcile with the provider console monthly
+
+  - type: list
+    label: Prompt caching
+    heading: What silently breaks the cache
+    items:
+      - "*Date and time in the prompt*: the prefix changes every minute"
+      - "*Tool order*: sort by name"
+      - "*Editing history after the fact*: nothing after the edit matches"
+    say: The cache works on prefixes and lives five minutes. It suits an agent perfectly, history only grows at the end.
+
+  - type: list
+    label: Context
+    heading: Keep out the excess, compact the long
+    items:
+      - "*A cap on any tool result* with a \"more data\" hint"
+      - "*Aggregates, not rows*: one line in the prompt"
+      - "*Clearing old results* by the API past 60 thousand tokens"
+      - "*Compacting history* into a summary past 150 thousand"
+
+  - type: list
+    label: Limits
+    heading: Safety valves
+    numbered: true
+    items:
+      - Steps per question
+      - Length of one reply
+      - Depth of thinking
+      - "*Money per employee per day*, checked before every step"
+
+  - type: statement
+    label: Result
+    text: The second question in a conversation is *three times cheaper*. A hundred people cost about two thousand dollars a month.
+    say: Cheaper still, batch processing for background jobs and a smaller model for housekeeping tasks.
+
+  - type: end
+    text: The agent counts money. Next, *an interface*.
+    url: balkhaev.com/blog/agent-cost
