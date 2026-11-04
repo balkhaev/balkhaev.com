@@ -460,7 +460,7 @@ The rule has a weak spot: the average covers all hours, nights and weekends incl
 - five or more tickets waiting over 4 hours for an answer: support can't keep up;
 - jobs in the queue overdue by more than 10 minutes: the worker can't keep up.
 
-What these checks won't catch: if the worker dies completely, nobody runs them, since the worker runs them itself. That needs an outside watcher, which we'll cover in the operations part.
+What these checks won't catch: if the worker dies completely, nobody runs them, since the worker runs them itself. That needs an outside watcher, which we cover in the [operations part](/blog/automations-ops/).
 
 ## Step 5. Hooking into the schedule
 
@@ -689,4 +689,4 @@ In CI the `Tests` step gets `DIGEST_CHAT_ID: "-400"`.
 - Alerts don't spam: one message when a problem starts and one when it ends.
 - The digest doesn't depend on the model and goes out even when the API is down.
 
-That completes the "Replacing …" parts. Sales, payments, support and analytics run by themselves, and people make the decisions. One part is left, "Operations": how to watch the system itself, back it up off the server, keep secrets and what it all costs.
+That completes the "Replacing …" parts. Sales, payments, support and analytics run by themselves, and people make the decisions. One part is left, ["Operations"](/blog/automations-ops/): how to watch the system itself, back it up off the server, keep secrets and what it all costs.
