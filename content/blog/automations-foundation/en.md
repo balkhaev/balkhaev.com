@@ -105,7 +105,7 @@ bun init -y
 bun add -d typescript @types/bun
 ```
 
-We have no runtime dependencies: the HTTP server and the Postgres client are built into Bun. Add scripts to `package.json`:
+We have no runtime dependencies: the HTTP server and the Postgres client are built into Bun. TypeScript is only needed for type checking, and since version 7 its `tsc` compiler is rewritten in Go and runs several times faster than before. Add scripts to `package.json`:
 
 ```json
 {
@@ -119,7 +119,7 @@ We have no runtime dependencies: the HTTP server and the Postgres client are bui
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5"
+    "typescript": "^7"
   }
 }
 ```
@@ -266,7 +266,7 @@ Right now anyone who knows the address can write an event into the database. In 
 Try it locally. The easiest way to get Postgres is Docker:
 
 ```bash
-docker run -d --name pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:17
+docker run -d --name pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:18
 echo 'DATABASE_URL=postgres://postgres:dev@localhost:5432/postgres' > .env
 
 bun run migrate
@@ -328,14 +328,15 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: app
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Since Postgres 18 the image keeps data in /var/lib/postgresql/18/docker
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app"]
       interval: 5s
@@ -466,19 +467,19 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
