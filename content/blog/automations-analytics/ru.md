@@ -11,7 +11,7 @@ tags: [automation, analytics, alerts, claude, postgres]
 В 9 утра бот присылает сводку за вчера: заявки, оплаты, поддержка, у каждой цифры среднее за неделю и стрелка, если отличие больше 30%. Все цифры считает SQL, а Claude только дописывает до трёх наблюдений, что стоит заметить. Раз в 15 минут система проверяет, не затихли ли заявки и оплаты, не копится ли очередь в поддержке и не отстаёт ли воркер. О проблеме приходит одно сообщение, когда она началась, и одно, когда закончилась.
 :::
 
-Это седьмая часть цикла про коммерческие автоматизации и последняя из серии «Заменяем …». В [прошлой части](/blog/ru/automations-support/) мы собрали поддержку. Теперь в базе лежат заявки, оплаты и обращения, и из них можно каждое утро получать картину бизнеса, никого не прося её собрать.
+Это седьмая часть цикла про коммерческие автоматизации и последняя из серии «Заменяем …». В [прошлой части](/blog/ru/automations-support/) мы собрали поддержку. Теперь в базе лежат заявки, оплаты и обращения, и из них можно каждое утро получать картину бизнеса, никого не прося её собрать. В статье только ключевые фрагменты кода, полный код серии с тестами лежит в [репозитории](https://github.com/balkhaev/balkhaev.com/tree/main/examples/automations).
 
 ## Что именно мы заменяем
 
@@ -66,137 +66,32 @@ flowchart TD
 
 ## Шаг 1. Таблица тревог и индексы
 
+Миграция создаёт таблицу горящих тревог и индексы по времени: `leads (created_at)`, `orders (paid_at)`, `tickets (created_at)` и `tickets (answered_at)`.
+
 ```sql
--- migrations/006_alerts.sql
--- Тревоги, которые горят прямо сейчас. Строка появляется, когда проблема
--- началась, и исчезает, когда закончилась: ровно два сообщения на проблему.
+-- migrations/006_alerts.sql: тревоги, которые горят прямо сейчас
 create table alerts (
   name text primary key,
   text text not null,
   since timestamptz not null default now()
 );
-
--- Сводка и тревоги каждый день фильтруют по этим колонкам
-create index leads_created on leads (created_at);
-create index orders_paid on orders (paid_at) where paid_at is not null;
-create index tickets_created on tickets (created_at);
-create index tickets_answered on tickets (answered_at) where answered_at is not null;
 ```
 
 Таблица `alerts` хранит тревоги, которые горят прямо сейчас. Индексы нужны, потому что сводка и проверки каждый день фильтруют заявки, оплаты и обращения по времени. Пока строк тысячи, разницы не видно, но через год без индексов каждый отчёт будет читать таблицы целиком.
 
 ## Шаг 2. Метрики
 
-```ts
-// src/metrics.ts
-import { sql } from "./db";
+Модуль `metrics.ts` считает один день бизнеса функцией `dayStats(from, to)`: заявки (всего, горячие, спам, не взятые, медиана времени до взятия), выставленные и оплаченные счета с суммами, обращения, ответы с медианой времени ответа и долей черновиков без правок, упавшие задачи. Каждая группа это один SQL-запрос, например заявки:
 
-/** Один день бизнеса в цифрах. Каждое число считает SQL, а не модель. */
-export interface DayStats {
-  leads: number;
-  hot: number;
-  spam: number;
-  untaken: number;
-  takeMinutes: number | null;
-  invoiced: number;
-  invoicedSum: number;
-  paid: number;
-  paidSum: number;
-  tickets: number;
-  answered: number;
-  answerMinutes: number | null;
-  draftsUsed: number;
-  failedJobs: number;
-}
-
-/** Полночь в часовом поясе сервера (TZ в compose.yml) `daysAgo` дней назад. */
-export function startOfDay(now: Date, daysAgo = 0) {
-  const day = new Date(now);
-  day.setHours(0, 0, 0, 0);
-  day.setDate(day.getDate() - daysAgo);
-  return day;
-}
-
-export async function dayStats(from: Date, to: Date): Promise<DayStats> {
-  const [leads] = await sql`
-    select
-      count(*)::int as leads,
-      count(*) filter (where qualification->>'temperature' = 'hot'
-                         and status <> 'spam'
-                         and (qualification->>'spam')::boolean is not true)::int as hot,
-      count(*) filter (where status = 'spam' or (qualification->>'spam')::boolean)::int as spam,
-      count(*) filter (where status = 'new' and (qualification->>'spam')::boolean is not true)::int as untaken,
-      percentile_cont(0.5) within group (
-        order by extract(epoch from taken_at - created_at) / 60
-      ) filter (where status = 'taken') as take_minutes
-    from leads where created_at >= ${from} and created_at < ${to}
-  `;
-  const [invoiced] = await sql`
-    select count(*)::int as n, coalesce(sum(amount), 0)::bigint as sum
-    from orders where created_at >= ${from} and created_at < ${to}
-  `;
-  const [paid] = await sql`
-    select count(*)::int as n, coalesce(sum(amount), 0)::bigint as sum
-    from orders where paid_at >= ${from} and paid_at < ${to}
-  `;
-  const [tickets] = await sql`
-    select count(*)::int as n from tickets where created_at >= ${from} and created_at < ${to}
-  `;
-  const [answers] = await sql`
-    select
-      count(*)::int as n,
-      count(*) filter (where draft_used)::int as drafts,
-      percentile_cont(0.5) within group (
-        order by extract(epoch from answered_at - created_at) / 60
-      ) as minutes
-    from tickets where answered_at >= ${from} and answered_at < ${to}
-  `;
-  const [jobs] = await sql`
-    select count(*)::int as n from jobs
-    where status = 'failed' and finished_at >= ${from} and finished_at < ${to}
-  `;
-  const minutes = (value: number | null) => (value === null ? null : Math.round(Number(value)));
-  return {
-    leads: leads.leads,
-    hot: leads.hot,
-    spam: leads.spam,
-    untaken: leads.untaken,
-    takeMinutes: minutes(leads.take_minutes),
-    invoiced: invoiced.n,
-    invoicedSum: Number(invoiced.sum),
-    paid: paid.n,
-    paidSum: Number(paid.sum),
-    tickets: tickets.n,
-    answered: answers.n,
-    answerMinutes: minutes(answers.minutes),
-    draftsUsed: answers.drafts,
-    failedJobs: jobs.n,
-  };
-}
-
-/** Вчерашний день и средний день за 7 дней до него. */
-export async function yesterdayVsWeek(now = new Date()) {
-  const yesterday = await dayStats(startOfDay(now, 1), startOfDay(now, 0));
-  const week: DayStats[] = [];
-  for (let i = 2; i <= 8; i++) {
-    week.push(await dayStats(startOfDay(now, i), startOfDay(now, i - 1)));
-  }
-  const average = {} as Record<keyof DayStats, number>;
-  for (const key of Object.keys(yesterday) as (keyof DayStats)[]) {
-    average[key] = week.reduce((total, day) => total + (day[key] ?? 0), 0) / week.length;
-  }
-  return { from: startOfDay(now, 1), to: startOfDay(now, 0), yesterday, average };
-}
-
-/** То, что есть прямо сейчас, а не за день: долги и очередь поддержки. */
-export async function currentState() {
-  const [overdue] = await sql`
-    select count(*)::int as n, coalesce(sum(amount), 0)::bigint as sum from orders
-    where status = 'pending' and created_at < now() - interval '14 days'
-  `;
-  const [open] = await sql`select count(*)::int as n from tickets where status = 'new'`;
-  return { overdue: overdue.n, overdueSum: Number(overdue.sum), openTickets: open.n };
-}
+```sql
+-- Заявки за день: сколько, сколько горячих и за сколько их брали (медиана)
+select
+  count(*)::int as leads,
+  count(*) filter (where qualification->>'temperature' = 'hot')::int as hot,
+  percentile_cont(0.5) within group (
+    order by extract(epoch from taken_at - created_at) / 60
+  ) filter (where status = 'taken') as take_minutes
+from leads where created_at >= ${from} and created_at < ${to}
 ```
 
 Несколько решений, которые стоит объяснить.
@@ -207,72 +102,13 @@ export async function currentState() {
 
 **Среднее за 7 дней, а не за вчера.** Сравнивать вчера с позавчера бессмысленно: понедельник почти всегда отличается от воскресенья. Неделя сглаживает дни недели и случайные всплески.
 
-**Текущее состояние отдельно.** Долги старше 14 дней и открытые обращения это не события за день, а то, что есть прямо сейчас. Их считает `currentState`.
+**Текущее состояние отдельно.** Долги старше 14 дней и открытые обращения это не события за день, а то, что есть прямо сейчас. Их считает `currentState`. А `yesterdayVsWeek` вызывает `dayStats` для вчера и для каждого из семи дней до него и усредняет.
 
 ## Шаг 3. Сводка
 
+Сводку собирает `digest.ts`. Функция `trend` ставит ▲ или ▼, если вчерашнее число отличается от среднего за неделю больше чем на 30%. `renderDigest` раскладывает числа по трём строкам: заявки, оплаты, поддержка. Для комментария модель получает JSON с числами и пересказы вчерашних заявок и обращений, которые она сама написала в прошлых частях, и возвращает по схеме массив из не более чем трёх строк. Весь её промпт:
+
 ```ts
-// src/digest.ts
-import { askJson } from "./claude";
-import { config } from "./config";
-import { sql } from "./db";
-import { currentState, type DayStats, yesterdayVsWeek } from "./metrics";
-import { money } from "./orders";
-import { html, tg } from "./telegram";
-
-/** ▲ или ▼, когда число отличается от среднего за неделю больше чем на 30%. */
-export function trend(value: number, average: number) {
-  if (average < 1 && value < 1) {
-    return "";
-  }
-  const change = (value - average) / Math.max(average, 1);
-  if (change > 0.3) {
-    return " ▲";
-  }
-  if (change < -0.3) {
-    return " ▼";
-  }
-  return "";
-}
-
-const avg = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
-
-export function renderDigest(
-  day: Date,
-  y: DayStats,
-  a: Record<keyof DayStats, number>,
-  now: { overdue: number; overdueSum: number; openTickets: number },
-  highlights: string[]
-) {
-  const date = day.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
-  const lines = [
-    `<b>📊 Вчера, ${date}</b>`,
-    "",
-    `<b>Заявки:</b> ${y.leads} (в среднем ${avg(a.leads)})${trend(y.leads, a.leads)} · 🔥 ${y.hot} · спам ${y.spam}`,
-    `взяли за ${y.takeMinutes ?? "–"} мин (медиана) · не взяты: ${y.untaken}`,
-    `<b>Оплаты:</b> ${y.paid} на ${money(y.paidSum)} (в среднем ${money(Math.round(a.paidSum))})${trend(y.paidSum, a.paidSum)}`,
-    `выставлено: ${y.invoiced} на ${money(y.invoicedSum)} · долги старше 14 дней: ${now.overdue} на ${money(now.overdueSum)}`,
-    `<b>Поддержка:</b> ${y.tickets} обращений (в среднем ${avg(a.tickets)})${trend(y.tickets, a.tickets)} · отвечено ${y.answered}, медиана ${y.answerMinutes ?? "–"} мин`,
-    `черновики без правок: ${y.draftsUsed} из ${y.answered} · открыто сейчас: ${now.openTickets}`,
-  ];
-  if (y.failedJobs > 0) {
-    lines.push(`<b>Упавшие задачи:</b> ${y.failedJobs}`);
-  }
-  if (highlights.length > 0) {
-    lines.push("", "<b>Что заметно:</b>", ...highlights.map((h) => `• ${html(h)}`));
-  }
-  return lines.join("\n");
-}
-
-const SCHEMA = {
-  type: "object",
-  properties: {
-    highlights: { type: "array", items: { type: "string" }, maxItems: 3 },
-  },
-  required: ["highlights"],
-  additionalProperties: false,
-};
-
 const SYSTEM = `Ты помогаешь владельцу небольшой веб-студии читать утреннюю сводку.
 Ты получаешь вчерашние цифры, средний день прошлой недели и краткие пересказы
 вчерашних заявок и обращений в поддержку.
@@ -280,50 +116,6 @@ const SYSTEM = `Ты помогаешь владельцу небольшой в
 относительно недели, закономерность в запросах клиентов, риск. Каждую одним предложением.
 Используй только данные числа и никогда не вычисляй новые. Если ничего
 не выделяется, верни пустой список. Пиши по-русски.`;
-
-/** О чём вчера писали клиенты, в пересказах самой модели из частей 4 и 6. */
-async function yesterdaySummaries(from: Date, to: Date) {
-  const leads = await sql`
-    select qualification->>'summary' as s from leads
-    where created_at >= ${from} and created_at < ${to} and qualification is not null
-      and (qualification->>'spam')::boolean is not true
-  `;
-  const tickets = await sql`
-    select triage->>'category' as c, triage->>'summary' as s from tickets
-    where created_at >= ${from} and created_at < ${to} and triage is not null
-  `;
-  return [
-    ...leads.map((l: any) => `lead: ${l.s}`),
-    ...tickets.map((t: any) => `ticket (${t.c}): ${t.s}`),
-  ].join("\n");
-}
-
-export async function sendDigest(now = new Date()) {
-  const { from, to, yesterday, average } = await yesterdayVsWeek(now);
-  const state = await currentState();
-  let highlights: string[] = [];
-  try {
-    const summaries = await yesterdaySummaries(from, to);
-    const answer = await askJson<{ highlights: string[] }>({
-      task: "digest",
-      system: SYSTEM,
-      content:
-        `<numbers>\n${JSON.stringify({ yesterday, weekAverage: average, now: state })}\n</numbers>\n\n` +
-        `<summaries>\n${summaries || "none"}\n</summaries>`,
-      schema: SCHEMA,
-      effort: "low",
-    });
-    highlights = answer.highlights.slice(0, 3);
-  } catch (error) {
-    // Цифры важнее комментария: отправляем сводку без него
-    console.error("digest commentary failed", error);
-  }
-  await tg("sendMessage", {
-    chat_id: config.digestChatId,
-    text: renderDigest(from, yesterday, average, state, highlights),
-    parse_mode: "HTML",
-  });
-}
 ```
 
 На что обратить внимание:
@@ -354,99 +146,20 @@ export async function sendDigest(now = new Date()) {
 
 Сводка отвечает на вопрос «как прошёл вчерашний день». Тревоги отвечают на другой: «не сломалось ли что-то прямо сейчас». Самые неприятные поломки тихие. Форма на сайте перестала отправляться после правки вёрстки, вебхук платёжки сменил адрес, и никаких ошибок нигде нет. Просто заявок нет.
 
+В `alerts.ts` каждая проверка возвращает имя, флаг «горит» и текст. `runChecks` собирает четыре проверки из четырёх коротких запросов, а `evaluate` превращает их в сообщения:
+
 ```ts
-// src/alerts.ts
-import { sql } from "./db";
-import { alert } from "./telegram";
-
-export interface Check {
-  name: string;
-  firing: boolean;
-  text: string;
-}
-
-/**
- * «Обычно к этому времени их было бы уже 5, а нет ни одного».
- * Обычный темп это среднее за последние 14 дней. Тишина подозрительна, когда
- * ожидаемое число событий с последнего доходит до `expected`.
- */
-export function silence(
-  name: string,
-  what: string,
-  rows: { last: Date | null; per_hour: number },
-  expected = 5
-): Check {
-  if (!rows.last) {
-    return { name, firing: false, text: "" };
-  }
-  const hours = (Date.now() - rows.last.getTime()) / 3_600_000;
-  const usual = Number(rows.per_hour) * hours;
-  return {
-    name,
-    firing: usual >= expected,
-    text: `Нет ${what} уже ${Math.round(hours)} ч, хотя обычно за это время было бы около ${Math.round(usual)}`,
-  };
-}
-
-/** Всё, за чем следим. Каждая проверка смотрит на данные как они есть сейчас. */
-export async function runChecks(): Promise<Check[]> {
-  const [leads] = await sql`
-    select max(created_at) as last,
-           count(*) filter (where created_at > now() - interval '14 days') / (14 * 24.0) as per_hour
-    from leads
+// evaluate: одно сообщение, когда проблема началась, и одно, когда закончилась
+if (check.firing) {
+  const [started] = await sql`
+    insert into alerts (name, text) values (${check.name}, ${check.text})
+    on conflict (name) do nothing
+    returning name
   `;
-  const [payments] = await sql`
-    select max(paid_at) as last,
-           count(*) filter (where paid_at > now() - interval '14 days') / (14 * 24.0) as per_hour
-    from orders
-  `;
-  const [support] = await sql`
-    select count(*)::int as n from tickets
-    where status = 'new' and created_at < now() - interval '4 hours'
-  `;
-  const [queue] = await sql`
-    select count(*)::int as n from jobs
-    where status = 'pending' and run_at < now() - interval '10 minutes'
-  `;
-  return [
-    silence("leads.silence", "заявок", leads),
-    silence("payments.silence", "оплат", payments),
-    {
-      name: "support.backlog",
-      firing: support.n >= 5,
-      text: `${support.n} обращений ждут ответа больше 4 часов`,
-    },
-    {
-      name: "queue.lag",
-      firing: queue.n > 0,
-      text: `${queue.n} задач просрочены больше чем на 10 минут: воркер не успевает`,
-    },
-  ];
-}
-
-/**
- * Тревога это состояние, а не сообщение: одно сообщение, когда проблема
- * началась, и одно, когда закончилась, как бы часто ни шли проверки.
- */
-export async function evaluate(checks: Check[]) {
-  for (const check of checks) {
-    if (check.firing) {
-      const [started] = await sql`
-        insert into alerts (name, text) values (${check.name}, ${check.text})
-        on conflict (name) do nothing
-        returning name
-      `;
-      if (started) {
-        await alert(`🚨 ${check.text}`);
-      }
-    } else {
-      const [ended] = await sql`delete from alerts where name = ${check.name} returning since, text`;
-      if (ended) {
-        const minutes = Math.round((Date.now() - ended.since.getTime()) / 60_000);
-        await alert(`✅ Снова в норме через ${minutes} мин: ${ended.text}`);
-      }
-    }
-  }
+  if (started) await alert(`🚨 ${check.text}`);
+} else {
+  const [ended] = await sql`delete from alerts where name = ${check.name} returning since, text`;
+  if (ended) await alert(`✅ Снова в норме: ${ended.text}`);
 }
 ```
 
@@ -466,201 +179,11 @@ export async function evaluate(checks: Check[]) {
 
 ## Шаг 5. Подключаем к расписанию
 
-Обработчики короткие, вся логика уже в модулях:
-
-```ts
-// src/handlers.ts
-import { evaluate, runChecks } from "./alerts";
-import { sendDigest } from "./digest";
-
-export const handlers: Record<string, Handler> = {
-  // ...
-
-  // Каждое утро: вчерашний день в цифрах с комментарием модели
-  "digest.daily": () => sendDigest(),
-
-  // Каждые 15 минут: не затихло ли и не застряло ли что-то
-  "alerts.check": async () => {
-    await evaluate(await runChecks());
-  },
-};
-```
-
-```ts
-// src/schedule.ts
-import { enqueue } from "./queue";
-
-export type Schedule =
-  | { kind: string; everyMinutes: number }
-  | { kind: string; dailyAt: string }; // "09:00" в часовом поясе сервера
-
-export const schedules: Schedule[] = [
-  { kind: "heartbeat", everyMinutes: 60 },
-  { kind: "invoices.remind", dailyAt: "10:00" },
-  { kind: "payments.reconcile", everyMinutes: 60 },
-  { kind: "digest.daily", dailyAt: "09:00" },
-  { kind: "alerts.check", everyMinutes: 15 },
-];
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-/**
- * Текущий слот расписания или null, если время ещё не пришло.
- * Слот становится ключом задачи, поэтому каждый слот выполняется один раз,
- * сколько бы воркеров его ни проверяли и как бы часто.
- */
-export function slot(schedule: Schedule, now: Date): string | null {
-  if ("everyMinutes" in schedule) {
-    const ms = schedule.everyMinutes * 60_000;
-    return new Date(Math.floor(now.getTime() / ms) * ms).toISOString();
-  }
-  const [hours, minutes] = schedule.dailyAt.split(":").map(Number);
-  if (now.getHours() * 60 + now.getMinutes() < hours * 60 + minutes) {
-    return null;
-  }
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
-export async function enqueueDue(now = new Date()) {
-  for (const schedule of schedules) {
-    const current = slot(schedule, now);
-    if (current) {
-      await enqueue({ kind: schedule.kind, key: `${schedule.kind}:${current}` });
-    }
-  }
-}
-```
-
-Ключи слотов из части про ядро гарантируют, что сводка уйдёт один раз в день, сколько бы воркеров ни работало.
+Обработчики короткие, вся логика уже в модулях: `digest.daily` вызывает `sendDigest()`, а `alerts.check` вызывает `evaluate(await runChecks())`. В расписание добавляются две строки: `{ kind: "digest.daily", dailyAt: "09:00" }` и `{ kind: "alerts.check", everyMinutes: 15 }`. Ключи слотов из части про ядро гарантируют, что сводка уйдёт один раз в день, сколько бы воркеров ни работало.
 
 ## Шаг 6. Тесты
 
-Проверяем, что метрики считают только события внутри дня, что стрелки появляются только при заметном отличии, что сводка уходит и с комментарием, и без него, если модель ответила ошибкой, и что тревога о тишине приходит один раз в начале и один раз в конце. Заглушка Claude из прошлой части научилась отвечать ошибкой.
-
-```ts
-// test/analytics.test.ts
-import { beforeEach, expect, test } from "bun:test";
-import { evaluate, runChecks } from "../src/alerts";
-import { config } from "../src/config";
-import { sql } from "../src/db";
-import { sendDigest, trend } from "../src/digest";
-import { dayStats, startOfDay } from "../src/metrics";
-import { calls, claude, reset } from "./stubs";
-
-const HOUR = 60 * 60 * 1000;
-const now = new Date();
-const yesterday = (hour: number, minute = 0) =>
-  new Date(startOfDay(now, 1).getTime() + hour * HOUR + minute * 60_000);
-const messages = (chat: string) =>
-  calls.filter((c) => c.method === "sendMessage" && String(c.body.chat_id) === chat);
-
-beforeEach(async () => {
-  reset();
-  await sql`truncate leads, tickets, accesses, orders, jobs, alerts restart identity cascade`;
-});
-
-async function seedYesterday() {
-  await sql`
-    insert into leads (id, name, contact, message, status, qualification, created_at, taken_at) values
-      ('a', 'A', 'a@x.io', '', 'taken', ${{ temperature: "hot", spam: false, summary: "Store by December" }},
-       ${yesterday(10)}, ${yesterday(10, 8)}),
-      ('b', 'B', 'b@x.io', '', 'spam', ${{ temperature: "cold", spam: true, summary: "SEO offer" }},
-       ${yesterday(11)}, null),
-      ('c', 'C', 'c@x.io', '', 'new', null, ${now}, null)
-  `;
-  await sql`
-    insert into orders (id, email, description, amount, status, created_at, paid_at) values
-      ('o1', 'a@x.io', 'Site', 1500000, 'paid', ${yesterday(-30)}, ${yesterday(12)}),
-      ('o2', 'b@x.io', 'Fix', 500000, 'pending', ${yesterday(13)}, null)
-  `;
-  await sql`
-    insert into tickets (source_id, channel, customer, message, status, draft_used, triage, created_at, answered_at)
-    values ('t1', 'email', 'a@x.io', 'Hi', 'answered', true,
-            ${{ category: "question", summary: "Asks about hosting" }}, ${yesterday(9)}, ${yesterday(9, 40)})
-  `;
-}
-
-test("day stats count only what happened inside the day", async () => {
-  await seedYesterday();
-  const stats = await dayStats(startOfDay(now, 1), startOfDay(now, 0));
-  expect(stats).toEqual({
-    leads: 2,
-    hot: 1,
-    spam: 1,
-    untaken: 0,
-    takeMinutes: 8,
-    invoiced: 1,
-    invoicedSum: 500000,
-    paid: 1,
-    paidSum: 1500000,
-    tickets: 1,
-    answered: 1,
-    answerMinutes: 40,
-    draftsUsed: 1,
-    failedJobs: 0,
-  });
-});
-
-test("the trend arrow shows only changes over 30%", () => {
-  expect(trend(14, 10)).toBe(" ▲");
-  expect(trend(12, 10)).toBe("");
-  expect(trend(6, 10)).toBe(" ▼");
-  expect(trend(0, 0)).toBe("");
-  expect(trend(2, 0)).toBe(" ▲");
-});
-
-test("the digest carries the model's highlights, and goes out without them if the model fails", async () => {
-  await seedYesterday();
-  claude.answer = { highlights: ["Заявок вдвое больше обычного"] };
-  await sendDigest(now);
-  const first = messages(config.digestChatId).at(-1)!.body.text;
-  expect(first).toContain("<b>Заявки:</b> 2 (в среднем 0) ▲");
-  expect(first).toContain("Заявок вдвое больше обычного");
-
-  const request = calls.find((c) => c.api === "claude")!.body;
-  expect(request.messages[0].content).toContain('"weekAverage"');
-  expect(request.messages[0].content).toContain("lead: Store by December");
-  expect(request.messages[0].content).not.toContain("SEO offer"); // спам в модель не попадает
-
-  claude.status = 400;
-  await sendDigest(now);
-  const second = messages(config.digestChatId).at(-1)!.body.text;
-  expect(second).toContain("<b>Оплаты:</b> 1");
-  expect(second).not.toContain("Что заметно");
-});
-
-test("a silence alert fires once and resolves once", async () => {
-  // По две заявки в час две недели, потом 10 часов тишины
-  await sql`
-    insert into leads (id, name, contact, message, created_at)
-    select 'old' || g, 'X', 'x@x.io', '', now() - interval '10 hours' - g * interval '30 minutes'
-    from generate_series(0, 14 * 48 - 21) as g
-  `;
-  await evaluate(await runChecks());
-  await evaluate(await runChecks());
-  const alerts = () => messages(config.alertChatId).map((c) => c.body.text);
-  expect(alerts()).toHaveLength(1);
-  expect(alerts()[0]).toStartWith("🚨 Нет заявок уже 10 ч");
-
-  await sql`insert into leads (id, name, contact, message) values ('fresh', 'Y', 'y@x.io', '')`;
-  await evaluate(await runChecks());
-  await evaluate(await runChecks());
-  expect(alerts()).toHaveLength(2);
-  expect(alerts()[1]).toStartWith("✅ Снова в норме");
-});
-
-test("overdue jobs raise the queue lag alert", async () => {
-  await sql`insert into jobs (kind, run_at) values ('x', now() - interval '20 minutes')`;
-  const checks = await runChecks();
-  expect(checks.find((c) => c.name === "queue.lag")!.firing).toBe(true);
-  expect(checks.find((c) => c.name === "payments.silence")!.firing).toBe(false);
-});
-```
-
-```text
- 30 pass
- 0 fail
-```
+Проверяем, что метрики считают только события внутри дня, что стрелки появляются только при заметном отличии, что сводка уходит и с комментарием, и без него, если модель ответила ошибкой, и что тревога о тишине приходит один раз в начале и один раз в конце. Заглушка Claude из прошлой части научилась отвечать ошибкой. Для тишины тест вставляет две недели заявок по две в час, затем десять часов ничего, и дважды подряд прогоняет проверки: тревога должна прийти одна, а после новой заявки одно «✅ Снова в норме».
 
 В CI в шаг `Tests` добавляется `DIGEST_CHAT_ID: "-400"`.
 

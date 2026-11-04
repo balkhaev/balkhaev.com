@@ -1,0 +1,97 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency: deploy
+
+env:
+  IMAGE: ghcr.io/your-name/automations
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - name: Tests
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
+          SITE_WEBHOOK_SECRET: test
+          TELEGRAM_WEBHOOK_SECRET: test
+          TELEGRAM_BOT_TOKEN: test
+          ALERT_CHAT_ID: "0"
+          LEADS_CHAT_ID: "0"
+          FORM_REDIRECT_URL: https://example.com/thanks
+          TELEGRAM_API: http://localhost:3999
+          YOOKASSA_SHOP_ID: test
+          YOOKASSA_SECRET_KEY: test
+          YOOKASSA_API: http://localhost:3996/v3
+          PUBLIC_URL: https://auto.example.com
+          ACCESS_URL: https://example.com/access/
+          EMAIL_API_KEY: test
+          EMAIL_FROM: test@example.com
+          EMAIL_API: http://localhost:3995
+          SUPPORT_CHAT_ID: "-300"
+          DIGEST_CHAT_ID: "-400"
+          EMAIL_INBOUND_SECRET: test
+          ANTHROPIC_API_KEY: test
+          ANTHROPIC_BASE_URL: http://localhost:3997
+        run: |
+          bun src/migrate.ts
+          bun test
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Ship to the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_ed25519
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+          scp compose.yml Caddyfile deploy.sh backup.sh "deploy@$HOST:/opt/automations/"
+          ssh "deploy@$HOST" "/opt/automations/deploy.sh ${{ github.sha }}"
+
+      - name: Smoke test
+        run: |
+          for i in 1 2 3 4 5 6; do
+            curl -fsS https://auto.example.com/health && exit 0
+            sleep 5
+          done
+          exit 1
