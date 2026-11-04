@@ -83,10 +83,34 @@ The display loop is capped at 60 fps, including the idle scene, and pauses in hi
 
 The PDFs (`balkhaev-cv-en.pdf`, `balkhaev-cv-ru.pdf`) are committed: after editing the content or styles, run `bun scripts/cv-pdf.ts`, which prints both with a local Chrome or Edge (`CHROME_PATH` overrides the browser). Nginx redirects `/cv` and `/cv/ru` to their trailing-slash URLs.
 
+## Blog
+
+`/blog/` (English) and `/blog/ru/` (Russian) are generated at build time from `content/blog/<slug>/en.md` and `ru.md`. A post can exist in one language or both; the same folder name links the two versions with `hreflang` and the language switcher. Each file starts with YAML frontmatter:
+
+```yaml
+title: The blog is open
+description: One line for the list and for search results.
+date: 2026-11-04
+tags: [meta]
+draft: false # optional; drafts are built only with `bun scripts/build.ts --drafts`
+```
+
+`src/blog/content.ts` reads and validates posts (the build fails with the file name on a bad field), `src/blog/markdown.ts` renders them, and `src/blog/render.ts` writes the list, post pages and an Atom feed per language (`/blog/atom.xml`, `/blog/ru/atom.xml`). The build also generates `sitemap.xml` from every page. Styles are in `public/blog/blog.css` and reuse the resume's self-hosted IBM Plex Sans; the theme follows `prefers-color-scheme`.
+
+What a post body supports, all rendered at build time with no JavaScript on the page:
+
+- GitHub-flavoured Markdown: tables, task lists, footnotes (`[^1]`). Raw HTML is dropped.
+- Formulas: `$inline$` and `$$display$$`, rendered by KaTeX. An invalid formula fails the build. The KaTeX stylesheet and woff2 fonts are copied to `/blog/katex/` and linked only on posts with math.
+- Code: fenced blocks highlighted by Shiki in GitHub light and dark themes; unknown languages fall back to plain text.
+- Callouts: `:::note`, `:::warning`, `:::tldr`, and `:::proof`, which collapses.
+- A table of contents from `##` and `###` headings, shown when a post has three or more.
+
 ## Production
 
 Coolify serves an Nginx image on `https://balkhaev.com`. DNS points to `49.13.216.63`. The Docker image listens on port 8080; TLS is handled by Coolify.
 
-After committing and pushing, run `bun run deploy` with `COOLIFY_ACCESS_TOKEN` set and SSH key access to `root@49.13.216.63`. Deployment builds the committed revision on the server, tags the image with the commit for rollback, and deploys that image. No credentials are stored in this repository.
+Every push to `main` deploys automatically through `.github/workflows/deploy.yml`: it runs `bun run check`, the tests and the build, then `bun run deploy`, then checks that `/`, `/cv/`, `/blog/`, `/blog/ru/` and `/sitemap.xml` answer 200. Pull requests run the same checks without deploying. The workflow needs two repository secrets: `COOLIFY_ACCESS_TOKEN` and `DEPLOY_SSH_KEY` (a private key accepted by `root@49.13.216.63`). An optional `DEPLOY_KNOWN_HOSTS` pins the server's host key; without it the workflow trusts `ssh-keyscan`. A failed deploy can be retried from the Actions tab (Run workflow).
+
+`bun run deploy` still works by hand with `COOLIFY_ACCESS_TOKEN` set and SSH key access to `root@49.13.216.63`. Deployment builds the committed revision on the server, tags the image with the commit for rollback, and deploys that image. No credentials are stored in this repository.
 
 After publishing, check the production URL and container health, then verify the live scene in a browser. At the initial radius and a held interior radius, wait without scrolling: source luminosity, disk features and the PG clock should advance while radius holds. Move down and back up: the PG clock should remain monotonic, while different retarded rays can show different emission ages. The default gaze should remain inward through horizon crossing, with continuous optical changes around the shadow. Manual gaze should persist across depth changes until explicitly restored. Check «Физика» and «Карта частот» outside and across the horizon, including unavailable static comparisons and captured central sky rays. Compare a manually selected escaping central ray and the rearward signal in the optional local illustration; turning or changing depth should change their rates without resetting their phases or rescaling PG time. Repeated images of a variable source should retain the same underlying pattern at different delays. At the final radius 0.02, confirm «Граница расчёта», live source animation, available diagnostics and outward depth navigation. Hidden-tab return should cause no time jump; reduced motion, touch/keyboard navigation, contacts and opt-in audio should remain available.

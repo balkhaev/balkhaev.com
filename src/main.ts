@@ -15,6 +15,8 @@ import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
 const hint = document.querySelector<HTMLElement>("#hint");
+const scene = document.querySelector<HTMLElement>("#scene");
+const SCENE_HASH = "#hole";
 const rateFormat = new Intl.NumberFormat("ru", { maximumSignificantDigits: 3 });
 
 function flightLabel(flight: ReturnType<typeof createFlight>) {
@@ -110,6 +112,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     fullscreenToggle.hidden = !document.fullscreenEnabled;
   }
   let renderer: HoleRenderer | null = null;
+  // The scene starts as a small preview on the page and opens to full screen.
+  let expanded = false;
+  let visible = true;
   let frame = 0;
   let last = 0;
   let time = 0;
@@ -240,8 +245,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const resume = () => {
     stop();
-    audio.setAudible(!document.hidden && Boolean(renderer));
-    if (document.hidden || !renderer) {
+    audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
+    if (document.hidden || !renderer || !(expanded || visible)) {
       return;
     }
     draw();
@@ -474,6 +479,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     dismissHint();
     redraw();
   });
+  const sceneKeys: Record<string, () => void> = {
+    " ": toggleTravel,
+    escape: () => openScene(false),
+    f: toggleFullscreen,
+    m: toggleSound,
+    p: physics.toggle,
+  };
   document.addEventListener("keydown", (event) => {
     if (
       event.defaultPrevented ||
@@ -487,17 +499,12 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     if (target?.closest("input, textarea, select, [contenteditable]")) {
       return;
     }
-    const key = event.key.toLowerCase();
-    let action: (() => void) | undefined;
-    if (key === "m") {
-      action = toggleSound;
-    } else if (key === "f") {
-      action = toggleFullscreen;
-    } else if (key === "p") {
-      action = physics.toggle;
-    } else if (key === " " && !target?.closest("button, a")) {
-      action = toggleTravel;
+    if (!expanded) {
+      return;
     }
+    const key = event.key.toLowerCase();
+    const action =
+      key === " " && target?.closest("button, a") ? undefined : sceneKeys[key];
     if (!action) {
       return;
     }
@@ -506,6 +513,70 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       action();
     }
   });
+  const openButton = document.querySelector<HTMLButtonElement>("#scene-open");
+  const closeButton = document.querySelector<HTMLButtonElement>("#scene-close");
+  const applyScene = (open: boolean) => {
+    expanded = open;
+    if (scene) {
+      scene.dataset.state = open ? "expanded" : "compact";
+    }
+    document.documentElement.classList.toggle("scene-expanded", open);
+    openButton?.setAttribute("aria-expanded", String(open));
+    if (!open) {
+      flight.pause();
+      gesture = null;
+      touches.clear();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => undefined);
+      }
+    }
+    fit();
+    resume();
+  };
+  const transition = (open: boolean) => {
+    if (open === expanded) {
+      return;
+    }
+    const swap = () => {
+      applyScene(open);
+      (open ? input : openButton)?.focus({ preventScroll: true });
+    };
+    if (still.matches || !document.startViewTransition) {
+      swap();
+    } else {
+      document.startViewTransition(swap);
+    }
+  };
+  function openScene(open: boolean) {
+    if (open === expanded) {
+      return;
+    }
+    if (open) {
+      history.pushState({ scene: true }, "", SCENE_HASH);
+    } else if (history.state?.scene) {
+      // Going back keeps the browser's Back button in step with the overlay.
+      history.back();
+      return;
+    } else {
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    transition(open);
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "#scene-open, [data-open-scene]"
+  )) {
+    button.addEventListener("click", () => openScene(true));
+  }
+  closeButton?.addEventListener("click", () => openScene(false));
+  window.addEventListener("popstate", () => {
+    transition(location.hash === SCENE_HASH);
+  });
+  if (scene) {
+    new IntersectionObserver(([entry]) => {
+      visible = entry?.isIntersecting ?? true;
+      resume();
+    }).observe(scene);
+  }
   const resize = new ResizeObserver(fit);
   resize.observe(surface);
   still.addEventListener("change", () => {
@@ -541,6 +612,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     pointer = null;
     delete input.dataset.dragging;
   });
+  expanded =
+    location.hash === SCENE_HASH || preview.phase !== null || previewStill;
+  applyScene(expanded);
   mount();
 }
 
