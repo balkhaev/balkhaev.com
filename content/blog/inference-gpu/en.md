@@ -1,7 +1,7 @@
 ---
 title: "Choosing a GPU: memory, speed and weight formats"
 description: Why memory size and bandwidth matter for inference more than raw compute. How to estimate the memory the weights and context will take, and which weight formats work on which GPUs.
-date: 2026-03-17
+date: 2026-06-02
 updated: 2026-11-04
 series: inference
 part: 2

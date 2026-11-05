@@ -1,7 +1,7 @@
 ---
 title: The agent loop and tools
 description: Give the model tools for files and shell commands, and write the harness that turns a chat into an agent.
-date: 2025-03-18
+date: 2025-11-18
 updated: 2026-11-04
 series: company-agent
 part: 3

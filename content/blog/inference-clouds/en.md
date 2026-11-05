@@ -1,7 +1,7 @@
 ---
 title: "RunPod and Vast.ai: where to rent without overpaying"
 description: How RunPod and Vast.ai differ, what rental types exist, where to keep the weights so you don't download them every time, and how not to pay for idle time.
-date: 2026-06-02
+date: 2026-07-28
 updated: 2026-11-04
 series: inference
 part: 4
