@@ -140,6 +140,7 @@ scenes:
       - title: A
         points: [Fast, Cheap]
       - title: B
+        pick: true
         points: [MCP server]
   - type: diagram
     heading: Flow
@@ -150,18 +151,19 @@ scenes:
 `
     );
     expect(narration(board, "en")).toEqual([
-      "Hello world. A subtitle.",
-      "Pick one. A: fast, cheap. B: MCP server.",
+      "Hello world.",
+      "Pick one. B: MCP server.",
       "Custom words",
     ]);
   });
 
-  test("a scene gets at least the time its line needs", () => {
+  test("a voiced scene lasts as long as its line", () => {
     const board = parseStoryboard(
       "test.yml",
       "context: T\nscenes:\n  - type: end\n    text: Bye\n"
     );
     expect(timeline(board)[0]?.duration).toBe(4);
     expect(timeline(board, [9.43])[0]?.duration).toBe(9.5);
+    expect(timeline(board, [1.2])[0]?.duration).toBe(2.5);
   });
 });

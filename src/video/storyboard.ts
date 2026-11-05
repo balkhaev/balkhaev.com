@@ -280,20 +280,24 @@ export function sceneDuration(scene: Scene): number {
   return Math.round(Math.max(MIN_SECONDS, seconds) * 10) / 10;
 }
 
+/** Shortest voiced scene, in seconds. */
+const MIN_VOICED_SECONDS = 2.5;
+
 /**
- * Places the scenes one after another. `minimum` gives a scene more time,
- * e.g. to fit its voiceover.
+ * Places the scenes one after another. Without `voice` each scene stays long
+ * enough to read; with it (seconds of narration per scene) each scene lasts
+ * as long as its line, so the video moves at the narrator's pace.
  */
 export function timeline(
   board: Storyboard,
-  minimum: number[] = []
+  voice: number[] = []
 ): TimedScene[] {
   let start = 0;
   return board.scenes.map((scene, index) => {
-    const duration = Math.max(
-      sceneDuration(scene),
-      Math.ceil((minimum[index] ?? 0) * 10) / 10
-    );
+    const duration =
+      voice.length > 0
+        ? Math.max(MIN_VOICED_SECONDS, Math.ceil((voice[index] ?? 0) * 10) / 10)
+        : sceneDuration(scene);
     const timed = { duration, scene, start };
     start = Math.round((start + duration) * 10) / 10;
     return timed;

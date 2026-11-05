@@ -27,10 +27,12 @@ DESIGN_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
 BASE_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 SENTENCE = re.compile(r"(?<=[.!?…])\s+")
 # Pause between sentences of one line, seconds.
-GAP = 0.3
+GAP = 0.12
 # Normal speech is 10-20 characters a second; outside these bounds the model
 # has skipped text or started babbling, so the sentence is generated again.
 MIN_CPS, MAX_CPS = 6.0, 32.0
+# Too short to judge: a word or two is spoken at its own pace.
+SHORT = 20
 ATTEMPTS = 4
 
 torch.set_num_threads(os.cpu_count() or 4)
@@ -83,7 +85,7 @@ def speak(spec):
             )
             wav = trim(wavs[0], sr)
             cps = len(sentence) / max(len(wav) / sr, 0.01)
-            if MIN_CPS <= cps <= MAX_CPS:
+            if len(sentence) < SHORT or MIN_CPS <= cps <= MAX_CPS:
                 return wav, sr
             print(f"  retry ({cps:.1f} chars/s): {sentence}")
         return wav, sr
