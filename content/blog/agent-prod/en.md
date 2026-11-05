@@ -1,7 +1,7 @@
 ---
 title: "Into production: perimeter, audit and checks"
 description: The final part of the series. We deploy the agent inside the company perimeter with three controlled exits, write an audit log, defend against prompt injection in documents, check answer quality with a question set and keep the database attacks in tests.
-date: 2025-12-09
+date: 2026-04-07
 updated: 2026-11-04
 series: company-agent
 part: 9

@@ -1,7 +1,7 @@
 ---
 title: Talking to a model
 description: Take a commercial model API and write a streaming terminal chat with history in 40 lines.
-date: 2025-02-18
+date: 2025-10-28
 updated: 2026-11-04
 series: company-agent
 part: 2

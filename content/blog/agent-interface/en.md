@@ -1,7 +1,7 @@
 ---
 title: "The interface: a web chat and a Slack bot"
 description: We take the agent out of the terminal. Company SSO sign-in, a web chat with streaming and conversation history, and a Slack bot that knows who is writing and answers only in direct messages.
-date: 2025-10-14
+date: 2026-03-17
 updated: 2026-11-04
 series: company-agent
 part: 8

@@ -1,7 +1,7 @@
 ---
 title: "Replacing support: sorting the inbox and drafting replies"
 description: Client emails and messages become cards in the support chat. Claude reads each ticket, takes the knowledge base and the client's orders into account and drafts a reply, and a person sends it with one tap.
-date: 2024-08-20
+date: 2025-08-19
 updated: 2026-11-04
 series: automations
 part: 6
