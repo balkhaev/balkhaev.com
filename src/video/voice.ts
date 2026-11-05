@@ -12,7 +12,7 @@ import type { Scene, Storyboard } from "./storyboard";
  * Names the narrator: the speech model plus the reference recording made
  * from VOICES. Bump it to re-voice every video with a new reference.
  */
-export const VOICE_VERSION = "qwen3-tts-v1";
+export const VOICE_VERSION = "qwen3-tts-v2";
 
 /**
  * Posts whose videos are voiced. "all" once the pilot is approved; until then
@@ -36,14 +36,14 @@ export interface VoiceConfig {
 export const VOICES: Record<string, VoiceConfig> = {
   en: {
     instruct:
-      "A calm, confident male narrator in his thirties with a warm, mid-low voice. Clear studio recording, natural conversational pace, friendly and unhurried, like a tech explainer video.",
+      "A calm, confident male narrator in his thirties with a warm, mid-low voice. Clear studio recording, brisk, energetic pace, to the point, like a fast-moving tech explainer video.",
     language: "English",
     reference:
       "Today we will take one idea from the concept to a working system. Step by step, without extra theory, and with the numbers that matter.",
   },
   ru: {
     instruct:
-      "Спокойный уверенный мужской голос диктора, около тридцати лет, тёплый тембр средней высоты. Чистая студийная запись, естественный разговорный темп, дружелюбно и без спешки, как в видео, которое объясняет технологию.",
+      "Спокойный уверенный мужской голос диктора, около тридцати лет, тёплый тембр средней высоты. Чистая студийная запись, бодрый быстрый темп, энергично и по делу, как в динамичном видео, которое объясняет технологию.",
     language: "Russian",
     reference:
       "Сегодня мы проведём одну идею от концепции до работающей системы. По шагам, без лишней теории и с цифрами, которые важны.",
@@ -51,12 +51,19 @@ export const VOICES: Record<string, VoiceConfig> = {
 };
 
 /** Silence before a scene's line and after it, in seconds. */
-export const LEAD_IN = 0.5;
-export const TAIL = 0.7;
+export const LEAD_IN = 0.15;
+export const TAIL = 0.3;
+/** Playback speed of the narration: the model speaks a little slowly. */
+export const SPEED = 1.12;
 
 const ACCENT = /\*([^*]+)\*/g;
 const END_PUNCT = /[.!?…:]$/;
 const CAPITALIZED = /^\p{Lu}\p{Ll}/u;
+const FIRST_SENTENCE = /^.+?[.!?…](?=\s+\p{Lu}|$)/su;
+/** A list item's key is the part before its colon, if that is short. */
+const ITEM_KEY = /^([^:]+):\s/;
+const KEY_WORDS = 3;
+const SPACES = /\s+/;
 
 interface Words {
   and: string;
@@ -126,7 +133,29 @@ function lowerFirst(text: string): string {
     : text;
 }
 
-/** The narration line of a scene, before `speakable`. */
+/** The first sentence of a text: captions are cut to it. */
+function firstSentence(text: string | undefined): string {
+  const trimmed = (text ?? "").trim();
+  return trimmed.match(FIRST_SENTENCE)?.[0] ?? trimmed;
+}
+
+/** "*Модель*: понимает вопрос" → "Модель"; long keys are dropped. */
+function itemKeys(items: string[]): string {
+  const keys = items.map(
+    (item) => item.replace(ACCENT, "$1").match(ITEM_KEY)?.[1]?.trim() ?? ""
+  );
+  const short = keys.every(
+    (key) => key && key.split(SPACES).length <= KEY_WORDS
+  );
+  return short
+    ? keys.map((key, index) => (index ? lowerFirst(key) : key)).join(", ")
+    : "";
+}
+
+/**
+ * The narration line of a scene, before `speakable`. It stays short: the
+ * screen already shows the details, the narrator says the point.
+ */
 function sceneLine(scene: Scene): string {
   if (scene.voice) {
     return scene.voice;
@@ -134,23 +163,23 @@ function sceneLine(scene: Scene): string {
   const parts: string[] = [];
   switch (scene.type) {
     case "title":
-      parts.push(scene.title, scene.subtitle ?? "");
+      parts.push(scene.title);
       break;
     case "statement":
       parts.push(scene.text);
       break;
     case "list":
-      parts.push(scene.heading, ...scene.items);
+      parts.push(scene.heading, itemKeys(scene.items));
       break;
-    case "compare":
+    case "compare": {
+      const pick = scene.columns.find((column) => column.pick);
       parts.push(
         scene.heading,
-        ...scene.columns.map(
-          (column) =>
-            `${column.title}: ${column.points.map(lowerFirst).join(", ")}`
-        )
+        firstSentence(scene.say),
+        pick ? `${pick.title}: ${lowerFirst(pick.points[0] ?? "")}` : ""
       );
       break;
+    }
     case "diagram":
       parts.push(scene.heading);
       break;
@@ -160,7 +189,9 @@ function sceneLine(scene: Scene): string {
     default:
       break;
   }
-  parts.push(scene.say ?? "");
+  if (scene.type !== "end" && scene.type !== "compare") {
+    parts.push(firstSentence(scene.say));
+  }
   return parts
     .filter((part) => part.trim())
     .map(sentence)

@@ -39,6 +39,7 @@ import {
   isVoiced,
   LEAD_IN,
   narration,
+  SPEED,
   TAIL,
   VOICE_VERSION,
   VOICES,
@@ -124,7 +125,7 @@ async function composition(job: Job) {
   const lines = voiced ? narration(board, job.lang) : [];
   // Silent videos keep the hash they had before voiceover existed.
   const voice = voiced
-    ? `${JSON.stringify({ lines, version: VOICE_VERSION, voice: VOICES[job.lang] })}\n`
+    ? `${JSON.stringify({ lines, pace: [LEAD_IN, SPEED, TAIL], version: VOICE_VERSION, voice: VOICES[job.lang] })}\n`
     : "";
   const hash = new CryptoHasher("sha256")
     .update(`${HYPERFRAMES}\n${flag("draft")}\n${voice}${page}`)
@@ -177,7 +178,7 @@ async function speak(job: Job, lines: string[], dir: string) {
   const seconds = JSON.parse(
     await readFile(join(out, "durations.json"), "utf8")
   ) as number[];
-  return seconds.map((value) => (value > 0 ? LEAD_IN + value + TAIL : 0));
+  return seconds.map((value) => LEAD_IN + value / SPEED + TAIL);
 }
 
 /** Lays the scene lines onto one track and puts it under the video. */
@@ -189,7 +190,7 @@ async function mux(silent: string, starts: number[], dir: string, mp4: string) {
   const delays = starts
     .map(
       (start, index) =>
-        `[${index + 1}:a]adelay=${Math.round((start + LEAD_IN) * 1000)}:all=1[a${index}]`
+        `[${index + 1}:a]atempo=${SPEED},adelay=${Math.round((start + LEAD_IN) * 1000)}:all=1[a${index}]`
     )
     .join(";");
   const labels = starts.map((_, index) => `[a${index}]`).join("");
