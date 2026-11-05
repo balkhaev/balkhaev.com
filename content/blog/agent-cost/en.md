@@ -1,7 +1,7 @@
 ---
 title: "Context and money: caching, compacting history and limits"
 description: We work out what every question to the agent costs, turn on prompt caching, keep junk out of the context, let the API shrink long conversations and set a daily limit per employee.
-date: 2025-08-26
+date: 2026-02-24
 updated: 2026-11-04
 series: company-agent
 part: 7
