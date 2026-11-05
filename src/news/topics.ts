@@ -204,6 +204,27 @@ export const TOPICS = {
       "privacy",
     ],
   },
+  training: {
+    label: { en: "Fine-tuning", ru: "Дообучение" },
+    words: [
+      "дообуч",
+      "fine-tun",
+      "finetun",
+      "post-train",
+      "LoRA!",
+      "QLoRA!",
+      "Unsloth",
+      "Axolotl",
+      "TRL!",
+      "DPO!",
+      "GRPO!",
+      "RLHF",
+      "дистилл",
+      "distill",
+      "датасет",
+      "dataset",
+    ],
+  },
   voice: {
     label: { en: "Voice", ru: "Голос" },
     words: [

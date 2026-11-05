@@ -331,7 +331,7 @@
         "text": "Модель Liquid AI занимает около 1,7 ГБ в Q4 и обучена с RL в реальных агентных обвязках.",
         "title": "LFM2.5-2.6B для агентов на телефоне",
         "url": "https://huggingface.co/LiquidAI/LFM2.5-2.6B",
-        "topics": ["agents", "open-models"]
+        "topics": ["agents", "open-models", "training"]
       }
     ]
   },
@@ -802,7 +802,7 @@
         "text": "Гибрид Mamba-Transformer с 12B активных параметров вышел с весами и рецептом обучения.",
         "title": "Nemotron 3 Super: 120B с контекстом 1M",
         "url": "https://nvidianews.nvidia.com/news/nemotron-3-super",
-        "topics": ["open-models", "search"]
+        "topics": ["open-models", "search", "training"]
       },
       {
         "source": "The AI Track",
@@ -1125,7 +1125,7 @@
         "text": "Гибридная Mamba-MoE на 30B (3B активных) вышла вместе с данными и рецептами обучения.",
         "title": "NVIDIA открыла Nemotron 3 Nano",
         "url": "https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
-        "topics": ["open-models", "inference"]
+        "topics": ["open-models", "inference", "training"]
       },
       {
         "source": "Google",
@@ -1206,7 +1206,7 @@
         "text": "Prime Intellect выпустила MoE на 106B (12B активных) и открыла код обучения с подкреплением.",
         "title": "INTELLECT-3: открытая модель и весь стек обучения",
         "url": "https://huggingface.co/PrimeIntellect/INTELLECT-3",
-        "topics": ["open-models"]
+        "topics": ["open-models", "training"]
       },
       {
         "source": "Hugging Face",

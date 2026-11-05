@@ -1,0 +1,64 @@
+context: Fine-tuning · 4/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 4
+    title: "Evaluation: did the model get *better*"
+    subtitle: An honest comparison on a held-out test.
+
+  - type: compare
+    label: Contestants
+    heading: Three models, one test
+    columns:
+      - title: Base with prompt
+        points:
+          - what fine-tuning added
+      - title: Claude
+        points:
+          - the current bar
+      - title: Adapter
+        pick: true
+        points:
+          - the candidate
+
+  - type: list
+    label: Metrics
+    heading: Per field
+    items:
+      - "*Validity* of the JSON"
+      - "*Category*: precision and recall for each"
+      - "*Urgent and needs a human*: recall matters most"
+      - "*Confusion table*: what gets mixed up"
+    say: Missing a complaint is much worse than calling a human once too often. So recall is the main metric for expensive errors.
+
+  - type: statement
+    label: Free text
+    text: "*Blind pairwise* comparison, with the judge checked by hand."
+
+  - type: diagram
+    label: Reading errors
+    heading: Where misses come from
+    nodes:
+      - { id: err, label: An error on the test, col: 4, row: 0, w: 4, step: 0 }
+      - { id: label, label: Wrong label, col: 0, row: 3, w: 3, step: 1 }
+      - { id: vague, label: Fuzzy boundary, col: 3, row: 3, w: 3, step: 1 }
+      - { id: gap, label: Too few examples, col: 6, row: 3, w: 3, step: 1 }
+      - { id: model, label: Weak model, col: 9, row: 3, w: 3, step: 2, accent: true }
+    edges:
+      - { from: err, to: label }
+      - { from: err, to: vague }
+      - { from: err, to: gap }
+      - { from: err, to: model }
+    say: Most errors are explained by the data. Fix the data, not the training parameters.
+
+  - type: list
+    label: Readiness
+    heading: Set the rule in advance
+    items:
+      - "Expensive errors *no more often* than in production"
+      - "Everything else *barely worse*"
+      - "Odd inputs *don't break* the answer"
+      - "Price and latency *noticeably lower*"
+
+  - type: end
+    text: Next, polishing with *DPO and GRPO*.
+    url: balkhaev.com/blog/finetune-eval

@@ -1,0 +1,63 @@
+context: Fine-tuning · 2/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 2
+    title: "Data: *where to get it* and how to clean it"
+    subtitle: Almost all of a model's quality depends on its data.
+
+  - type: list
+    label: The task
+    heading: A ticket in, JSON out
+    items:
+      - "*category*: one of eight categories"
+      - "*urgency*: high, normal or low"
+      - "*summary*: the gist in one sentence"
+      - "*needs_human*: does a human need to step in"
+
+  - type: list
+    label: Sources
+    heading: Where examples come from
+    items:
+      - "*Logs with human edits*: the most valuable"
+      - "*Manual labels*: rare and hard cases"
+      - "*A big teacher model*: when you have little data"
+    say: Every corrected card is an example where the model was wrong and a human showed how it should be.
+
+  - type: compare
+    label: How many
+    heading: Quality beats quantity
+    columns:
+      - title: Format
+        points:
+          - 200–500 examples
+      - title: Narrow skill
+        pick: true
+        points:
+          - 1,000–3,000 examples
+      - title: Complex skill
+        points:
+          - 5,000–20,000 examples
+
+  - type: statement
+    label: The main rule
+    text: Set the test aside *first* and never train on it.
+    say: Split by time and by customer. Otherwise the model recognises the email instead of understanding it, and the test lies.
+
+  - type: list
+    label: Cleaning
+    heading: What to remove
+    items:
+      - "*Duplicates* and near duplicates"
+      - "*Contradictions*: one input, different answers"
+      - "*Junk*: auto-replies and newsletters"
+      - "*Class imbalance*: add the rare ones"
+      - "*Personal data* the task doesn't need"
+
+  - type: statement
+    label: Last step
+    text: Read *a hundred examples* yourself.
+    say: It's dull, but every time you find something no script caught.
+
+  - type: end
+    text: Next, the first *LoRA* run.
+    url: balkhaev.com/blog/finetune-data

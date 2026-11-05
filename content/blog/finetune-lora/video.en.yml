@@ -1,0 +1,70 @@
+context: Fine-tuning · 3/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 3
+    title: "First run: *LoRA* on one GPU"
+    subtitle: Unsloth and TRL on a rented GPU.
+
+  - type: statement
+    label: What LoRA is
+    text: The model's weights are frozen; *small add-on matrices* are trained.
+    say: The result is an adapter of tens of megabytes. Quality close to full fine-tuning, many times less memory.
+
+  - type: list
+    label: Base model
+    heading: How to choose
+    items:
+      - "*Instruct*, not base"
+      - "*Apache 2.0* or MIT"
+      - "*The smallest* that almost manages"
+      - "For example, *Qwen3.5-9B*"
+
+  - type: compare
+    label: GPU
+    heading: Memory for 9B
+    columns:
+      - title: 16-bit LoRA
+        pick: true
+        points:
+          - 30–40 GB
+          - a 48–96 GB card
+          - better quality
+      - title: 4-bit QLoRA
+        points:
+          - 12–20 GB
+          - RTX 4090 or 5090
+          - slower
+
+  - type: list
+    label: Parameters
+    heading: Only a few matter
+    items:
+      - "Rank *16*, alpha equal to rank"
+      - "Learning rate *2e-4*"
+      - "*One to three* epochs"
+      - "Loss *on the answer only*"
+      - "The same *chat template* as in production"
+
+  - type: compare
+    label: Loss curve
+    heading: How to read it
+    columns:
+      - title: Both fall
+        pick: true
+        points:
+          - the model is learning
+      - title: Validation rises
+        points:
+          - memorising examples
+          - take the best checkpoint
+      - title: Loss jumps
+        points:
+          - halve the learning rate
+
+  - type: statement
+    label: Money
+    text: Two thousand examples, *under an hour* and a couple of dollars.
+
+  - type: end
+    text: Next, an honest *evaluation*.
+    url: balkhaev.com/blog/finetune-lora

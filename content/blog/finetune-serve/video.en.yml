@@ -1,0 +1,63 @@
+context: Fine-tuning · 7/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 7
+    title: "To production: *an adapter in vLLM*"
+    subtitle: Shadow mode, switching and retraining.
+
+  - type: compare
+    label: How to host
+    heading: Adapter or merged model
+    columns:
+      - title: Adapter on the base
+        pick: true
+        points:
+          - many tasks on one GPU
+          - a version is a file of tens of MB
+          - roll back by changing a name
+      - title: Merged model
+        points:
+          - slightly faster
+          - can be compressed to FP8
+          - a copy per task
+
+  - type: list
+    label: Shipping
+    heading: Three steps
+    numbered: true
+    items:
+      - "*Shadow*: Claude answers, the adapter writes a log"
+      - "*Part of traffic*: 10% with fallback to Claude"
+      - "*All traffic*: Claude only as fallback"
+    say: The test is the past. Production traffic is always a bit different, so we move it over gradually.
+
+  - type: statement
+    label: The main metric
+    text: The share of cards *a human corrected*.
+    say: Every correction is both a quality signal and a new training example.
+
+  - type: list
+    label: The loop
+    heading: Once a month
+    items:
+      - "Fresh edits into *a new dataset version*"
+      - "A new adapter with *the same scripts*"
+      - "Compare with the current one *on the test*"
+      - "Shadow, then *switch by name*"
+
+  - type: list
+    label: Summary
+    heading: The whole series in seven steps
+    numbered: true
+    items:
+      - Is fine-tuning needed
+      - Data from logs and edits
+      - Test set aside first
+      - LoRA on a rented GPU
+      - Evaluation vs base and Claude
+      - Polishing with GRPO or DPO
+      - Shadow, switch, retrain
+
+  - type: end
+    text: Series done. The model *learns from every correction*.
+    url: balkhaev.com/blog/finetune-serve
