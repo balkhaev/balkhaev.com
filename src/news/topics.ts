@@ -141,7 +141,7 @@ export const TOPICS = {
     words: ["MCP!", "Model Context Protocol", "коннектор", "connector"],
   },
   media: {
-    label: { en: "Images and video", ru: "Картинки и видео" },
+    label: { en: "Images and video", ru: "Изображения и видео" },
     words: [
       "изображен",
       "картин",
