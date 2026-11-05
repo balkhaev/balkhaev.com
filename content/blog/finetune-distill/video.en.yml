@@ -1,0 +1,52 @@
+context: Fine-tuning · 6/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 6
+    title: "Distillation: the small learns *from the big*"
+    subtitle: When labels are scarce but data is plentiful.
+
+  - type: diagram
+    label: The idea
+    heading: The teacher labels, the student learns
+    nodes:
+      - { id: pool, label: Unlabelled tickets, col: 0, row: 0, w: 4, step: 0 }
+      - { id: teacher, label: Teacher, sub: big model, col: 5, row: 0, w: 3, step: 1 }
+      - { id: filter, label: Agreement filter, col: 9, row: 0, w: 3, step: 2 }
+      - { id: humans, label: People, sub: disputed cases, col: 9, row: 3, w: 3, step: 3 }
+      - { id: student, label: Student, sub: small model, col: 4, row: 3, w: 4, step: 4, accent: true }
+    edges:
+      - { from: pool, to: teacher }
+      - { from: teacher, to: filter }
+      - { from: filter, to: humans, label: disputed }
+      - { from: filter, to: student, label: agree }
+      - { from: humans, to: student }
+
+  - type: list
+    label: Teacher
+    heading: How to choose
+    items:
+      - "*Licence*: Apache 2.0 or MIT"
+      - "Commercial API terms *often forbid* training on outputs"
+      - "The teacher sets *the ceiling*: check it on the test"
+
+  - type: list
+    label: Filter
+    heading: Don't trust the teacher blindly
+    items:
+      - "Ask *three times*"
+      - "Or ask *two different* teachers"
+      - "Send disputed ones to *people*"
+    say: Disputed examples are the most valuable. They are the borderline cases the student will stumble on too.
+
+  - type: statement
+    label: The rule
+    text: The test is labelled *only by people*.
+    say: Otherwise you measure how much the student resembles the teacher, not how often it's right.
+
+  - type: statement
+    label: Money
+    text: The teacher labels ten thousand tickets for *a few to a few tens of dollars*.
+
+  - type: end
+    text: Next, shipping *to production*.
+    url: balkhaev.com/blog/finetune-distill

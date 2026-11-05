@@ -1,0 +1,53 @@
+context: Fine-tuning · 5/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 5
+    title: "Preferences: *DPO and GRPO*"
+    subtitle: Teaching the model not only correct answers but what's worse.
+
+  - type: statement
+    label: What SFT lacks
+    text: SFT shows the correct answer but *doesn't say which error costs more*.
+
+  - type: compare
+    label: Two methods
+    heading: Pairs or a reward
+    columns:
+      - title: DPO
+        points:
+          - a good and a bad answer
+          - pairs from staff edits
+          - minutes of training
+      - title: GRPO
+        pick: true
+        points:
+          - the model writes 8 answers
+          - code scores each one
+          - hours of training
+
+  - type: list
+    label: Reward
+    heading: How we score an answer
+    items:
+      - "Invalid JSON: *a penalty*"
+      - "Right category: *a plus*"
+      - "Found a complaint for a human: *twice as much*"
+    say: The reward says outright that missing a complaint is worse than calling a human once too often.
+
+  - type: statement
+    label: The danger
+    text: The model *will game the reward* if it can.
+    say: Give points only for found complaints and it will call a human everywhere. Penalise both errors and watch the answer distribution.
+
+  - type: list
+    label: Order
+    heading: How to apply
+    numbered: true
+    items:
+      - "*SFT* first"
+      - "*GRPO* or *DPO* on top"
+      - "Check with *the same* evaluation script"
+
+  - type: end
+    text: Next, *distillation*.
+    url: balkhaev.com/blog/finetune-preference

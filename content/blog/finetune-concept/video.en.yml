@@ -1,0 +1,67 @@
+context: Fine-tuning · 1/7
+scenes:
+  - type: title
+    kicker: Fine-tuning · part 1
+    title: "When to fine-tune and when *a prompt is enough*"
+    subtitle: A model for your own task. We start by asking whether you need it at all.
+
+  - type: compare
+    label: What fine-tuning changes
+    heading: Behaviour, not knowledge
+    columns:
+      - title: Good for
+        pick: true
+        points:
+          - A strict answer format
+          - Your tone and style
+          - A narrow skill without a long prompt
+          - A small model instead of a big one
+      - title: Bad for
+        points:
+          - New facts and prices
+          - Citing sources
+          - Smarter than the base model
+
+  - type: list
+    label: The ladder
+    heading: Cheap steps first
+    numbered: true
+    items:
+      - "*Prompt*: instruction and JSON schema"
+      - "*Examples in the prompt*: 5–20 worked cases"
+      - "*Search and RAG*: the right documents in the request"
+      - "*Fine-tuning*: when it's still bad or too costly"
+    say: Facts go into search, not weights. Facts change, and nobody retrains a model after every price list.
+
+  - type: list
+    label: When it's justified
+    heading: Three conditions
+    items:
+      - "The task is *narrow and high-volume*"
+      - "The result *can be checked*"
+      - "There are *hundreds to thousands of examples*"
+
+  - type: statement
+    label: Money
+    text: A LoRA run costs *a few dollars*. Data and evaluation are what's expensive.
+    say: The main win is usually cost, not quality. A small fine-tuned model does one job many times cheaper.
+
+  - type: diagram
+    label: What we build
+    heading: Ticket triage on our own model
+    nodes:
+      - { id: logs, label: Logs and edits, col: 0, row: 0, w: 3, step: 0 }
+      - { id: data, label: Dataset, sub: train and test, col: 4, row: 0, w: 3, step: 1 }
+      - { id: sft, label: LoRA, sub: rented GPU, col: 8, row: 0, w: 4, step: 2 }
+      - { id: eval, label: Evaluation, sub: vs Claude, col: 8, row: 3, w: 4, step: 3, accent: true }
+      - { id: serve, label: vLLM in production, col: 3, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: logs, to: data }
+      - { from: data, to: sft }
+      - { from: sft, to: eval }
+      - { from: eval, to: serve }
+      - { from: serve, to: logs, label: new edits }
+
+  - type: end
+    text: Next we collect *data*.
+    url: balkhaev.com/blog/finetune-concept

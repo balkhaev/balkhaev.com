@@ -1,0 +1,52 @@
+context: Дообучение · 6/7
+scenes:
+  - type: title
+    kicker: Дообучение · часть 6
+    title: "Дистилляция: маленькая учится *у большой*"
+    subtitle: Когда разметки мало, а данных много.
+
+  - type: diagram
+    label: Идея
+    heading: Учитель размечает, ученик учится
+    nodes:
+      - { id: pool, label: Неразмеченные обращения, col: 0, row: 0, w: 4, step: 0 }
+      - { id: teacher, label: Учитель, sub: большая модель, col: 5, row: 0, w: 3, step: 1 }
+      - { id: filter, label: Фильтр согласия, col: 9, row: 0, w: 3, step: 2 }
+      - { id: humans, label: Люди, sub: спорные случаи, col: 9, row: 3, w: 3, step: 3 }
+      - { id: student, label: Ученик, sub: маленькая модель, col: 4, row: 3, w: 4, step: 4, accent: true }
+    edges:
+      - { from: pool, to: teacher }
+      - { from: teacher, to: filter }
+      - { from: filter, to: humans, label: спорные }
+      - { from: filter, to: student, label: согласны }
+      - { from: humans, to: student }
+
+  - type: list
+    label: Учитель
+    heading: Как выбрать
+    items:
+      - "*Лицензия*: Apache 2.0 или MIT"
+      - "Условия коммерческих API *часто запрещают* учить на ответах"
+      - "Учитель задаёт *потолок*: проверьте его на тесте"
+
+  - type: list
+    label: Фильтр
+    heading: Не верьте учителю слепо
+    items:
+      - "Спросите *три раза*"
+      - "Или *двух разных* учителей"
+      - "Спорное отдайте *людям*"
+    say: Спорные примеры самые ценные. Это пограничные случаи, на которых будет спотыкаться и ученик.
+
+  - type: statement
+    label: Правило
+    text: Тест размечают *только люди*.
+    say: Иначе вы мерите, насколько ученик похож на учителя, а не насколько он прав.
+
+  - type: statement
+    label: Деньги
+    text: Десять тысяч обращений учитель размечает за *единицы или десятки долларов*.
+
+  - type: end
+    text: Дальше выкатка *в прод*.
+    url: balkhaev.com/blog/ru/finetune-distill
