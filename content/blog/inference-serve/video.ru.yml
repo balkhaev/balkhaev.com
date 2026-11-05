@@ -56,5 +56,5 @@ scenes:
     text: Для продукта это обычный OpenAI API. Меняются только *адрес и ключ*.
 
   - type: end
-    text: Текст работает. Дальше *картинки и видео*.
+    text: Текст работает. Дальше *изображения и видео*.
     url: balkhaev.com/blog/ru/inference-serve
