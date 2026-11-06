@@ -69,7 +69,7 @@
         "text": "Открытая VL-модель на 120B вместе с данными и рецептами.",
         "title": "Nemotron 3.5 Super VL для документов и видео",
         "url": "https://developer.nvidia.com/blog/nvidia-nemotron-3-5-super-vl-powers-specialized-agents-with-multimodal-reasoning/",
-        "topics": ["open-models", "search"]
+        "topics": ["open-models", "search", "data"]
       },
       {
         "source": "Google",
@@ -237,7 +237,7 @@
         "text": "Плагин с 37 готовыми навыками для продаж.",
         "title": "Claudeforce: Claude внутри Salesforce",
         "url": "https://www.salesforce.com/news/press-releases/2026/08/26/salesforce-and-anthropic-announce-claudeforce/",
-        "topics": ["automation", "agents"]
+        "topics": ["automation", "agents", "data"]
       },
       {
         "source": "Z.ai",
@@ -648,7 +648,7 @@
         "text": "Google превратила Vertex AI в единую платформу для создания и контроля корпоративных агентов.",
         "title": "Gemini Enterprise Agent Platform",
         "url": "https://theaitrack.com/gemini-enterprise-agent-platform/",
-        "topics": ["agents", "automation"]
+        "topics": ["agents", "automation", "data"]
       },
       {
         "source": "OpenAI",
@@ -829,7 +829,7 @@
         "text": "Командная строка даёт агентам доступ к Gmail, Docs, Sheets и Drive.",
         "title": "Google Workspace CLI для агентов",
         "url": "https://theaitrack.com/google-workspace-cli-ai-agents/",
-        "topics": ["agents", "automation", "mcp"]
+        "topics": ["agents", "automation", "mcp", "data"]
       }
     ]
   },

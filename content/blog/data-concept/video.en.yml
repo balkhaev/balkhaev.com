@@ -1,0 +1,65 @@
+context: Company data · 1/7
+scenes:
+  - type: title
+    kicker: Taming data · part 1
+    title: "One picture instead of *five systems*"
+    subtitle: Why data sprawls and what to do about it.
+
+  - type: list
+    label: Where data lives
+    heading: A bit everywhere
+    items:
+      - "*Accounting*: orders, shipments, payments"
+      - "*CRM*: deals and managers"
+      - "*Site*: store orders"
+      - "*Sheets*: plan and key accounts"
+    say: Each system works on its own. Trouble starts when an answer needs two systems at once.
+
+  - type: list
+    label: Symptoms
+    heading: How to spot the chaos
+    items:
+      - "Different numbers *at one meeting*"
+      - "One customer *in five places*"
+      - "A *three-day* Excel report"
+      - "The AI assistant *lies confidently*"
+
+  - type: compare
+    label: What to do
+    heading: Don't replace, gather
+    columns:
+      - title: One new system
+        points:
+          - expensive and slow
+          - teams won't leave their tools
+          - spreadsheets again in a year
+      - title: One picture on top
+        pick: true
+        points:
+          - systems stay
+          - data is copied to a warehouse
+          - reconciled there into one story
+
+  - type: diagram
+    label: Layers
+    heading: What the picture is made of
+    nodes:
+      - { id: src, label: Sources, col: 0, row: 0, w: 3, step: 0 }
+      - { id: raw, label: Raw copies, col: 4, row: 0, w: 3, step: 1 }
+      - { id: core, label: One story, sub: customers and orders, col: 8, row: 0, w: 4, step: 2, accent: true }
+      - { id: met, label: Numbers, sub: metrics and glossary, col: 8, row: 3, w: 4, step: 3 }
+      - { id: use, label: AI and automations, col: 3, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: src, to: raw }
+      - { from: raw, to: core }
+      - { from: core, to: met }
+      - { from: met, to: use }
+
+  - type: statement
+    label: The point
+    text: AI goes *on top*, not instead of the middle.
+    say: If the data has three Romashkas and two revenues, the model picks one, and a different one each day.
+
+  - type: end
+    text: Next we map *the sources*.
+    url: balkhaev.com/blog/data-concept

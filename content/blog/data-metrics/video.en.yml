@@ -1,0 +1,49 @@
+context: Company data · 5/7
+scenes:
+  - type: title
+    kicker: Taming data · part 5
+    title: "Numbers everyone *agrees on*"
+    subtitle: Metrics, a glossary and checks.
+
+  - type: compare
+    label: Why numbers differ
+    heading: Two revenues
+    columns:
+      - title: Sales director
+        points:
+          - CRM deals
+          - with VAT
+          - no returns
+      - title: CFO
+        pick: true
+        points:
+          - 1C shipments
+          - without VAT
+          - minus returns
+
+  - type: list
+    label: The agreement
+    heading: For every metric
+    items:
+      - "One *written definition*"
+      - "An *owner* who settles disputes"
+      - "What it *excludes*"
+    say: If people need different numbers, those are two metrics with different names.
+
+  - type: list
+    label: Checks
+    heading: Four kinds
+    items:
+      - "*Integrity*: duplicates and broken links"
+      - "*Freshness* of loads"
+      - "*Plausibility*: zero or a spike"
+      - "*Reconciliation* with accounting"
+
+  - type: statement
+    label: When it breaks
+    text: Better *yesterday's correct* numbers than today's broken ones.
+    say: If a check fails, marts aren't updated, and Telegram says what broke and where.
+
+  - type: end
+    text: Next we add an *AI assistant* on top.
+    url: balkhaev.com/blog/data-metrics

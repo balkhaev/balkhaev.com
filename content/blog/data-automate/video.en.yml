@@ -1,0 +1,50 @@
+context: Company data · 7/7
+scenes:
+  - type: title
+    kicker: Taming data · part 7
+    title: "Data *comes to people* by itself"
+    subtitle: Digests, rules, tasks and reverse sync.
+
+  - type: diagram
+    label: The actions step
+    heading: After every build
+    nodes:
+      - { id: build, label: dbt build, col: 0, row: 0, w: 3, step: 0 }
+      - { id: dig, label: Digest, sub: to chat, col: 4, row: 0, w: 3, step: 1 }
+      - { id: rules, label: Rules, sub: SQL, col: 8, row: 0, w: 4, step: 2 }
+      - { id: tasks, label: CRM tasks, sub: brief from Claude, col: 8, row: 3, w: 4, step: 3, accent: true }
+      - { id: sync, label: CRM fields, col: 3, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: build, to: dig }
+      - { from: dig, to: rules }
+      - { from: rules, to: tasks }
+      - { from: tasks, to: sync }
+
+  - type: statement
+    label: A rule
+    text: A customer is quiet *twice as long* as usual.
+    say: While the customer was split across five records, this query was impossible. On top of one story it's plain SQL.
+
+  - type: list
+    label: No duplicates, no clashes
+    heading: Two rules
+    items:
+      - "Every action goes *to the log first*"
+      - "Write *only to your own* CRM fields"
+
+  - type: list
+    label: Recap
+    heading: The series in seven steps
+    numbered: true
+    items:
+      - One picture instead of new systems
+      - A map of sources and owners
+      - Everything in one warehouse
+      - Customers merged into one
+      - Metrics with one definition
+      - An assistant that cites its source
+      - Signals come to people by themselves
+
+  - type: end
+    text: Series done. Data *first*, then AI.
+    url: balkhaev.com/blog/data-automate

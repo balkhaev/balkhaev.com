@@ -1,0 +1,42 @@
+context: Company data · 6/7
+scenes:
+  - type: title
+    kicker: Taming data · part 6
+    title: "AI assistant: *plain-language questions*"
+    subtitle: Claude Opus 5.5 and an MCP server over metrics.
+
+  - type: list
+    label: Tools
+    heading: Three of them
+    numbered: true
+    items:
+      - "*list_metrics*: read the glossary"
+      - "*query_metric*: compute a metric"
+      - "*sql*: the escape hatch"
+    say: The model doesn't write a query for revenue. It asks for revenue, and the server builds the SQL from the glossary.
+
+  - type: list
+    label: Protection
+    heading: A read-only role
+    items:
+      - "Sees *only marts*"
+      - "Transactions *read-only*"
+      - "Queries *under 10 seconds*"
+
+  - type: list
+    label: Answer rules
+    heading: Every answer cites its source
+    items:
+      - "Metric, period, filters"
+      - "Data *freshness*"
+      - "Ambiguous question: *ask*"
+      - "No data: *say so*"
+
+  - type: statement
+    label: Testing
+    text: Thirty *real questions* with known answers.
+    say: Run them after every glossary or prompt change.
+
+  - type: end
+    text: Next data *comes to people by itself*.
+    url: balkhaev.com/blog/data-assistant

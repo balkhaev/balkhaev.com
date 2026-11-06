@@ -1,0 +1,54 @@
+context: Company data · 2/7
+scenes:
+  - type: title
+    kicker: Taming data · part 2
+    title: "A map of *sources and questions*"
+    subtitle: A week of inventory saves months.
+
+  - type: list
+    label: How to look
+    heading: Through people, not IT
+    numbered: true
+    items:
+      - "Where do you *do your work*?"
+      - "What *reports* do you make, and from what?"
+      - "What numbers are you *missing*?"
+    say: The third question matters most. Its answers become the list of business questions.
+
+  - type: list
+    label: The map
+    heading: For every source
+    items:
+      - "*Owner*: who knows what fields mean"
+      - "*Access*: API, OData, replica"
+      - "*Volume and change rate*"
+
+  - type: diagram
+    label: Entities
+    heading: What sources talk about
+    nodes:
+      - { id: cust, label: Customer, sub: "1C, CRM, site", col: 0, row: 0, w: 4, step: 0, accent: true }
+      - { id: ord, label: Order, sub: 1C and site, col: 5, row: 0, w: 3, step: 1 }
+      - { id: pay, label: Payment, sub: 1C, col: 9, row: 0, w: 3, step: 2 }
+      - { id: tick, label: Ticket, sub: help desk, col: 0, row: 3, w: 4, step: 3 }
+    edges:
+      - { from: cust, to: ord }
+      - { from: ord, to: pay }
+      - { from: cust, to: tick }
+
+  - type: statement
+    label: Access
+    text: Every source gets *its own read-only account*.
+    say: Not the accountant's password and not an admin token. And a replica instead of the site's primary database.
+
+  - type: list
+    label: Personal data
+    heading: Copy only what's needed
+    items:
+      - "Phone and email *as a hash*"
+      - "Addresses and names *not needed*"
+      - "Passports and cards *never*"
+
+  - type: end
+    text: Next we *copy the data* into a warehouse.
+    url: balkhaev.com/blog/data-inventory
