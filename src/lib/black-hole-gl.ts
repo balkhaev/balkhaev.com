@@ -67,6 +67,8 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
+  /** Presentation-only grading of the fall: 0..1 each. */
+  fall?: { crossing: number; inside: number; tension: number };
   /** False-colour map of actual per-source frequency ratios in the calculated region. */
   spectral?: boolean;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
@@ -445,6 +447,8 @@ uniform sampler2D uGlow2;
 uniform sampler2D uGlow3;
 uniform sampler2D uGlow4;
 uniform sampler2D uExposure;
+uniform vec4 uFall; // tension near the horizon, crossing pulse, depth inside, scene time
+uniform vec2 uAspect;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -456,14 +460,51 @@ vec3 encode(vec3 linear) {
 	return mix(linear * 12.92, 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linear));
 }
 
+// Presentation only: the falling eye's view smears toward the centre and splits by colour.
+vec3 streaked(vec2 uv, float amount) {
+	vec2 toCentre = uv - 0.5;
+	float pulse = uFall.y;
+	float split = amount * 0.006 + pulse * 0.007;
+	vec3 sum = vec3(0.0);
+	float weight = 0.0;
+	for (int i = 0; i < 10; i++) {
+		float k = float(i) / 9.0;
+		float scale = 1.0 - amount * 0.07 * k - pulse * 0.12 * k * k;
+		float w = 1.0 - 0.7 * k;
+		sum.r += texture(uScene, 0.5 + toCentre * scale * (1.0 + split)).r * w;
+		sum.g += texture(uScene, 0.5 + toCentre * scale).g * w;
+		sum.b += texture(uScene, 0.5 + toCentre * scale * (1.0 - split)).b * w;
+		weight += w;
+	}
+	return sum / weight;
+}
+
 void main() {
 	vec4 scene = texture(uScene, vUv);
-	vec3 glow = texture(uGlow0, vUv).rgb * 0.6 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.1 + texture(uGlow3, vUv).rgb * 0.04 + texture(uGlow4, vUv).rgb * 0.01;
-	vec3 light = mix(scene.rgb, glow, 0.012) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
+	float tension = uFall.x;
+	float pulse = uFall.y;
+	float inside = uFall.z;
+	float smear = tension + pulse;
+	vec3 base = smear > 0.002 ? streaked(vUv, smear) : scene.rgb;
+	vec3 glow = texture(uGlow0, vUv).rgb * 0.5 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.13 + texture(uGlow3, vUv).rgb * 0.08 + texture(uGlow4, vUv).rgb * 0.04;
+	vec3 light = mix(base, glow, 0.045 + 0.05 * pulse) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
 	// Luminance tone mapping preserves the thermal colour in bright filaments.
 	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
 	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
 	mapped /= max(1.0, max(mapped.r, max(mapped.g, mapped.b)));
+	// A warmer, slightly richer grade outside; a colder one past the horizon.
+	float grey = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
+	mapped = max(mix(vec3(grey), mapped, 1.45 + 0.2 * inside), 0.0);
+	mapped *= mix(vec3(1.08, 0.98, 0.86), vec3(0.82, 0.9, 1.22), inside);
+	vec2 p = (vUv - 0.5) * uAspect;
+	float edge = length(p);
+	float vignette = 1.0 - (0.32 + 0.45 * inside + 0.5 * tension) * smoothstep(0.35 - 0.12 * inside, 1.05, edge);
+	mapped *= vignette;
+	// The crossing: a blue-white pulse of compressed outside light, then darkness.
+	float ring = exp(-pow((edge - pulse * 0.9) * 7.0, 2.0)) * pulse;
+	float flash = pulse * pulse * (0.1 + 0.9 * smoothstep(0.12, 0.8, edge));
+	mapped += vec3(0.62, 0.78, 1.0) * (flash * 0.55 + ring * 0.4);
+	mapped = min(mapped, vec3(1.0));
 	vec3 colour = encode(mapped);
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);
@@ -615,6 +656,8 @@ export function createHoleRenderer(
       "uGlow3",
       "uGlow4",
       "uExposure",
+      "uFall",
+      "uAspect",
     ]);
     particleProgram = compile(gl, PARTICLE_FRAGMENT, [], PARTICLE_VERTEX);
     skyProgram = compile(
@@ -1073,6 +1116,16 @@ export function createHoleRenderer(
       gl.uniform1i(finish("uGlow4"), 5);
       texture(6, exposure.texture);
       gl.uniform1i(finish("uExposure"), 6);
+      const { fall } = frame;
+      gl.uniform4f(
+        finish("uFall"),
+        fall?.tension ?? 0,
+        fall?.crossing ?? 0,
+        fall?.inside ?? 0,
+        frame.time
+      );
+      const aspect = Math.max(width, height);
+      gl.uniform2f(finish("uAspect"), width / aspect, height / aspect);
       pass(null);
       gpu.end();
     },

@@ -57,15 +57,22 @@
                 type="button"
               ></button>
               <div class="scene-bar">
-                <p class="scene-title">Падение в чёрную дыру</p>
                 <button
                   aria-keyshortcuts="Escape"
+                  aria-label="Свернуть"
                   class="scene-close"
                   id="scene-close"
+                  title="Свернуть · Esc"
                   type="button"
                 >
-                  Свернуть <span aria-hidden="true" class="close-mark">×</span>
+                  <span aria-hidden="true" class="close-mark">×</span>
                 </button>
+              </div>
+              <div aria-hidden="true" class="horizon-cross" id="horizon-cross">
+                <p class="horizon-cross-title">Горизонт событий</p>
+                <p class="horizon-cross-note">
+                  Вы внутри. Отсюда наружу не выходит даже свет.
+                </p>
               </div>
               <footer class="flight-info">
                 <div class="flight-state">
@@ -180,11 +187,6 @@
                     <span id="journey-radius">12.50</span
                     ><span class="radius-unit" id="journey-unit">rₛ</span>
                   </div>
-                  <span
-                    class="journey-signal"
-                    hidden
-                    id="journey-signal"
-                  ></span>
                 </div>
                 <div aria-hidden="true" class="journey-track">
                   <span id="journey-progress"></span

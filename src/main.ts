@@ -130,6 +130,61 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let last = 0;
   let time = 0;
   const physics = createPhysicsPanel(() => redraw());
+  // The crossing pulse plays once each time the fall carries the eye inward
+  // through r = rₛ; scrolling back out and in again replays it.
+  const crossCaption = document.querySelector<HTMLElement>("#horizon-cross");
+  let wasCrossed = flight.crossed;
+  let crossAt = -1;
+  let crossTimer = 0;
+  let noteStage = "";
+  let noteTimer = 0;
+  const fallGrade = (radius: number) => {
+    const ease = (a: number, b: number, x: number) => {
+      const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
+    const inside = ease(1, 0.62, radius);
+    const tension = 0.3 * ease(2.2, 1, radius) * (1 - 0.7 * inside);
+    let crossing = 0;
+    if (crossAt >= 0) {
+      const age = (performance.now() - crossAt) / 1000;
+      crossing = age < 0.14 ? age / 0.14 : Math.exp(-(age - 0.14) / 0.75);
+      if (age > 4) {
+        crossAt = -1;
+        crossing = 0;
+      }
+    }
+    return { crossing, inside, tension };
+  };
+  const markCrossing = () => {
+    const { crossed } = flight;
+    if (crossed && !wasCrossed && flight.playback !== "rewinding") {
+      crossAt = still.matches || previewStill ? -1 : performance.now();
+      if (scene && crossCaption) {
+        scene.classList.remove("crossing");
+        // Restart the CSS animation on a replayed crossing.
+        requestAnimationFrame(() => scene.classList.add("crossing"));
+        clearTimeout(crossTimer);
+        crossTimer = window.setTimeout(
+          () => scene.classList.remove("crossing"),
+          5200
+        );
+      }
+    }
+    wasCrossed = crossed;
+  };
+  const showNote = (stage: string) => {
+    if (stage === noteStage || !flightNote) {
+      return;
+    }
+    noteStage = stage;
+    flightNote.classList.remove("faded");
+    clearTimeout(noteTimer);
+    noteTimer = window.setTimeout(
+      () => flightNote.classList.add("faded"),
+      6500
+    );
+  };
   let pointer: { x: number; y: number; at: number } | null = null;
   let lastImpulse = 0;
   const touches = new Map<number, { x: number; y: number }>();
@@ -159,6 +214,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     surface.dataset.gazePitch = view.pitch.toFixed(4);
     updateText(flightStatus, flightLabel(flight));
     updateText(flightNote, flightInstruction(flight));
+    showNote(flightNote?.textContent ?? "");
+    markCrossing();
     updateText(radiusLabel, journey.radius.toFixed(2));
     const skyAngle = Math.acos(
       Math.max(
@@ -214,6 +271,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     frameView();
     renderer.draw({
       accretion: 1,
+      fall: fallGrade(flight.journey.radius),
       spectral: physics.spectral,
       time,
     });
@@ -287,6 +345,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       const age = Number.isFinite(requestedAge)
         ? Math.max(0, Math.min(30, requestedAge))
         : 3;
+      const crossAge = Number(params.get("preview-cross"));
+      if (params.has("preview-cross") && Number.isFinite(crossAge)) {
+        crossAt = performance.now() - crossAge * 1000;
+        draw();
+      }
       if (effect === "impact") {
         renderer.disturb(0.69, 0.57, time - age, 1.4, true);
       } else if (effect === "stream") {
@@ -532,8 +595,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   });
   const openButton = document.querySelector<HTMLButtonElement>("#scene-open");
   const closeButton = document.querySelector<HTMLButtonElement>("#scene-close");
+  let hintTimer = 0;
   const applyScene = (open: boolean) => {
     expanded = open;
+    clearTimeout(hintTimer);
+    if (open) {
+      hintTimer = window.setTimeout(dismissHint, 7000);
+    }
     lensZoom = open ? 1 : COMPACT_ZOOM;
     if (scene) {
       scene.dataset.state = open ? "expanded" : "compact";
