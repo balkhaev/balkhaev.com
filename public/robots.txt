@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /russ/
 
 Sitemap: https://balkhaev.com/sitemap.xml
