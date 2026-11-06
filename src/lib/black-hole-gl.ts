@@ -32,6 +32,8 @@ import {
 } from "./infall-geodesics";
 import {
   createPlungingFlow,
+  DISK_PEAK_TEMPERATURE,
+  FEED_TEMPERATURE,
   PLUNGE_SAMPLES,
   PLUNGE_SHADER,
 } from "./plunging-flow";
@@ -67,8 +69,6 @@ export interface HoleView extends SceneView {
 export interface HoleFrame {
   /** How much the disk takes in: its brightness, 1 at rest. */
   accretion: number;
-  /** Presentation-only grading of the fall: 0..1 each. */
-  fall?: { crossing: number; inside: number; tension: number };
   /** False-colour map of actual per-source frequency ratios in the calculated region. */
   spectral?: boolean;
   /** Time in r_s/c: at 1 per second the innermost gas goes round in about 46 seconds. */
@@ -135,7 +135,7 @@ const float DISK_OUT = ${DISK_OUT.toFixed(1)};
 // Peak of the zero-torque Schwarzschild thin-disk flux, at r = 4.7755 r_s.
 const float FLUX_PEAK = 0.00011458947;
 // The hottest gas, kelvin, before any shift.
-const float T_PEAK = 2800.0;
+const float T_PEAK = ${DISK_PEAK_TEMPERATURE.toFixed(1)};
 
 
 float rowOf(float angle) {
@@ -198,13 +198,21 @@ float densityHash(ivec2 cell) {
   return float(h ^ (h >> 16u)) / 4294967295.0;
 }
 
+// Gradient noise: smooth, isotropic cells, so sheared gas reads as turbulence rather than blocks.
+vec2 densityGradient(ivec2 cell) {
+  float a = densityHash(cell) * TAU;
+  return vec2(cos(a), sin(a));
+}
 float densityNoise(vec2 p) {
   vec2 cell = floor(p);
   vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
+  vec2 w = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
   ivec2 c = ivec2(cell);
-  vec4 corners = vec4(densityHash(c), densityHash(c + ivec2(1, 0)), densityHash(c + ivec2(0, 1)), densityHash(c + ivec2(1)));
-  return mix(mix(corners.x, corners.y, f.x), mix(corners.z, corners.w, f.x), f.y);
+  float a = dot(densityGradient(c), f);
+  float b = dot(densityGradient(c + ivec2(1, 0)), f - vec2(1.0, 0.0));
+  float d = dot(densityGradient(c + ivec2(0, 1)), f - vec2(0.0, 1.0));
+  float e = dot(densityGradient(c + ivec2(1)), f - vec2(1.0));
+  return clamp(0.5 + 0.9 * mix(mix(a, b, w.x), mix(d, e, w.x), w.y), 0.0, 1.0);
 }
 
 // Remove only unresolved frequencies; keep resolved filaments sharp as the view changes.
@@ -236,9 +244,11 @@ vec4 disk(float r, float psi, float lambda, float angular, float energy, float d
 	float wisps = filteredDensity(flow * 2.5 + vec2(r * 24.0 + clouds * 3.0, r * 2.0));
 	float fine = filteredDensity(flow * 14.0 + vec2(r * 70.0, r * 15.0));
 	float structure = smoothstep(0.18, 0.82, 0.35 * clouds + 0.45 * wisps + 0.2 * fine);
-	float strandPhase = (r - wake.z) * 47.0 + clouds * 9.0 + sin(phase * 4.0) * 1.4;
-	float strand = pow(0.5 + 0.5 * sin(strandPhase), 14.0);
-	strand = mix(strand, 0.15, smoothstep(0.8, 2.0, fwidth(strandPhase)));
+	// Shear stretches turbulent cells into trailing filaments: ridges of noise elongated along the orbit.
+	vec2 sheared = flow * 1.6 + vec2((r - wake.z) * 38.0 + clouds * 2.5, (r - wake.z) * 6.0);
+	float ridge = 1.0 - abs(2.0 * filteredDensity(sheared) - 1.0);
+	float ridgeFine = 1.0 - abs(2.0 * filteredDensity(sheared * 2.3 + vec2(5.2, 1.3)) - 1.0);
+	float strand = ridge * ridge * ridge * (0.55 + 0.45 * ridgeFine);
 	// Small thermal eddies co-rotate with the disk; compression heats the wake's edges.
 	float ember = smoothstep(0.64, 0.9, fine) * smoothstep(0.48, 0.8, wisps);
 	float breathing = 0.5 + 0.5 * sin((uTime - delay) * 0.24 + clouds * TAU);
@@ -252,7 +262,7 @@ vec4 disk(float r, float psi, float lambda, float angular, float energy, float d
 	// A finite emitting inner boundary feeds the plunge, instead of a black gap at the ISCO.
 	float feed = 1.0 - smoothstep(3.0, 3.8, r);
 	vec4 injection = inflowMaterial(phase, uTime - delay + EPOCH);
-	float innerTemperature = 2050.0 * (0.6 + 0.55 * injection.x + 0.1 * injection.z + injection.w * 0.2);
+	float innerTemperature = ${FEED_TEMPERATURE.toFixed(1)} * (0.6 + 0.55 * injection.x + 0.1 * injection.z + injection.w * 0.2);
 	float temperature = mix(T_PEAK * pow(flux, 0.25), innerTemperature, feed);
 	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.58 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
 	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
@@ -447,8 +457,6 @@ uniform sampler2D uGlow2;
 uniform sampler2D uGlow3;
 uniform sampler2D uGlow4;
 uniform sampler2D uExposure;
-uniform vec4 uFall; // tension near the horizon, crossing pulse, depth inside, scene time
-uniform vec2 uAspect;
 in vec2 vUv;
 out vec4 outColor;
 
@@ -460,51 +468,14 @@ vec3 encode(vec3 linear) {
 	return mix(linear * 12.92, 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linear));
 }
 
-// Presentation only: the falling eye's view smears toward the centre and splits by colour.
-vec3 streaked(vec2 uv, float amount) {
-	vec2 toCentre = uv - 0.5;
-	float pulse = uFall.y;
-	float split = amount * 0.006 + pulse * 0.007;
-	vec3 sum = vec3(0.0);
-	float weight = 0.0;
-	for (int i = 0; i < 10; i++) {
-		float k = float(i) / 9.0;
-		float scale = 1.0 - amount * 0.07 * k - pulse * 0.12 * k * k;
-		float w = 1.0 - 0.7 * k;
-		sum.r += texture(uScene, 0.5 + toCentre * scale * (1.0 + split)).r * w;
-		sum.g += texture(uScene, 0.5 + toCentre * scale).g * w;
-		sum.b += texture(uScene, 0.5 + toCentre * scale * (1.0 - split)).b * w;
-		weight += w;
-	}
-	return sum / weight;
-}
-
 void main() {
 	vec4 scene = texture(uScene, vUv);
-	float tension = uFall.x;
-	float pulse = uFall.y;
-	float inside = uFall.z;
-	float smear = tension + pulse;
-	vec3 base = smear > 0.002 ? streaked(vUv, smear) : scene.rgb;
-	vec3 glow = texture(uGlow0, vUv).rgb * 0.5 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.13 + texture(uGlow3, vUv).rgb * 0.08 + texture(uGlow4, vUv).rgb * 0.04;
-	vec3 light = mix(base, glow, 0.045 + 0.05 * pulse) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
+	vec3 glow = texture(uGlow0, vUv).rgb * 0.6 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.1 + texture(uGlow3, vUv).rgb * 0.04 + texture(uGlow4, vUv).rgb * 0.01;
+	vec3 light = mix(scene.rgb, glow, 0.012) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
 	// Luminance tone mapping preserves the thermal colour in bright filaments.
 	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
 	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
 	mapped /= max(1.0, max(mapped.r, max(mapped.g, mapped.b)));
-	// A warmer, slightly richer grade outside; a colder one past the horizon.
-	float grey = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
-	mapped = max(mix(vec3(grey), mapped, 1.45 + 0.2 * inside), 0.0);
-	mapped *= mix(vec3(1.08, 0.98, 0.86), vec3(0.82, 0.9, 1.22), inside);
-	vec2 p = (vUv - 0.5) * uAspect;
-	float edge = length(p);
-	float vignette = 1.0 - (0.32 + 0.45 * inside + 0.5 * tension) * smoothstep(0.35 - 0.12 * inside, 1.05, edge);
-	mapped *= vignette;
-	// The crossing: a blue-white pulse of compressed outside light, then darkness.
-	float ring = exp(-pow((edge - pulse * 0.9) * 7.0, 2.0)) * pulse;
-	float flash = pulse * pulse * (0.1 + 0.9 * smoothstep(0.12, 0.8, edge));
-	mapped += vec3(0.62, 0.78, 1.0) * (flash * 0.55 + ring * 0.4);
-	mapped = min(mapped, vec3(1.0));
 	vec3 colour = encode(mapped);
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);
@@ -656,8 +627,6 @@ export function createHoleRenderer(
       "uGlow3",
       "uGlow4",
       "uExposure",
-      "uFall",
-      "uAspect",
     ]);
     particleProgram = compile(gl, PARTICLE_FRAGMENT, [], PARTICLE_VERTEX);
     skyProgram = compile(
@@ -1116,16 +1085,6 @@ export function createHoleRenderer(
       gl.uniform1i(finish("uGlow4"), 5);
       texture(6, exposure.texture);
       gl.uniform1i(finish("uExposure"), 6);
-      const { fall } = frame;
-      gl.uniform4f(
-        finish("uFall"),
-        fall?.tension ?? 0,
-        fall?.crossing ?? 0,
-        fall?.inside ?? 0,
-        frame.time
-      );
-      const aspect = Math.max(width, height);
-      gl.uniform2f(finish("uAspect"), width / aspect, height / aspect);
       pass(null);
       gpu.end();
     },

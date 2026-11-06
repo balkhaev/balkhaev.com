@@ -788,75 +788,6 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
 .scene-control:not(#physics-toggle) span {
   display: none;
 }
-.horizon-cross {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  visibility: hidden;
-  place-content: center;
-  padding: 0 var(--gutter);
-  text-align: center;
-  pointer-events: none;
-  opacity: 0;
-}
-.horizon-cross-title {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: clamp(14px, 2.2vw, 22px);
-  color: #e8f0ff;
-  text-transform: uppercase;
-  letter-spacing: 0.42em;
-  text-shadow: 0 0 24px #8fb4ff99;
-}
-.horizon-cross-note {
-  margin: 14px 0 0;
-  font-size: 13px;
-  color: #b9c6dd;
-  letter-spacing: 0.02em;
-}
-.scene.crossing .horizon-cross {
-  visibility: visible;
-  animation: horizon-caption 5s ease forwards;
-}
-.scene.crossing #hole {
-  animation: horizon-shake 1.1s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-@keyframes horizon-caption {
-  0%,
-  8% {
-    opacity: 0;
-    letter-spacing: 0.9em;
-  }
-  22% {
-    opacity: 1;
-  }
-  70% {
-    opacity: 1;
-    letter-spacing: 0.42em;
-  }
-  100% {
-    opacity: 0;
-    letter-spacing: 0.36em;
-  }
-}
-@keyframes horizon-shake {
-  0% {
-    transform: scale(1);
-  }
-  10% {
-    transform: scale(1.06) translate(0.6%, -0.4%);
-  }
-  22% {
-    transform: scale(1.03) translate(-0.5%, 0.3%);
-  }
-  38% {
-    transform: scale(1.015) translate(0.25%, 0.2%);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
 .journey-track {
   position: absolute;
   inset: auto var(--gutter) max(14px, env(safe-area-inset-bottom));
@@ -1229,7 +1160,6 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
 .scene[data-state="compact"] #observer,
 .scene[data-state="compact"] .scene-bar,
 .scene[data-state="compact"] .flight-info,
-.scene[data-state="compact"] .physics-panel,
-.scene[data-state="compact"] .horizon-cross {
+.scene[data-state="compact"] .physics-panel {
   display: none !important;
 }
