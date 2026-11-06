@@ -329,6 +329,14 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       frame = requestAnimationFrame(tick);
     }
   };
+  // Local review only: freeze the crossing pulse at a chosen age in seconds.
+  const previewCrossing = (params: URLSearchParams) => {
+    const age = Number(params.get("preview-cross"));
+    if (params.has("preview-cross") && Number.isFinite(age)) {
+      crossAt = performance.now() - age * 1000;
+      draw();
+    }
+  };
   const mount = () => {
     renderer = createHoleRenderer(surface, view);
     if (!renderer) {
@@ -345,11 +353,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       const age = Number.isFinite(requestedAge)
         ? Math.max(0, Math.min(30, requestedAge))
         : 3;
-      const crossAge = Number(params.get("preview-cross"));
-      if (params.has("preview-cross") && Number.isFinite(crossAge)) {
-        crossAt = performance.now() - crossAge * 1000;
-        draw();
-      }
+      previewCrossing(params);
       if (effect === "impact") {
         renderer.disturb(0.69, 0.57, time - age, 1.4, true);
       } else if (effect === "stream") {
