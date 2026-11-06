@@ -414,6 +414,9 @@
       color: var(--signal);
     }
     .lb {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
       position: fixed;
       inset: 0;
       z-index: 100;
@@ -577,15 +580,14 @@
           <button aria-label="Уменьшить" data-act="out" type="button">−</button>
           <span class="lb-zoom" id="lb-zoom">100%</span>
           <button aria-label="Увеличить" data-act="in" type="button">+</button>
-          <button data-act="fit" type="button">Вписать</button>
           <button aria-label="Закрыть" data-act="close" type="button">✕</button>
         </div>
       </div>
       <div class="lb-stage" id="lb-stage">
         <div class="lb-canvas" id="lb-canvas"></div>
         <span class="lb-help"
-          >Колесо или щипок: масштаб · тянуть: сдвиг · двойной клик: вписать ·
-          Esc: закрыть</span
+          >Колесо или щипок: масштаб · тянуть: сдвиг · двойной клик: исходный
+          вид · Esc: закрыть</span
         >
       </div>
     </div>
@@ -799,10 +801,10 @@
           zoomAt(1.25, ...centre());
         } else if (act === "out") {
           zoomAt(0.8, ...centre());
-        } else if (act === "fit") {
-          fit();
         }
       });
+      lb.el.addEventListener("selectstart", (e) => e.preventDefault());
+      lb.el.addEventListener("dragstart", (e) => e.preventDefault());
       lb.stage.addEventListener(
         "wheel",
         (e) => {
