@@ -308,6 +308,107 @@
       stroke: var(--signal);
       stroke-width: 2.5px;
     }
+    .ent-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: center;
+      margin: 0 0 1.4em;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .prose h3.ent-group {
+      margin: 1.8em 0 0.6em;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .ents {
+      border-top: 1px solid var(--ink);
+    }
+    .ent {
+      scroll-margin-top: 72px;
+      border-bottom: 1px solid var(--hair);
+    }
+    .ent > summary {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      align-items: baseline;
+      padding: 12px 28px 12px 0;
+      cursor: pointer;
+      list-style: none;
+    }
+    .ent > summary::-webkit-details-marker {
+      display: none;
+    }
+    .ent > summary::after {
+      position: absolute;
+      top: 12px;
+      right: 4px;
+      font-family: var(--mono);
+      color: var(--muted);
+      content: "+";
+    }
+    .ent[open] > summary::after {
+      content: "−";
+    }
+    .ent-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .ent > summary:hover .ent-name {
+      color: var(--signal);
+    }
+    .ent-owner {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .ent-pd {
+      padding: 1px 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--signal);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: 1px solid var(--signal);
+    }
+    .ent-body {
+      padding: 0 0 18px;
+    }
+    .ent-body > p:first-child {
+      margin-top: 0;
+    }
+    .ent-meta {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 6px 16px;
+      margin: 0.8em 0 1em;
+      font-size: 15px;
+    }
+    .ent-meta dt {
+      padding-top: 3px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .ent-meta dd {
+      margin: 0;
+    }
+    .prose .ent-note {
+      padding-left: 12px;
+      font-size: 15px;
+      color: var(--muted);
+      border-left: 2px solid var(--signal);
+    }
     .cards {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -494,6 +595,88 @@
       letter-spacing: 0.06em;
       pointer-events: none;
     }
+    .ent-map {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0 24px;
+      margin: 1.6em 0 0;
+    }
+    .ent-col-h {
+      padding-bottom: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-bottom: 1px solid var(--ink);
+    }
+    .prose .ent-tile {
+      display: grid;
+      gap: 2px;
+      padding: 10px 0 12px;
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--hair);
+    }
+    .prose .ent-tile b {
+      font-size: 17px;
+    }
+    .prose .ent-tile span {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .prose .ent-tile code {
+      justify-self: start;
+      font-size: 11px;
+    }
+    .prose .ent-tile:hover b {
+      color: var(--signal);
+    }
+    .chains {
+      padding: 16px 18px 6px;
+      margin: 1.6em 0;
+      background: var(--paper-2);
+    }
+    .chains-h {
+      margin-bottom: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .prose .chain {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 8px;
+      align-items: baseline;
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+    .prose .chain-k {
+      flex: 0 0 130px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .prose .chain a {
+      font-weight: 600;
+    }
+    .prose .chain i {
+      font-size: 13px;
+      font-style: normal;
+      color: var(--muted);
+    }
+    .prose .chain i::before {
+      color: var(--signal);
+      content: "→ ";
+    }
+    .prose .chain i::after {
+      color: var(--signal);
+      content: " →";
+    }
     @media (max-width: 900px) {
       .russ-tools {
         grid-column: span 9;
@@ -504,6 +687,13 @@
       }
     }
     @media (max-width: 600px) {
+      .ent-map {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+      .prose .chain-k {
+        flex-basis: 100%;
+      }
       .russ-tools {
         flex: 1 1 100%;
       }
@@ -714,6 +904,9 @@
           document.title = `${view.querySelector("h1").textContent} · Русс-маркет`;
         }
         if (target && target !== view) {
+          if (target instanceof HTMLDetailsElement) {
+            target.open = true;
+          }
           target.scrollIntoView();
         } else {
           window.scrollTo(0, 0);
