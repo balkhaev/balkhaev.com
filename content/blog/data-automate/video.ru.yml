@@ -1,0 +1,50 @@
+context: Данные компании · 7/7
+scenes:
+  - type: title
+    kicker: Укрощение данных · часть 7
+    title: "Данные *сами приходят* к людям"
+    subtitle: Сводки, правила, задачи и обратная синхронизация.
+
+  - type: diagram
+    label: Шаг действий
+    heading: После каждой сборки
+    nodes:
+      - { id: build, label: dbt build, col: 0, row: 0, w: 3, step: 0 }
+      - { id: dig, label: Сводка, sub: в чат, col: 4, row: 0, w: 3, step: 1 }
+      - { id: rules, label: Правила, sub: SQL, col: 8, row: 0, w: 4, step: 2 }
+      - { id: tasks, label: Задачи в CRM, sub: справка от Claude, col: 8, row: 3, w: 4, step: 3, accent: true }
+      - { id: sync, label: Поля в CRM, col: 3, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: build, to: dig }
+      - { from: dig, to: rules }
+      - { from: rules, to: tasks }
+      - { from: tasks, to: sync }
+
+  - type: statement
+    label: Правило
+    text: Клиент молчит *вдвое дольше* обычного.
+    say: Пока клиент был разбит на пять записей, такой запрос был невозможен. Поверх одной истории это обычный SQL.
+
+  - type: list
+    label: Без дублей и обид
+    heading: Два правила
+    items:
+      - "Каждое действие *сначала в журнал*"
+      - "Пишем *только в свои поля* CRM"
+
+  - type: list
+    label: Итог
+    heading: Весь цикл в семи шагах
+    numbered: true
+    items:
+      - Одна картина вместо замены систем
+      - Карта источников и владельцев
+      - Всё в одно хранилище
+      - Клиенты сведены в одного
+      - Метрики с одним определением
+      - Помощник с источником в ответе
+      - Сигналы сами приходят к людям
+
+  - type: end
+    text: Цикл закончен. Сначала *данные*, потом ИИ.
+    url: balkhaev.com/blog/ru/data-automate

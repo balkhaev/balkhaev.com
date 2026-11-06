@@ -1,0 +1,48 @@
+context: Company data · 4/7
+scenes:
+  - type: title
+    kicker: Taming data · part 4
+    title: "One story: *customers, orders, money*"
+    subtitle: The hardest and most valuable layer.
+
+  - type: list
+    label: dbt layers
+    heading: Two steps
+    numbered: true
+    items:
+      - "*staging*: clear names, types, filters"
+      - "*core*: shared customer and order tables"
+
+  - type: list
+    label: Merging customers
+    heading: By keys
+    items:
+      - "*Tax ID*: digits only"
+      - "*Email*: lowercase"
+      - "*Phone*: E.164 format"
+    say: A shared office phone and a manager's own email only look unique. Such keys are excluded.
+
+  - type: compare
+    label: Disputed pairs
+    heading: Who decides
+    columns:
+      - title: Claude
+        points:
+          - gathers the arguments
+          - answers by schema
+          - saves time
+      - title: A person
+        pick: true
+        points:
+          - confirms with one tap
+          - decision stored in a table
+          - rebuilds give the same result
+
+  - type: statement
+    label: Orders
+    text: A site order sits in the site database *and in 1C*.
+    say: Add them up and retail is counted twice. Match them by the site order number in the 1C document.
+
+  - type: end
+    text: Next we *agree on the numbers*.
+    url: balkhaev.com/blog/data-model

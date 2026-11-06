@@ -1,0 +1,55 @@
+context: Данные компании · 3/7
+scenes:
+  - type: title
+    kicker: Укрощение данных · часть 3
+    title: "Всё в *одно хранилище*"
+    subtitle: Postgres 18 и dlt без лишних платформ.
+
+  - type: list
+    label: Хранилище
+    heading: Отдельный Postgres
+    items:
+      - "*Сырые схемы*: копии как есть"
+      - "*core*: одна история"
+      - "*marts*: витрины для людей и ИИ"
+    say: Тяжёлые отчёты не должны тормозить магазин, а сбой загрузки не должен ломать рабочие системы.
+
+  - type: compare
+    label: Как грузить
+    heading: Изменения или окно
+    columns:
+      - title: CRM и сайт
+        pick: true
+        points:
+          - есть дата изменения
+          - каждый час только новое
+          - обновление по ключу
+      - title: 1С
+        points:
+          - даты изменения нет
+          - каждую ночь окно 60 дней
+          - раз в месяц целиком
+
+  - type: statement
+    label: Ловушка
+    text: dlt по умолчанию *выбрасывает кириллицу* из имён.
+    say: Поэтому загрузку 1С запускаем с SCHEMA__NAMING равным direct. Имена останутся как в 1С.
+
+  - type: diagram
+    label: Расписание
+    heading: Один контейнер с cron
+    nodes:
+      - { id: cron, label: cron, col: 0, row: 0, w: 3, step: 0 }
+      - { id: dlt, label: dlt, sub: загрузка, col: 4, row: 0, w: 3, step: 1 }
+      - { id: raw, label: Сырые схемы, col: 8, row: 0, w: 4, step: 2 }
+      - { id: dbt, label: dbt build, col: 8, row: 3, w: 4, step: 3 }
+      - { id: tg, label: Telegram, sub: при сбое, col: 3, row: 3, w: 4, step: 4, accent: true }
+    edges:
+      - { from: cron, to: dlt }
+      - { from: dlt, to: raw }
+      - { from: raw, to: dbt }
+      - { from: dbt, to: tg }
+
+  - type: end
+    text: Дальше *сводим клиентов* в одного.
+    url: balkhaev.com/blog/ru/data-ingest
