@@ -8,6 +8,9 @@ export const PLUNGE_SAMPLES = 2048;
 export const PLUNGE_KICK = 0.045;
 export const PLUNGE_L = Math.sqrt(3);
 export const PLUNGE_E = Math.sqrt(8 / 9 + PLUNGE_KICK ** 2);
+/** Peak effective temperature of the thin disk (K) and of the gas fed inward at the ISCO. */
+export const DISK_PEAK_TEMPERATURE = 4500;
+export const FEED_TEMPERATURE = DISK_PEAK_TEMPERATURE * (2050 / 2800);
 const LOG_RANGE = Math.log(PLUNGE_OUT / PLUNGE_IN);
 
 export interface PlungingFlow {
@@ -132,13 +135,14 @@ vec4 plungeState(float r) {
 vec4 inflowMaterial(float phase, float birthTime) {
   vec2 material = vec2(cos(phase), sin(phase));
   float clouds = filteredDensity(material * 3.4 + vec2(birthTime * 0.028, 7.0));
-  float filaments = filteredDensity(material * 47.0 + vec2(birthTime * 0.7, clouds * 2.0));
-  float fine = filteredDensity(material * 180.0 + vec2(birthTime * 3.4, 0.0));
+  // Streams keep their identity while they fall: slow drift in birth time, fast variation across phase.
+  float filaments = filteredDensity(material * 30.0 + vec2(birthTime * 0.12, clouds * 1.5));
+  float fine = filteredDensity(material * 110.0 + vec2(birthTime * 0.45, 0.0));
   // Irregular injection patches shear naturally into streams, with no evenly spaced spiral arms.
   vec2 gradient = vec2(dFdx(filaments), dFdy(filaments));
   float variance = dot(gradient, gradient) / 12.0;
-  float width = 0.0016 + 2.0 * variance;
-  float stream = sqrt(0.0016 / width) * exp(-pow(filaments - 0.55, 2.0) / width);
+  float width = 0.018 + 2.0 * variance;
+  float stream = sqrt(0.018 / width) * exp(-pow(filaments - 0.55, 2.0) / width);
   stream *= 0.2 + 0.8 * clouds * clouds;
   return vec4(clouds, filaments, fine, stream);
 }
@@ -170,7 +174,7 @@ vec4 plungingDisk(float r, float psi, float lambda, float angular, float energy,
   float incidence = emitterIncidence(r, angular, lambda, shift);
   float alpha = materialOpacity(injectionDepth(structure, column), incidence);
   // Prescribed thermal emission with a restrained compression contribution; no luminous horizon.
-  float temperature = 2050.0 * pow(max(column, 0.0001), 0.12) * pow(3.0 / r, 0.08);
+  float temperature = ${FEED_TEMPERATURE.toFixed(1)} * pow(max(column, 0.0001), 0.12) * pow(3.0 / r, 0.08);
   temperature *= 0.6 + 0.55 * structure.x + 0.1 * structure.z + structure.w * 0.2;
   return vec4(frequencyInspection(blackbody(temperature * shift) * uAccretion, shift), alpha);
 }
