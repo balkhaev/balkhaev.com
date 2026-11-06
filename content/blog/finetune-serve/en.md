@@ -1,7 +1,7 @@
 ---
 title: "To production: an adapter in vLLM, shadow mode and retraining"
 description: How to ship a fine-tuned model without risk. An adapter on top of the base model or merged weights, versions and rollback, shadow mode next to the current model, gradual switching, monitoring and a retraining loop. The series checklist.
-date: 2026-10-27
+date: 2026-10-26
 updated: 2026-11-05
 series: finetune
 part: 7

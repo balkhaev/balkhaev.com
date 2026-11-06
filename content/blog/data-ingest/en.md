@@ -1,7 +1,7 @@
 ---
 title: "Ingest: copy data from every system into one warehouse"
 description: We stand up a Postgres 18 warehouse and set up regular copying from the CRM, the site database, 1C and Google Sheets with dlt. Raw schemas, incremental loads, 1C without a modified date, and the schedule.
-date: 2026-09-08
+date: 2026-09-11
 updated: 2026-11-06
 series: company-data
 part: 3

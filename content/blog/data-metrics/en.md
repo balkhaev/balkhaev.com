@@ -1,7 +1,7 @@
 ---
 title: "Numbers everyone agrees on: metrics, glossary and checks"
 description: Why the sales director and the CFO have different revenue and how to stop it. Agree on metrics once, write a glossary that both people and AI read, and set up checks that keep broken data out of reports.
-date: 2026-10-06
+date: 2026-10-05
 updated: 2026-11-06
 series: company-data
 part: 5

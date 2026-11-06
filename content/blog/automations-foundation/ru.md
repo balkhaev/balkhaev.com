@@ -1,7 +1,7 @@
 ---
 title: "Фундамент: сервер, база и деплой по пушу"
 description: Арендуем VPS, настраиваем его, пишем первый сервис на Bun с Postgres и миграциями, упаковываем в Docker Compose с Caddy и настраиваем деплой через GitHub Actions.
-date: 2025-06-24
+date: 2025-06-18
 updated: 2026-11-04
 series: automations
 part: 2

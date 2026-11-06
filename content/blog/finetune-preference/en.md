@@ -1,7 +1,7 @@
 ---
 title: "Preferences: DPO from human edits and GRPO with a checkable reward"
 description: How to keep training a model after SFT not on correct answers but on comparing good with bad. DPO on staff corrections, GRPO with a reward computed by code, and how to stop the model from gaming the reward.
-date: 2026-09-29
+date: 2026-09-30
 updated: 2026-11-05
 series: finetune
 part: 5

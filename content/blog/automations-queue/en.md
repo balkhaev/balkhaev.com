@@ -1,7 +1,7 @@
 ---
 title: "The core: events, a queue and retries"
 description: Verify webhook signatures, drop duplicate events, write a job queue on Postgres, a worker with retries and a schedule. The core every automation in the series runs on.
-date: 2025-07-08
+date: 2025-07-06
 updated: 2026-11-04
 series: automations
 part: 3

@@ -1,7 +1,7 @@
 ---
 title: "Data: where to get examples and how to clean them"
 description: Where to get examples for fine-tuning, how many you need, what format to store them in, how to clean them and how to split off a test set so the evaluation doesn't lie.
-date: 2026-08-18
+date: 2026-08-20
 updated: 2026-11-05
 series: finetune
 part: 2

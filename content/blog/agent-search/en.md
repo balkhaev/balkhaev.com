@@ -1,7 +1,7 @@
 ---
 title: "Company knowledge: searching documents"
 description: Index the company wiki, write a full-text search MCP server, and teach the agent to search documents the way a person does.
-date: 2026-01-13
+date: 2026-01-19
 updated: 2026-11-04
 series: company-agent
 part: 5

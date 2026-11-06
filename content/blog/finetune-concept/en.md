@@ -1,7 +1,7 @@
 ---
 title: "Concept: when to fine-tune and when a prompt or RAG is enough"
 description: What fine-tuning changes in a model and what it doesn't. The ladder from prompt to your own model, the kinds of fine-tuning in plain words, what it costs and what we build in this series.
-date: 2026-08-04
+date: 2026-08-03
 updated: 2026-11-05
 series: finetune
 part: 1
