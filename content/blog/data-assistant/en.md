@@ -1,7 +1,7 @@
 ---
 title: "AI assistant: ask the data questions in plain language"
 description: We stand up an MCP server over the marts and the metric glossary and connect Claude Opus 5.5. Tools for metrics with a fallback SQL, a read-only role, answer rules with a source and a question set for testing.
-date: 2026-10-20
+date: 2026-10-22
 updated: 2026-11-06
 series: company-data
 part: 6

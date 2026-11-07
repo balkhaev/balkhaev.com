@@ -1,7 +1,7 @@
 ---
 title: "Money: the price of a million tokens, idle time and serverless"
 description: How to calculate the real cost of your own model including idle time, when to keep the GPU on, when to shut it down when idle and when to move to serverless. The series' final checklist.
-date: 2026-07-21
+date: 2026-07-26
 updated: 2026-11-04
 series: inference
 part: 7

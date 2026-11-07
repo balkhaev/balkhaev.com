@@ -1,7 +1,7 @@
 ---
 title: "Distillation: a small model learns from a big one"
 description: When you have few labels, a big teacher model labels the unlabelled data and a small model learns from its answers. Choosing a teacher and licences, filtering the teacher's mistakes, what it costs and where the limits are.
-date: 2026-10-13
+date: 2026-10-14
 updated: 2026-11-05
 series: finetune
 part: 6

@@ -1,7 +1,7 @@
 ---
 title: "One story: reconcile customers, orders and money"
 description: We build the one-story layer in dbt. Clean the raw data, merge a customer from 1C, the CRM, the site and the help desk into one record, remove double-counted orders and tie payments. Where a language model helps merge customers and where a person decides.
-date: 2026-09-22
+date: 2026-09-28
 updated: 2026-11-06
 series: company-data
 part: 4

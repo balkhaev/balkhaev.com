@@ -1,7 +1,7 @@
 ---
 title: "First run: LoRA on one rented GPU"
 description: We pick a base model and a GPU, run LoRA training with Unsloth and TRL, set the few parameters that actually matter and learn to read the loss curve.
-date: 2026-09-01
+date: 2026-09-02
 updated: 2026-11-05
 series: finetune
 part: 3

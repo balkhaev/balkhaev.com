@@ -1,7 +1,7 @@
 ---
 title: "Evaluation: how to tell the model got better"
 description: An honest comparison of the fine-tuned model with the base model and a commercial one on a held-out test. Per-field metrics, the cost of errors, reading the misses, odd inputs and a rule for when the model is ready for production.
-date: 2026-09-15
+date: 2026-09-17
 updated: 2026-11-05
 series: finetune
 part: 4

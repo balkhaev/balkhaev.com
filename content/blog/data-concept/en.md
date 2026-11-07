@@ -1,7 +1,7 @@
 ---
 title: "Concept: why data sprawls and what one picture means"
 description: What data chaos looks like in an ordinary company, why another system doesn't cure it, and the layers of one picture that an AI assistant and automations can run on.
-date: 2026-08-11
+date: 2026-08-12
 updated: 2026-11-06
 series: company-data
 part: 1

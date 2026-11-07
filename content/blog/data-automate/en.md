@@ -1,7 +1,7 @@
 ---
 title: "Automation: data comes to people and systems by itself"
 description: The last part of the series. A daily digest, rules on top of the one story, CRM tasks with a brief prepared by Claude, syncing fields back into working systems, and how to keep the whole thing alive.
-date: 2026-11-03
+date: 2026-11-02
 updated: 2026-11-06
 series: company-data
 part: 7

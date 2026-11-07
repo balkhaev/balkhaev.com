@@ -1,7 +1,7 @@
 ---
 title: "Inventory: a map of sources, owners and questions"
 description: How to learn in a week where a company's data lives, who is responsible for it and which parts the first questions need. A source map, entities, read-only access and personal data.
-date: 2026-08-25
+date: 2026-08-23
 updated: 2026-11-06
 series: company-data
 part: 2
