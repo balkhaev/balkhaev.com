@@ -14,11 +14,8 @@ import type { Scene, Storyboard } from "./storyboard";
  */
 export const VOICE_VERSION = "qwen3-tts-v2";
 
-/**
- * Posts whose videos are voiced. "all" once the pilot is approved; until then
- * the other videos stay silent and are not re-rendered.
- */
-export const VOICED: string[] | "all" = ["agent-concept"];
+/** Posts whose videos are voiced: "all", or a list of slugs. */
+export const VOICED: string[] | "all" = "all";
 
 export function isVoiced(slug: string): boolean {
   return VOICED === "all" || VOICED.includes(slug);
