@@ -317,6 +317,24 @@ vec3 distantGalaxy(vec3 dir, vec3 dx, vec3 dy, float shift) {
     + shiftedSpectrum(9000.0, shift) * young * 0.00022;
 }
 
+const int VOLUME_SAMPLES = 9;
+const float DISK_SPREAD = 2.6;
+/** Vertical scale height: a thin inner disk that flares outward (h/r about 0.05). */
+float diskHeight(float r) {
+	// It thins to a sheet toward the ISCO, where gas joins the plunge.
+	return 0.012 + (0.045 * r + 0.05) * smoothstep(DISK_IN, DISK_IN + 1.4, r);
+}
+float gaussianCdf(float x) {
+	// Logistic approximation of the normal CDF, accurate to ~1e-2.
+	return 1.0 / (1.0 + exp(-1.702 * x));
+}
+/** Fraction of the column between two heights, for a Gaussian core plus a faint wide halo. */
+float verticalShare(float a, float b, float h) {
+	float core = abs(gaussianCdf(b / h) - gaussianCdf(a / h));
+	float halo = abs(gaussianCdf(b / (2.6 * h)) - gaussianCdf(a / (2.6 * h)));
+	return 0.82 * core + 0.18 * halo;
+}
+
 void main() {
 	vec2 offset = (gl_FragCoord.xy - uCenter) * uSensor;
 	float rho = length(offset);
@@ -371,11 +389,58 @@ void main() {
         vec3 photonCovector = radialCovector * radial - angular * u * tangent;
 				emission = photosphere(hit, uTime - delay + EPOCH, photonCovector, energy);
 			} else {
-				if (r > DISK_OUT) continue;
-				float psi = atan(hit.z, hit.x);
+				if (r > DISK_OUT + 1.0) continue;
 				float lambda = -angular * normal.y;
-				if (r >= DISK_IN) emission = disk(r, psi, lambda, angular, energy, delay);
-				else emission = plungingDisk(r, psi, lambda, angular, energy, pathSlope(row, phi, phiEnd, angular, energy), delay);
+				if (r < DISK_IN) {
+					// Plunging gas thins as it accelerates inward: it stays a sheet.
+					float psi = atan(hit.z, hit.x);
+					vec4 stream = plungingDisk(r, psi, lambda, angular, energy, pathSlope(row, phi, phiEnd, angular, energy), delay);
+					light += through * stream.rgb * stream.a;
+					through *= 1.0 - stream.a;
+					continue;
+				}
+				// A thick disk: integrate emission and absorption along the geodesic through a
+				// Gaussian vertical profile around the midplane crossing, instead of one thin sheet.
+				float slope = abs(r * (-sin(phi) * e1.y + cos(phi) * e2.y));
+				float height = diskHeight(r);
+				float span = min(DISK_SPREAD * height / max(slope, 1e-4), 0.45);
+				float start = max(phi - span, 0.0);
+				float stop = min(phi + span, phiEnd);
+				int samples = diskCount <= 1 ? VOLUME_SAMPLES : 3;
+				float stride = (stop - start) / float(samples);
+				for (int i = 0; i < VOLUME_SAMPLES; i++) {
+					if (i >= samples || through < 0.01) break;
+					float a = start + (float(i) + 0.5) * stride;
+					float ua = inverseRadius(row, a);
+					if (ua <= 0.0 || ua > 1.0 / PLUNGE_MIN) continue;
+					float ra = 1.0 / ua;
+					if (ra > DISK_OUT || ra < PLUNGE_MIN) continue;
+					vec3 at = ra * (cos(a) * e1 + sin(a) * e2);
+					float h = diskHeight(ra);
+					// Mass per unit height across this stride of the ray, as a fraction of the column.
+					float y0 = (start + float(i) * stride);
+					float lowY = (1.0 / max(inverseRadius(row, y0), 1e-4)) * dot(cos(y0) * e1 + sin(y0) * e2, vec3(0.0, 1.0, 0.0));
+					float highY = (1.0 / max(inverseRadius(row, y0 + stride), 1e-4)) * dot(cos(y0 + stride) * e1 + sin(y0 + stride) * e2, vec3(0.0, 1.0, 0.0));
+					float share = verticalShare(lowY, highY, h);
+					if (share < 1e-4) continue;
+					float psi = atan(at.z, at.x);
+					float lag = travelTime(row, a);
+					// Turbulent clumps co-rotate with the gas, so the slab has depth, not a flat surface.
+					float spin = psi + uSpin * sqrt(0.5 / (ra * ra * ra)) * (uTime - lag + EPOCH);
+					vec2 orbit = ra * vec2(cos(spin), sin(spin));
+					float puff = filteredDensity(orbit * 1.4 + vec2(at.y * 4.0, -at.y * 2.5));
+					share *= (0.35 + 1.3 * puff * puff) / 0.74;
+					vec4 sheet = ra >= DISK_IN
+						? disk(ra, psi, lambda, angular, energy, lag)
+						: plungingDisk(ra, psi, lambda, angular, energy, pathSlope(row, a, phiEnd, angular, energy), lag);
+					// Hotter, denser midplane; tenuous, cooler gas higher up.
+					float lift = abs(at.y) / h;
+					float column = -log(max(1.0 - sheet.a, 0.002));
+					float absorbed = 1.0 - exp(-column * share);
+					light += through * sheet.rgb * (0.85 + 0.3 * exp(-lift * lift)) * absorbed;
+					through *= 1.0 - absorbed;
+				}
+				continue;
 			}
 			light += through * emission.rgb * emission.a;
 			through *= 1.0 - emission.a;
