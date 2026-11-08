@@ -74,6 +74,63 @@ function travelAction(
   return flight.active ? "Продолжить" : "Начать падение";
 }
 
+const SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software|basic render/i;
+
+/**
+ * True on a CPU rasteriser (no GPU, or a blocked driver), where compiling the
+ * shader and every frame stall the page for seconds. Probed on a throwaway canvas.
+ */
+function softwareRenderer() {
+  const gl = document.createElement("canvas").getContext("webgl2");
+  if (!gl) {
+    return false;
+  }
+  const info = gl.getExtension("WEBGL_debug_renderer_info");
+  const software = Boolean(
+    info && SOFTWARE_GL.test(gl.getParameter(info.UNMASKED_RENDERER_WEBGL))
+  );
+  gl.getExtension("WEBGL_lose_context")?.loseContext();
+  return software;
+}
+
+/** Runs once the page has loaded and the main thread is idle. */
+function afterLoad(run: () => void) {
+  const idle = () => {
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      setTimeout(run, 200);
+    }
+  };
+  if (document.readyState === "complete") {
+    idle();
+  } else {
+    window.addEventListener("load", idle, { once: true });
+  }
+}
+
+/** Deterministic material-interaction frames for local visual review only. */
+function previewEffect(renderer: HoleRenderer, time: number) {
+  const params = new URLSearchParams(location.search);
+  const effect = params.get("preview-effect");
+  const requestedAge = Number(params.get("preview-age") ?? 3);
+  const age = Number.isFinite(requestedAge)
+    ? Math.max(0, Math.min(30, requestedAge))
+    : 3;
+  if (effect === "impact") {
+    renderer.disturb(0.69, 0.57, time - age, 1.4, true);
+  } else if (effect === "stream") {
+    for (let i = 0; i < 12; i += 1) {
+      renderer.disturb(
+        0.58 + i * 0.014,
+        0.57,
+        time - age - (11 - i) * 0.18,
+        0.8
+      );
+    }
+  }
+}
+
 function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const still = matchMedia("(prefers-reduced-motion: reduce)");
   const preview = scenePreview(location.hostname, location.search);
@@ -122,6 +179,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     fullscreenToggle.hidden = !document.fullscreenEnabled;
   }
   let renderer: HoleRenderer | null = null;
+  let mounting = false;
+  let attempted = false;
+  let software = false;
   // The scene starts as a small preview on the page and opens to full screen.
   let expanded = false;
   // Lens magnification: the dot on the page looks closer than the full scene.
@@ -325,42 +385,40 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     audio.setAudible(
       !document.hidden && Boolean(renderer) && expanded && !mergerOn
     );
+    if (!(renderer || attempted) && expanded) {
+      // Opened before the deferred start: build the scene now.
+      mount();
+    }
     if (document.hidden || !renderer || !(expanded || visible)) {
       return;
     }
     draw();
-    if (!(still.matches || previewStill)) {
+    // A software rasteriser animates only the open scene: the dot stays a still.
+    if (!(still.matches || previewStill || (software && !expanded))) {
       frame = requestAnimationFrame(tick);
     }
   };
-  const mount = () => {
-    renderer = createHoleRenderer(surface, view);
+  const mount = async () => {
+    if (mounting) {
+      return;
+    }
+    mounting = true;
+    attempted = true;
+    const made = await createHoleRenderer(surface, view);
+    mounting = false;
+    if (renderer) {
+      made?.dispose();
+      return;
+    }
+    renderer = made;
     if (!renderer) {
       audio.setAudible(false);
       return;
     }
     renderer.quality(quality.level);
     fit();
-    // Deterministic material-interaction frames for local visual review only.
     if (previewStill) {
-      const params = new URLSearchParams(location.search);
-      const effect = params.get("preview-effect");
-      const requestedAge = Number(params.get("preview-age") ?? 3);
-      const age = Number.isFinite(requestedAge)
-        ? Math.max(0, Math.min(30, requestedAge))
-        : 3;
-      if (effect === "impact") {
-        renderer.disturb(0.69, 0.57, time - age, 1.4, true);
-      } else if (effect === "stream") {
-        for (let i = 0; i < 12; i += 1) {
-          renderer.disturb(
-            0.58 + i * 0.014,
-            0.57,
-            time - age - (11 - i) * 0.18,
-            0.8
-          );
-        }
-      }
+      previewEffect(renderer, time);
     }
     resume();
   };
@@ -852,7 +910,18 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   expanded =
     location.hash === SCENE_HASH || preview.phase !== null || previewStill;
   applyScene(expanded);
-  mount();
+  if (expanded) {
+    mount();
+  } else {
+    // The dot is decoration: let the page paint and settle before the GPU work.
+    // A software rasteriser keeps the drawn fallback until the scene is opened.
+    afterLoad(() => {
+      software = softwareRenderer();
+      if (!(software || attempted)) {
+        mount();
+      }
+    });
+  }
   // Local visual review of the merger at a fixed time: ?preview-merger=<M>.
   const mergerPreview = previewStill
     ? new URLSearchParams(location.search).get("preview-merger")

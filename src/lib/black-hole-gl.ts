@@ -562,12 +562,18 @@ interface Program {
   uniforms: Map<string, WebGLUniformLocation | null>;
 }
 
+interface PendingProgram extends Program {
+  names: string[];
+  shaders: WebGLShader[];
+}
+
+/** Starts compiling and linking; `linked` checks the result once the driver is done. */
 function compile(
   gl: WebGL2RenderingContext,
   fragment: string,
   names: string[],
   vertex = VERTEX
-): Program {
+): PendingProgram {
   const shader = (type: number, source: string) => {
     const made = gl.createShader(type);
     if (!made) {
@@ -575,28 +581,72 @@ function compile(
     }
     gl.shaderSource(made, source);
     gl.compileShader(made);
-    if (!gl.getShaderParameter(made, gl.COMPILE_STATUS)) {
-      throw new Error(`WebGL: ${gl.getShaderInfoLog(made) ?? "shader"}`);
-    }
     return made;
   };
   const program = gl.createProgram();
-  const vertexShader = shader(gl.VERTEX_SHADER, vertex);
-  const fragmentShader = shader(gl.FRAGMENT_SHADER, fragment);
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.linkProgram(program);
-  gl.deleteShader(vertexShader);
-  gl.deleteShader(fragmentShader);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`WebGL: ${gl.getProgramInfoLog(program) ?? "program"}`);
+  const shaders = [
+    shader(gl.VERTEX_SHADER, vertex),
+    shader(gl.FRAGMENT_SHADER, fragment),
+  ];
+  for (const made of shaders) {
+    gl.attachShader(program, made);
   }
-  return {
-    program,
-    uniforms: new Map(
-      names.map((name) => [name, gl.getUniformLocation(program, name)])
-    ),
-  };
+  gl.linkProgram(program);
+  return { names, program, shaders, uniforms: new Map() };
+}
+
+const COMPLETION_STATUS_KHR = 0x91_b1;
+
+/** Resolves when the driver has finished every program or lost the context. */
+function completed(gl: WebGL2RenderingContext, programs: PendingProgram[]) {
+  return new Promise<void>((resolve) => {
+    const poll = () => {
+      if (
+        gl.isContextLost() ||
+        programs.every((item) =>
+          gl.getProgramParameter(item.program, COMPLETION_STATUS_KHR)
+        )
+      ) {
+        resolve();
+      } else {
+        setTimeout(poll, 16);
+      }
+    };
+    poll();
+  });
+}
+
+/**
+ * Waits for the driver to finish every program without blocking the page
+ * (KHR_parallel_shader_compile), then reports failures and reads uniforms.
+ * Without the extension the first status query simply waits, as before.
+ */
+async function linked(
+  gl: WebGL2RenderingContext,
+  programs: PendingProgram[]
+): Promise<void> {
+  if (gl.getExtension("KHR_parallel_shader_compile")) {
+    await completed(gl, programs);
+  }
+  if (gl.isContextLost()) {
+    throw new Error("WebGL: context lost");
+  }
+  for (const item of programs) {
+    if (!gl.getProgramParameter(item.program, gl.LINK_STATUS)) {
+      const logs = item.shaders
+        .map((made) => gl.getShaderInfoLog(made))
+        .filter(Boolean);
+      throw new Error(
+        `WebGL: ${[...logs, gl.getProgramInfoLog(item.program)].join("\n")}`
+      );
+    }
+    for (const made of item.shaders) {
+      gl.deleteShader(made);
+    }
+    for (const name of item.names) {
+      item.uniforms.set(name, gl.getUniformLocation(item.program, name));
+    }
+  }
 }
 
 function dataTexture(
@@ -628,10 +678,10 @@ function dataTexture(
 }
 
 /** Makes the renderer, or null where WebGL 2 is not to be had. */
-export function createHoleRenderer(
+export async function createHoleRenderer(
   canvas: HTMLCanvasElement,
   initial: HoleView
-): HoleRenderer | null {
+): Promise<HoleRenderer | null> {
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     antialias: false,
@@ -644,15 +694,15 @@ export function createHoleRenderer(
     return null;
   }
   const floatTargets = gl.getExtension("EXT_color_buffer_float") !== null;
-  let scene: Program;
-  let downsample: Program;
-  let blur: Program;
-  let compose: Program;
-  let particleProgram: Program;
-  let skyProgram: Program;
-  let externalProgram: Program;
-  let meterProgram: Program;
-  let adaptProgram: Program;
+  let scene: PendingProgram;
+  let downsample: PendingProgram;
+  let blur: PendingProgram;
+  let compose: PendingProgram;
+  let particleProgram: PendingProgram;
+  let skyProgram: PendingProgram;
+  let externalProgram: PendingProgram;
+  let meterProgram: PendingProgram;
+  let adaptProgram: PendingProgram;
   try {
     scene = compile(gl, SCENE, [
       "uTable",
@@ -737,6 +787,17 @@ export function createHoleRenderer(
       ],
       EXTERNAL_LIGHT_VERTEX
     );
+    await linked(gl, [
+      scene,
+      downsample,
+      blur,
+      meterProgram,
+      adaptProgram,
+      compose,
+      particleProgram,
+      skyProgram,
+      externalProgram,
+    ]);
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
       console.error(error);
