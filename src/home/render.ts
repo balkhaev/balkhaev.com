@@ -19,14 +19,6 @@ const html = (text: string) =>
 /** The project's one-line summary: the text before its first colon. */
 export const summary = (text: string) => text.split(":")[0]?.trim() ?? text;
 
-/** The summary of a project described in the Russian resume. */
-function summaryOf(name: string) {
-  const project = RESUMES.ru.projectGroups
-    .flatMap((group) => group.projects)
-    .find((item) => item.name === name);
-  return project ? summary(project.text) : "";
-}
-
 const SCHEME = /^https?:\/\//;
 const TRAILING_SLASH = /\/$/;
 const YEAR = /\d{4}/g;
@@ -53,6 +45,11 @@ export function latestPosts(posts: Post[], count = LATEST) {
 /** Projects Mikhail chose for the homepage, in his order. */
 export const HOME_PROJECTS: Project[] = [
   {
+    name: "Luv Club",
+    text: "AI-компаньоны со студией: фото, видео и 3D-сцены",
+    url: "https://luv.club/",
+  },
+  {
     name: "Adorely",
     text: "Платформа AI-компаньонов: генерация фото и видео, чат и голос",
     url: "https://adorely.co/",
@@ -61,21 +58,6 @@ export const HOME_PROJECTS: Project[] = [
     name: "Sinly",
     text: "Платформа AI-компаньонов на общем мультитенантном бэкенде",
     url: "https://sinly.io/",
-  },
-  {
-    name: "Luv Club",
-    text: "AI-компаньоны со студией: фото, видео и 3D-сцены",
-    url: "https://luv.club/",
-  },
-  {
-    name: "ggpick.club",
-    text: summaryOf("ggpick.club"),
-    url: "https://ggpick.club/",
-  },
-  {
-    name: "Алтай — живая земля",
-    text: summaryOf("Алтай — живая земля"),
-    url: "https://алтайземля.рф/",
   },
 ];
 
