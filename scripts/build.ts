@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
-import { build, file } from "bun";
+import { build, file, Glob } from "bun";
 import {
   BLOG_LANGS,
   checkSeries,
@@ -130,4 +131,48 @@ await writeFile(
   `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((url) => `<url><loc>${ORIGIN}${url}</loc></url>`).join("")}</urlset>
 `
+);
+
+// Cache busting: every local stylesheet and script a page links carries its
+// content hash, so nginx lets browsers keep it for a year (deploy/nginx.conf).
+const LINKED_ASSET = /(?:src|href)="(\/[^"?#]+\.(?:css|js))"/g;
+const hashes = new Map<string, Promise<string | null>>();
+function assetHash(path: string) {
+  let hash = hashes.get(path);
+  if (!hash) {
+    const asset = file(`dist${path}`);
+    hash = asset
+      .arrayBuffer()
+      .then((data) =>
+        createHash("sha256")
+          .update(new Uint8Array(data))
+          .digest("hex")
+          .slice(0, 10)
+      )
+      .catch(() => null);
+    hashes.set(path, hash);
+  }
+  return hash;
+}
+async function versionAssets(path: string) {
+  const source = await readFile(path, "utf8");
+  const links = [
+    ...new Set([...source.matchAll(LINKED_ASSET)].map((match) => match[1])),
+  ].filter((link): link is string => Boolean(link));
+  const versions = await Promise.all(links.map(assetHash));
+  let content = source;
+  links.forEach((link, index) => {
+    const hash = versions[index];
+    if (hash) {
+      content = content.replaceAll(`="${link}"`, `="${link}?v=${hash}"`);
+    }
+  });
+  if (content !== source) {
+    await writeFile(path, content);
+  }
+}
+await Promise.all(
+  [...new Glob("**/*.html").scanSync("dist")].map((html) =>
+    versionAssets(`dist/${html}`)
+  )
 );
