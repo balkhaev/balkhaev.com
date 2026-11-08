@@ -1,7 +1,8 @@
 import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { file, sleep } from "bun";
-import type { Issue } from "../src/news/content";
+import { readIssues } from "../src/news/channel";
+import { FIRST_ISSUE, type Issue } from "../src/news/content";
 import { mergeIssues } from "../src/news/feed";
 import { renderNews } from "../src/news/render";
 
@@ -12,6 +13,39 @@ import { renderNews } from "../src/news/render";
  */
 const feed =
   "https://raw.githubusercontent.com/balkhaev/balkhaev.com/main/content/news/editions.json";
+
+/**
+ * The Telegram digest @bestburyat fills the days without an edition of the
+ * site's own (before the collector has an API key, or when it fails). It is
+ * read here, from the server: Telegram gives GitHub's runners no posts.
+ */
+const telegram = new URL("https://t.me/s/bestburyat");
+telegram.searchParams.set("q", "AI за два дня");
+
+async function own(): Promise<Issue[]> {
+  const response = await fetch(feed, {
+    redirect: "error",
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Editions HTTP ${response.status}`);
+  }
+  const data: unknown = await response.json();
+  return Array.isArray(data) ? (data as Issue[]) : [];
+}
+
+async function digest(): Promise<Issue[]> {
+  const response = await fetch(telegram, {
+    redirect: "error",
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) {
+    throw new Error(`Telegram HTTP ${response.status}`);
+  }
+  return (await readIssues(response)).filter(
+    (issue) => issue.date >= FIRST_ISSUE.date
+  );
+}
 
 async function replace(target: string, content: string) {
   if (
@@ -36,17 +70,21 @@ async function known(target: string): Promise<Issue[]> {
 }
 
 async function refresh(folder: string) {
-  const response = await fetch(feed, {
-    redirect: "error",
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) {
-    throw new Error(`Editions HTTP ${response.status}`);
+  const [mine, theirs] = await Promise.allSettled([own(), digest()]);
+  for (const result of [mine, theirs]) {
+    if (result.status === "rejected") {
+      console.error(
+        "News source failed",
+        result.reason instanceof Error ? result.reason.message : "read error"
+      );
+    }
   }
-  const data: unknown = await response.json();
-  const issues = Array.isArray(data) ? (data as Issue[]) : [];
+  // mergeIssues keeps the first edition per date: the site's own wins.
+  const issues = [mine, theirs].flatMap((result) =>
+    result.status === "fulfilled" ? result.value : []
+  );
   if (issues.length === 0) {
-    return;
+    throw new Error("No news source answered");
   }
   const json = join(folder, "feed.json");
   const merged = mergeIssues([...issues, ...(await known(json))]);
