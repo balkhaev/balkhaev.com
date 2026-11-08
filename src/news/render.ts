@@ -67,7 +67,7 @@ export function renderNews(updates: Issue[] = []) {
   const ordered = mergeIssues(updates);
   return `<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Новости AI · Balkhaev</title><meta name="description" content="Дайджест раз в два дня. Крупные релизы AI, открытые веса и новые возможности со ссылками на первоисточники.">
+<title>Новости AI · Balkhaev</title><meta name="description" content="Ежедневный дайджест AI: крупные релизы, открытые веса и новые возможности со ссылками на первоисточники.">
 <link rel="canonical" href="https://balkhaev.com/news/"><link rel="icon" href="/icon.svg">
 <meta property="og:title" content="Новости AI · Balkhaev"><meta property="og:url" content="https://balkhaev.com/news/">
 <meta name="theme-color" content="#efece6">
@@ -75,8 +75,7 @@ export function renderNews(updates: Issue[] = []) {
 </head><body id="top"><div class="page news">
 ${siteHeader("ru", "news")}
 <main><div class="masthead"><h1>Новости AI<span aria-hidden="true" class="stop"></span></h1></div>
-<div class="lead"><p>Крупные релизы, открытые веса и новые возможности AI. Раз в два дня — со ссылками на первоисточники.</p>
-<p class="lead-actions"><a class="pill" href="${channel}">Дайджест в Telegram <span aria-hidden="true">↗</span></a></p></div>
+<div class="lead"><p>Крупные релизы, открытые веса и новые возможности AI. Сайт собирает их сам каждое утро из блогов лабораторий, Hugging Face, релизов и профильных изданий — со ссылками на первоисточники.</p></div>
 ${ordered.map(edition).join("")}</main>
 ${siteFooter("ru", '<a href="/blog/ru/">Блог</a>')}</div></body></html>`;
 }

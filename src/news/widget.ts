@@ -1,6 +1,7 @@
 import type { Issue } from "./content";
 import {
   isTopic,
+  type Pick,
   type Picked,
   pickStories,
   TOPICS,
@@ -39,7 +40,7 @@ const LABELS: Record<
     all: "All news",
     fresh: "Nothing on this topic yet. The latest in AI",
     kicker: "News on the topic",
-    note: "The digest is in Russian",
+    note: "Some stories are in Russian",
     topic: "Topic",
   },
   ru: {
@@ -82,20 +83,28 @@ export function widgetBody(picked: Picked, topics: TopicId[], lang: TopicLang) {
   const label = LABELS[lang];
   const names = topics.map((id) => TOPICS[id].label[lang]).join(" · ");
   const head = picked.matched ? label.kicker : label.fresh;
-  const items = picked.stories
-    .filter(({ story }) => WEB.test(story.url))
-    .map(
-      ({ date, story }, index) => `<li class="news-item">
+  const shown = picked.stories.filter(({ story }) => WEB.test(story.url));
+  // English pages show a story's English version when it has one.
+  const local = (story: Pick["story"]) =>
+    lang === "en" && story.en
+      ? { ...story.en, lang: "en" }
+      : { lang: "ru", text: story.text, title: story.title };
+  const items = shown
+    .map(({ date, story }, index) => {
+      const { lang: storyLang, text, title } = local(story);
+      return `<li class="news-item" lang="${storyLang}">
 <span class="news-no">${String(index + 1).padStart(2, "0")}</span>
-<div class="news-main"><a class="news-title" href="${html(story.url)}" rel="external noopener noreferrer" target="_blank">${html(story.title)}</a>
-<p class="news-text">${html(story.text)}</p>
+<div class="news-main"><a class="news-title" href="${html(story.url)}" rel="external noopener noreferrer" target="_blank">${html(title)}</a>
+<p class="news-text">${html(text)}</p>
 <p class="news-meta"><time datetime="${date}">${shortDate(date)}</time><span>${html(story.source)} <span aria-hidden="true">↗</span></span></p></div>
-</li>`
-    )
+</li>`;
+    })
     .join("");
-  const note = label.note ? `<span lang="en">${label.note}</span>` : "";
+  const russian = shown.some(({ story }) => local(story).lang === "ru");
+  const note =
+    label.note && russian ? `<span lang="en">${label.note}</span>` : "";
   return `<p class="news-head"><span class="news-kicker"><span aria-hidden="true" class="news-dot"></span>${head}</span><span class="news-topic">${html(names)}</span></p>
-<ol class="news-list" lang="ru">${items}</ol>
+<ol class="news-list">${items}</ol>
 <p class="news-foot"><a href="/news/">${label.all} <span aria-hidden="true">→</span></a>${note}</p>`;
 }
 

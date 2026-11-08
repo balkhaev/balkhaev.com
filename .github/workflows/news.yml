@@ -1,0 +1,55 @@
+name: News
+
+# The site's daily AI news edition: scripts/collect-news.ts reads the sources,
+# a model picks and retells the main stories (RU + EN), and the edition is
+# committed to content/news/editions.json. The running site polls that file
+# on GitHub every 15 minutes, so no redeploy is needed.
+on:
+  schedule:
+    # 05:17 UTC = 08:17 Moscow; off the hour, when Actions queues are busy.
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Replace today's edition if it already exists
+        type: boolean
+        default: false
+
+concurrency:
+  group: news
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  # GitHub Models is the editor when ANTHROPIC_API_KEY is not set.
+  models: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - name: Collect today's edition
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun scripts/collect-news.ts ${{ inputs.force && '--force' || '' }}
+      - name: Commit
+        run: |
+          git diff --quiet -- content/news && { echo "Nothing new"; exit 0; }
+          git config user.name "balkhaev.com news"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/news/editions.json
+          git commit -m "news: edition $(date -u +%F)"
+          # main may have moved while the edition was collected.
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1
