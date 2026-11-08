@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import {
+  blackbodyRgb,
   createSpectrum,
   MAX_TEMPERATURE,
   MIN_TEMPERATURE,
@@ -30,16 +31,24 @@ test("the GPU spectrum table preserves colour and intensity over the useful temp
         Math.log(MAX_TEMPERATURE / MIN_TEMPERATURE)) *
       (SPECTRUM_SAMPLES - 1);
     const low = Math.floor(at);
-    for (const [channel, wavelength, white] of [
-      [0, 0.611, 0.322_05],
-      [1, 0.549, 0.361_52],
-      [2, 0.464, 0.396_27],
-    ]) {
-      const a = data[low * 4 + (channel ?? 0)] ?? 0;
-      const b = data[(low + 1) * 4 + (channel ?? 0)] ?? 0;
+    const exact = blackbodyRgb(temperature);
+    const scale = Math.max(...exact);
+    for (let channel = 0; channel < 3; channel += 1) {
+      const a = data[low * 4 + channel] ?? 0;
+      const b = data[(low + 1) * 4 + channel] ?? 0;
       const sampled = a + (b - a) * (at - low);
-      const exact = planck(wavelength ?? 0.549, temperature) / (white ?? 1);
-      expect(Math.abs(sampled / exact - 1)).toBeLessThan(0.002);
+      expect(Math.abs(sampled - (exact[channel] ?? 0)) / scale).toBeLessThan(
+        0.003
+      );
     }
   }
+});
+
+test("blackbody colours follow the eye: D65 is neutral, cool gas is orange, hot gas is blue", () => {
+  const white = blackbodyRgb(6504);
+  expect((white[0] ?? 0) / (white[2] ?? 1)).toBeCloseTo(1, 6);
+  const ember = blackbodyRgb(3000);
+  expect((ember[2] ?? 0) / (ember[0] ?? 1)).toBeLessThan(0.2);
+  const hot = blackbodyRgb(20_000);
+  expect((hot[0] ?? 0) / (hot[2] ?? 1)).toBeLessThan(0.5);
 });

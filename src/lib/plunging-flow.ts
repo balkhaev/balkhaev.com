@@ -9,7 +9,7 @@ export const PLUNGE_KICK = 0.045;
 export const PLUNGE_L = Math.sqrt(3);
 export const PLUNGE_E = Math.sqrt(8 / 9 + PLUNGE_KICK ** 2);
 /** Peak effective temperature of the thin disk (K) and of the gas fed inward at the ISCO. */
-export const DISK_PEAK_TEMPERATURE = 4500;
+export const DISK_PEAK_TEMPERATURE = 3000;
 export const FEED_TEMPERATURE = DISK_PEAK_TEMPERATURE * (2050 / 2800);
 const LOG_RANGE = Math.log(PLUNGE_OUT / PLUNGE_IN);
 
