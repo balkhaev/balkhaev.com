@@ -1,4 +1,6 @@
 export interface Story {
+  /** English title and text; the site's own editions carry them. */
+  en?: { text: string; title: string };
   source: string;
   text: string;
   title: string;
@@ -10,6 +12,7 @@ export interface Story {
   url: string;
 }
 
+import editions from "../../content/news/editions.json";
 import archive from "./archive.json";
 
 export interface Issue {
@@ -59,3 +62,9 @@ export const FIRST_ISSUE: Issue = {
  * collected from release trackers and news roundups, linked to their sources.
  */
 export const ARCHIVE = archive as Issue[];
+
+/**
+ * Editions the site collects itself (scripts/collect-news.ts, run daily by
+ * .github/workflows/news.yml), newest first.
+ */
+export const EDITIONS = editions as Issue[];

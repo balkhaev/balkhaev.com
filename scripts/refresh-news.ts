@@ -1,13 +1,17 @@
 import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { file, sleep } from "bun";
-import { readIssues } from "../src/news/channel";
-import { FIRST_ISSUE, type Issue } from "../src/news/content";
+import type { Issue } from "../src/news/content";
 import { mergeIssues } from "../src/news/feed";
 import { renderNews } from "../src/news/render";
 
-const feed = new URL("https://t.me/s/bestburyat");
-feed.searchParams.set("q", "AI за два дня");
+/**
+ * The editions the site collects (scripts/collect-news.ts, committed daily by
+ * .github/workflows/news.yml). The container picks up new ones from GitHub,
+ * so a new edition needs no redeploy.
+ */
+const feed =
+  "https://raw.githubusercontent.com/balkhaev/balkhaev.com/main/content/news/editions.json";
 
 async function replace(target: string, content: string) {
   if (
@@ -37,20 +41,17 @@ async function refresh(folder: string) {
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) {
-    throw new Error(`Telegram HTTP ${response.status}`);
+    throw new Error(`Editions HTTP ${response.status}`);
   }
-  const issues = (await readIssues(response)).filter(
-    (issue) => issue.date >= FIRST_ISSUE.date
-  );
+  const data: unknown = await response.json();
+  const issues = Array.isArray(data) ? (data as Issue[]) : [];
   if (issues.length === 0) {
     return;
   }
   const json = join(folder, "feed.json");
-  await replace(
-    json,
-    JSON.stringify(mergeIssues([...issues, ...(await known(json))]))
-  );
-  await replace(join(folder, "index.html"), renderNews(issues));
+  const merged = mergeIssues([...issues, ...(await known(json))]);
+  await replace(json, JSON.stringify(merged));
+  await replace(join(folder, "index.html"), renderNews(merged));
 }
 
 const directory = process.argv.at(2) ?? "dist/news";

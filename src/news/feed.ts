@@ -1,4 +1,4 @@
-import { ARCHIVE, FIRST_ISSUE, type Issue } from "./content";
+import { ARCHIVE, EDITIONS, FIRST_ISSUE, type Issue } from "./content";
 
 /** Editions the feed keeps: the archive year plus about a year of new ones. */
 export const FEED_SIZE = 400;
@@ -16,6 +16,9 @@ const valid = (issue: Partial<Issue> | null) =>
       typeof story.text === "string" &&
       typeof story.source === "string" &&
       typeof story.url === "string" &&
+      (story.en === undefined ||
+        (typeof story.en?.title === "string" &&
+          typeof story.en.text === "string")) &&
       (story.topics === undefined ||
         (Array.isArray(story.topics) &&
           story.topics.every((topic) => typeof topic === "string"))) &&
@@ -24,11 +27,11 @@ const valid = (issue: Partial<Issue> | null) =>
 
 /**
  * One edition per date (the first one given wins), newest first, with the
- * launch edition and the archive always there.
+ * collected editions, the launch edition and the archive always there.
  */
 export function mergeIssues(issues: Issue[]): Issue[] {
   const byDate = new Map<string, Issue>();
-  for (const issue of [...issues, FIRST_ISSUE, ...ARCHIVE]) {
+  for (const issue of [...issues, ...EDITIONS, FIRST_ISSUE, ...ARCHIVE]) {
     if (valid(issue) && !byDate.has(issue.date)) {
       byDate.set(issue.date, issue);
     }

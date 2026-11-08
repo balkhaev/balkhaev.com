@@ -114,7 +114,26 @@ test("renders an escaped widget in the post language", () => {
   expect(html).toContain('data-topics="open-models"');
   expect(html).toContain("&lt;b&gt;open&lt;/b&gt; weights");
   expect(html).toContain("News on the topic");
-  expect(html).toContain("The digest is in Russian");
+  expect(html).toContain("Some stories are in Russian");
+});
+
+test("English widgets use a story's English version when it has one", () => {
+  const html = renderWidget(["open-models"], 2, "en", undefined, [
+    {
+      date: "2026-11-08",
+      post: null,
+      stories: [
+        {
+          ...story("Открытые веса"),
+          en: { text: "Weights are out.", title: "Open weights" },
+        },
+      ],
+    },
+  ]);
+  expect(html).toContain('lang="en">');
+  expect(html).toContain("Open weights");
+  expect(html).not.toContain("Открытые веса");
+  expect(html).not.toContain("in Russian");
 });
 
 test("::news in Markdown becomes the widget and flags the post", async () => {
