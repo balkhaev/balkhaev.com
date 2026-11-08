@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  APPROACH_END,
+  gasAt,
   holesAt,
   MERGE_SEPARATION,
   MERGE_TIME,
@@ -42,10 +44,10 @@ describe("binary merger", () => {
     const dt = 1e-3;
     const omega = (orbitalPhaseAt(t + dt) - orbitalPhaseAt(t - dt)) / (2 * dt);
     expect(omega).toBeCloseTo(Math.sqrt(1 / separationAt(t) ** 3), 6);
-    // About four and a half visible orbits before the horizons meet.
+    // About twenty orbits from the companion's arrival to the merger.
     const orbits = orbitalPhaseAt(MERGE_TIME) / (2 * Math.PI);
-    expect(orbits).toBeGreaterThan(4);
-    expect(orbits).toBeLessThan(6);
+    expect(orbits).toBeGreaterThan(15);
+    expect(orbits).toBeLessThan(25);
   });
 
   test("the wave chirps, peaks at merger and rings down", () => {
@@ -96,10 +98,11 @@ describe("binary merger", () => {
   });
 
   test("stages follow the sequence", () => {
-    expect(mergerStageAt(0)).toBe("inspiral");
+    expect(mergerStageAt(0)).toBe("approach");
+    expect(mergerStageAt(APPROACH_END + 1)).toBe("inspiral");
     expect(mergerStageAt(MERGE_TIME - 1)).toBe("plunge");
     expect(mergerStageAt(MERGE_TIME + PLUNGE_TIME + 1)).toBe("ringdown");
-    expect(mergerStageAt(SEQUENCE_END)).toBe("settled");
+    expect(mergerStageAt(SEQUENCE_END)).toBe("refill");
   });
 
   test("playback slows into the merger and lasts under half a minute", () => {
@@ -107,5 +110,23 @@ describe("binary merger", () => {
     const seconds = mergerDuration();
     expect(seconds).toBeGreaterThan(15);
     expect(seconds).toBeLessThan(30);
+  });
+
+  test("the companion truncates the first disk; the remnant's disk refills", () => {
+    const start = gasAt(0);
+    // The main scene's disk: 3 to 11 r_s.
+    expect(start.miniInner).toBe(3);
+    expect(start.miniOuter).toBeCloseTo(11, 6);
+    // Roche truncation near 0.42 a once the gas has adjusted.
+    const mid = gasAt(APPROACH_END);
+    expect(mid.miniOuter).toBeCloseTo(0.42 * separationAt(APPROACH_END), 6);
+    // Gone before the plunge; the ring keeps a cavity of about 2a.
+    expect(gasAt(MERGE_TIME - 1).miniOuter).toBe(0);
+    expect(gasAt(MERGE_TIME - 1).ringInner).toBeGreaterThanOrEqual(10);
+    // Refilled: the main scene's disk around the remnant (r_s = 2 * 0.952).
+    const end = gasAt(SEQUENCE_END);
+    expect(end.ringInner).toBeCloseTo(3 * 2 * REMNANT_MASS, 6);
+    expect(end.ringOuter).toBeCloseTo(11 * 2 * REMNANT_MASS, 6);
+    expect(end.ringIsco).toBeCloseTo(end.ringInner, 6);
   });
 });

@@ -1,4 +1,5 @@
 import { MERGER_SHADER, PEAK_AMPLITUDE } from "./binary-merger";
+import { blackbodyRgb } from "./spectrum";
 
 /**
  * Renderer for the binary merger: every pixel follows a light ray backwards
@@ -13,26 +14,63 @@ import { MERGER_SHADER, PEAK_AMPLITUDE } from "./binary-merger";
  * shows the outgoing quadrupole wave r·h₊ at that point, evaluated at the
  * retarded time t − r. It is a diagnostic overlay, like a frequency map: the
  * real strain is far too small to see by eye.
+ *
+ * Gas lies in the same plane: the first hole's thin disk and a circumbinary
+ * ring, each a blackbody with the Novikov–Thorne-like temperature profile,
+ * Doppler-boosted by Keplerian motion (plus the hole's own orbital motion)
+ * and redshifted by gravity, seen through the same bent rays.
  */
 
 export interface MergerView {
   /** Azimuth around the orbital axis, in degrees. */
   azimuth: number;
-  /** Camera distance from the centre of mass, in M. */
+  /** Camera distance from the target, in M. */
   distance: number;
   /** Elevation above the orbital plane, in degrees. */
   elevation: number;
-  /** Vertical field of view, in degrees. */
+  /** Field of view across the shorter side of the screen, in degrees. */
   fov: number;
+  /** Point the camera looks at, in M. */
+  target: [number, number, number];
+}
+
+export interface MergerGas {
+  miniInner: number;
+  miniOuter: number;
+  miniTemperature: number;
+  ringDensity: number;
+  ringInner: number;
+  ringIsco: number;
+  ringOuter: number;
+  ringTemperature: number;
 }
 
 export interface MergerFrame {
+  gas: MergerGas;
   holes: [number, number, number][];
   /** Mass of each hole, in M. */
   mass: number;
   time: number;
+  /** Orbital velocity of the first hole (carries its disk). */
+  velocity: [number, number, number];
   /** 0 hides the strain map, 1 shows it. */
   waves: number;
+}
+
+const COLOR_STEPS = 24;
+const COLOR_MIN = 600;
+const COLOR_MAX = 15_000;
+
+/** Blackbody chromaticity at unit luminance, log-spaced in temperature. */
+function blackbodyTable() {
+  const table: number[] = [];
+  for (let i = 0; i < COLOR_STEPS; i += 1) {
+    const t = COLOR_MIN * (COLOR_MAX / COLOR_MIN) ** (i / (COLOR_STEPS - 1));
+    const [r = 0, g = 0, b = 0] = blackbodyRgb(t);
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b || 1;
+    table.push(r / y, g / y, b / y);
+  }
+  return new Float32Array(table);
 }
 
 const VERTEX = `#version 300 es
@@ -52,6 +90,11 @@ uniform vec3 uHoleB;
 uniform float uMass;
 uniform float uTime;
 uniform float uWaves;
+uniform vec3 uVelocityA;
+uniform vec4 uMini;
+uniform vec4 uRing;
+uniform vec2 uRingShape;
+uniform vec3 uBlackbody[${COLOR_STEPS}];
 out vec4 color;
 ${MERGER_SHADER}
 const float PEAK = ${PEAK_AMPLITUDE.toFixed(6)};
@@ -137,6 +180,92 @@ vec3 accel(vec3 x, vec3 v, float rs) {
 	return bend(x, v, uHoleA, rs) + bend(x, v, uHoleB, rs);
 }
 
+vec3 blackbody(float t) {
+	float x = clamp(log(t / ${COLOR_MIN.toFixed(1)}) / log(${(COLOR_MAX / COLOR_MIN).toFixed(4)}), 0.0, 1.0) * ${(COLOR_STEPS - 1).toFixed(1)};
+	int i = int(floor(x));
+	int j = min(i + 1, ${COLOR_STEPS - 1});
+	return mix(uBlackbody[i], uBlackbody[j], fract(x));
+}
+
+// Turbulence carried by differential rotation. Two layers restart in turn so
+// the shear never winds the pattern into noise.
+float flow(vec2 d, float omega, float seed) {
+	float r = length(d);
+	float angle = atan(d.y, d.x);
+	float cycle = 50.0;
+	float t1 = mod(uTime, cycle);
+	float t2 = mod(uTime + 0.5 * cycle, cycle);
+	float a1 = angle - omega * t1;
+	float a2 = angle - omega * t2 + 2.1;
+	float n1 = fbm(vec3(cos(a1) * r, sin(a1) * r, seed) * 0.9 + vec3(0.0, 0.0, r * 1.7));
+	float n2 = fbm(vec3(cos(a2) * r, sin(a2) * r, seed + 5.0) * 0.9 + vec3(0.0, 0.0, r * 1.7));
+	return mix(n1, n2, abs(2.0 * t1 / cycle - 1.0));
+}
+
+// Thin concentric filaments, like the sheared streams of the main disk.
+float filaments(float r, vec2 d) {
+	vec2 u = d / max(r, 1e-3);
+	float n = noise(vec3(r * 9.0, u * 1.6));
+	float m = noise(vec3(r * 23.0 + 4.0, u * 2.4));
+	return 0.45 + 0.75 * n * n + 0.4 * m;
+}
+
+// Observed colour (premultiplied) and opacity of a thin Keplerian disk.
+vec4 diskLight(vec2 d, float r, float mass, float temperature, vec3 bulk, vec3 ray, float density) {
+	vec3 velocity = sqrt(mass / r) * vec3(-d.y, 0.0, d.x) / r + bulk;
+	float beta2 = min(dot(velocity, velocity), 0.8);
+	float gamma = inversesqrt(1.0 - beta2);
+	// Light leaves the gas toward the camera, against the traced ray.
+	float doppler = 1.0 / (gamma * (1.0 + dot(velocity, ray)));
+	float gravity = sqrt(max(0.05, 1.0 - 3.0 * mass / r));
+	float g = doppler * gravity;
+	float observed = temperature * g;
+	float luminance = pow(observed / 3000.0, 4.0) * 0.75;
+	float alpha = clamp(density, 0.0, 0.96);
+	// Matches the main scene's pale, near-white gas at the same temperature.
+	vec3 tint = mix(blackbody(observed), vec3(1.0), 0.3);
+	return vec4(tint * luminance * alpha, alpha);
+}
+
+vec4 gasAt(vec3 p, vec3 ray) {
+	vec4 sum = vec4(0.0);
+	if (uMini.y > 0.0) {
+		vec2 d = (p - uHoleA).xz;
+		float r = length(d);
+		if (r > uMini.x && r < uMini.y + 0.5) {
+			float x = r / uMini.x;
+			float profile = pow(x, -0.75) * pow(max(0.0, 1.0 - inversesqrt(x)), 0.25) / 0.488;
+			float omega = sqrt(uMass / (r * r * r));
+			float turbulence = flow(d, omega, 1.0);
+			float density = smoothstep(uMini.x, uMini.x + 0.5, r)
+				* (1.0 - smoothstep(uMini.y - 1.2, uMini.y + 0.4, r))
+				* (0.15 + 1.2 * turbulence * turbulence) * filaments(r, d);
+			sum = diskLight(d, r, uMass, uMini.z * profile * (0.9 + 0.2 * turbulence), uVelocityA, ray, density * 0.95);
+		}
+	}
+	vec2 c = p.xz;
+	float rc = length(c);
+	if (rc > uRing.x && rc < uRing.y + 3.0) {
+		float x = rc / uRing.x;
+		float profile = pow(x, -0.75);
+		if (uRing.w > 0.0) {
+			// Refilled to the remnant's ISCO: the same profile as the first disk.
+			float xi = rc / uRing.w;
+			profile = mix(profile, pow(xi, -0.75) * pow(max(0.0, 1.0 - inversesqrt(xi)), 0.25) / 0.488, uRingShape.y);
+		}
+		float mass = 2.0 * uMass;
+		float omega = sqrt(mass / (rc * rc * rc));
+		float turbulence = flow(c, omega, 9.0);
+		float edge = mix(2.5, 0.5, uRingShape.y);
+		float density = smoothstep(uRing.x, uRing.x + edge, rc)
+			* (1.0 - smoothstep(uRing.y - 4.0, uRing.y + 3.0, rc))
+			* (0.15 + 1.2 * turbulence * turbulence) * filaments(rc * 0.7, c) * uRingShape.x;
+		vec4 ring = diskLight(c, rc, mass, uRing.z * profile * (0.9 + 0.2 * turbulence), vec3(0.0), ray, density * 1.2);
+		sum += (1.0 - sum.a) * ring;
+	}
+	return sum;
+}
+
 // Diverging strain colour: stretched along one axis (cool), the other (warm).
 vec3 strainColor(float s) {
 	vec3 cool = vec3(0.25, 0.62, 1.0);
@@ -164,7 +293,7 @@ vec4 strainAt(vec3 p) {
 }
 
 void main() {
-	vec2 ndc = (2.0 * gl_FragCoord.xy - uResolution) / uResolution.y;
+	vec2 ndc = (2.0 * gl_FragCoord.xy - uResolution) / min(uResolution.x, uResolution.y);
 	vec3 v = normalize(uBasis * vec3(ndc * uTanHalf, 1.0));
 	vec3 x = uEye;
 	float rs = 2.0 * uMass;
@@ -199,6 +328,9 @@ void main() {
 		v += step * a2;
 		if (x.y * next.y < 0.0 && through > 0.02) {
 			vec3 hit = mix(x, next, x.y / (x.y - next.y));
+			vec4 gas = gasAt(hit, normalize(v));
+			overlay += through * gas.rgb;
+			through *= 1.0 - gas.a;
 			vec4 strain = strainAt(hit);
 			overlay += through * strain.a * strain.rgb;
 			through *= 1.0 - strain.a;
@@ -212,9 +344,12 @@ void main() {
 	// A ray still winding near the photon spheres after all steps is treated as lost.
 	vec3 light = captured || !escaped ? vec3(0.0) : sky(dir, pixel);
 	light = light * through + overlay;
-	// Filmic shoulder that keeps hue, then sRGB encoding.
+	// The main scene's tone curve: hue kept, very bright light drifts to white.
 	float peak = max(max(light.r, light.g), light.b);
-	vec3 mapped = peak > 0.0 ? light / peak * (1.0 - exp(-peak * 1.6)) : vec3(0.0);
+	float tone = 1.0 - exp(-peak * 1.5);
+	float white = 1.0 - exp(-max(0.0, peak * 1.5 - 1.0) * 0.25);
+	vec3 hue = peak > 0.0 ? light / peak : vec3(0.0);
+	vec3 mapped = mix(hue, vec3(1.0), white) * tone;
 	color = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
 }`;
 
@@ -244,16 +379,21 @@ function compileShader(
   return shader;
 }
 
-/** Orthonormal camera basis (right, up, forward) looking at the origin. */
+/** Orthonormal camera basis (right, up, forward) looking at the target. */
 export function mergerCamera(view: MergerView) {
   const az = (view.azimuth * Math.PI) / 180;
   const el = (view.elevation * Math.PI) / 180;
-  const eye: [number, number, number] = [
+  const offset = [
     view.distance * Math.cos(el) * Math.sin(az),
     view.distance * Math.sin(el),
     view.distance * Math.cos(el) * Math.cos(az),
   ];
-  const forward = eye.map((value) => -value / view.distance);
+  const eye = offset.map((value, i) => value + (view.target[i] ?? 0)) as [
+    number,
+    number,
+    number,
+  ];
+  const forward = offset.map((value) => -value / view.distance);
   const [fx = 0, fy = 0, fz = 0] = forward;
   const rightLength = Math.hypot(fz, fx) || 1;
   const right = [-fz / rightLength, 0, fx / rightLength];
@@ -297,16 +437,25 @@ export function createMergerRenderer(
     "uMass",
     "uTime",
     "uWaves",
+    "uVelocityA",
+    "uMini",
+    "uRing",
+    "uRingShape",
+    "uBlackbody",
   ] as const;
   const at = Object.fromEntries(
     names.map((name) => [name, gl.getUniformLocation(program, name)])
   ) as Record<(typeof names)[number], WebGLUniformLocation | null>;
   const vao = gl.createVertexArray();
+  // biome-ignore lint/correctness/useHookAtTopLevel: WebGL's useProgram, not a React hook
+  gl.useProgram(program);
+  gl.uniform3fv(at.uBlackbody, blackbodyTable());
   let camera = mergerCamera({
     azimuth: 0,
     distance: 30,
     elevation: 25,
     fov: 50,
+    target: [0, 0, 0],
   });
   let tanHalf = Math.tan((25 * Math.PI) / 180);
   return {
@@ -329,11 +478,32 @@ export function createMergerRenderer(
       gl.uniform1f(at.uMass, frame.mass);
       gl.uniform1f(at.uTime, frame.time);
       gl.uniform1f(at.uWaves, frame.waves);
+      const { gas } = frame;
+      gl.uniform3fv(at.uVelocityA, frame.velocity);
+      gl.uniform4f(
+        at.uMini,
+        gas.miniInner,
+        gas.miniOuter,
+        gas.miniTemperature,
+        0
+      );
+      gl.uniform4f(
+        at.uRing,
+        gas.ringInner,
+        gas.ringOuter,
+        gas.ringTemperature,
+        gas.ringIsco
+      );
+      gl.uniform2f(
+        at.uRingShape,
+        gas.ringDensity,
+        gas.ringIsco > 0 ? Math.min(1, gas.ringIsco / gas.ringInner) : 0
+      );
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     resize(width, height, ratio) {
       // The ray march is heavy; a lighter pixel grid keeps it fluid.
-      const pixels = 900_000;
+      const pixels = 700_000;
       const scale = Math.min(
         Math.min(ratio, 1.5) * 0.75,
         Math.sqrt(pixels / Math.max(1, width * height))

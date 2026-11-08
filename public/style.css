@@ -550,6 +550,8 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
   width: 100%;
   height: 100%;
   background: #000;
+  opacity: 0;
+  transition: opacity 1.2s ease;
 }
 #merger[hidden] {
   display: none;
@@ -796,7 +798,7 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
   color: #71685f;
 }
 /* Only the physics toggle keeps a word; the rest are icons with titles. */
-.scene-control:not(#physics-toggle, #merger-toggle) span {
+.scene-control:not(#physics-toggle) span {
   display: none;
 }
 .journey-track {
@@ -1174,8 +1176,9 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
 .scene[data-state="compact"] .physics-panel {
   display: none !important;
 }
-.scene[data-mode="merger"] #hole,
-.scene[data-mode="merger"] .horizon-tick,
+.scene[data-mode="merger"] #merger {
+  opacity: 1;
+}
 .scene[data-mode="merger"] #journey-signal {
   visibility: hidden;
 }

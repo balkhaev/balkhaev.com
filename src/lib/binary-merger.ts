@@ -8,14 +8,24 @@
  * distance r is h = 4 η M (M ω)^(2/3) / r with gravitational-wave phase 2Φ.
  * When the horizons meet, a single remnant rings down in its fundamental
  * l = m = 2 quasinormal mode (Berti, Cardoso & Will 2006 fits).
+ *
+ * Gas: the first hole starts with the accretion disk of the main scene (3 to
+ * 11 r_s). A companion truncates such a disk near 0.42 a (its Roche lobe), so
+ * the disk shrinks and is gone when that radius reaches the ISCO; the gas
+ * stays in a circumbinary ring with a cavity of about 2a. Once the binary
+ * shrinks faster than the gas can follow (decoupling) the cavity stays open;
+ * after the merger the ring flows back in and forms the remnant's disk. That
+ * last refill takes years for real gas; here it is shown fast-forwarded.
  */
+
+import { DISK_PEAK_TEMPERATURE } from "./plunging-flow";
 
 export const MASS_1 = 0.5;
 export const MASS_2 = 0.5;
 export const TOTAL_MASS = MASS_1 + MASS_2;
 const ETA = (MASS_1 * MASS_2) / TOTAL_MASS ** 2;
-/** Initial separation: about four orbits of visible inspiral. */
-export const START_SEPARATION = 9;
+/** Initial separation: the companion is still beyond the first hole's disk. */
+export const START_SEPARATION = 16;
 /** Horizons (r_s = 2m) touch: a common horizon forms. */
 export const MERGE_SEPARATION = 2 * (MASS_1 + MASS_2) * 1.05;
 /** Peters coalescence time from the start separation. */
@@ -39,8 +49,20 @@ const QNM_FREQUENCY =
 const QNM_QUALITY = 0.7 + 1.4187 * (1 - REMNANT_SPIN) ** -0.499;
 export const RINGDOWN_ANGULAR_FREQUENCY = QNM_FREQUENCY;
 export const RINGDOWN_DAMPING_TIME = (2 * QNM_QUALITY) / QNM_FREQUENCY;
-/** Total length of the sequence shown, in M: the last burst travels outward. */
-export const SEQUENCE_END = MERGE_TIME + 6 * RINGDOWN_DAMPING_TIME;
+/** The companion's approach ends (and the close inspiral starts) at a = 12. */
+export const APPROACH_END = TAU * (1 - (12 / START_SEPARATION) ** 4);
+/** The circumbinary gas starts to flow back once the ringdown has faded. */
+export const REFILL_START = MERGE_TIME + 3 * RINGDOWN_DAMPING_TIME;
+/** Fast-forwarded refill of the remnant's disk, in scene M. */
+export const REFILL_TIME = 90;
+/** Total length of the sequence shown, in M. */
+export const SEQUENCE_END = REFILL_START + REFILL_TIME;
+/** Separation below which the gas no longer follows the shrinking binary. */
+const DECOUPLING_SEPARATION = 5;
+const DISK_INNER = 3;
+const DISK_OUTER = 11;
+const ROCHE_FRACTION = 0.42;
+const REMNANT_RS = 2 * REMNANT_MASS;
 
 export function separationAt(t: number) {
   const clamped = Math.min(Math.max(t, 0), MERGE_TIME);
@@ -94,25 +116,76 @@ export function waveAt(t: number) {
   };
 }
 
-export type MergerStage = "inspiral" | "plunge" | "ringdown" | "settled";
+export type MergerStage =
+  | "approach"
+  | "inspiral"
+  | "plunge"
+  | "ringdown"
+  | "refill";
 
 export function mergerStageAt(t: number): MergerStage {
-  if (t > MERGE_TIME + 5 * RINGDOWN_DAMPING_TIME) {
-    return "settled";
+  if (t > REFILL_START) {
+    return "refill";
   }
   if (t > MERGE_TIME + PLUNGE_TIME) {
     return "ringdown";
   }
+  if (t < APPROACH_END) {
+    return "approach";
+  }
   return separationAt(t) < 3.2 ? "plunge" : "inspiral";
+}
+
+function smoothstep(from: number, to: number, x: number) {
+  const k = Math.max(0, Math.min(1, (x - from) / (to - from)));
+  return k * k * (3 - 2 * k);
+}
+
+/** How far the remnant's disk has refilled, 0 to 1. */
+export function refillAt(t: number) {
+  return smoothstep(REFILL_START, SEQUENCE_END, t);
+}
+
+/**
+ * Gas around the pair, in M (r_s of one hole = 1): the first hole's own disk
+ * (zero outer radius once destroyed) and the circumbinary ring.
+ */
+export function gasAt(t: number) {
+  const a = separationAt(t);
+  const settle = smoothstep(0, APPROACH_END * 0.7, t);
+  const truncated = ROCHE_FRACTION * a;
+  const miniOuter =
+    t > MERGE_TIME
+      ? 0
+      : DISK_OUTER + (Math.min(DISK_OUTER, truncated) - DISK_OUTER) * settle;
+  const refill = refillAt(t);
+  const cavity = 2 * Math.max(a, DECOUPLING_SEPARATION);
+  return {
+    miniInner: DISK_INNER,
+    miniOuter: miniOuter > DISK_INNER + 0.6 ? miniOuter : 0,
+    miniTemperature: DISK_PEAK_TEMPERATURE,
+    // Stripped gas thickens the ring while the first hole's disk shrinks.
+    ringDensity: 0.3 + 0.7 * settle,
+    ringInner: cavity + (DISK_INNER * REMNANT_RS - cavity) * refill,
+    // The refilled disk ends at the remnant's ISCO, like the main scene's.
+    ringIsco: DISK_INNER * REMNANT_RS * refill,
+    ringOuter: 36 + (DISK_OUTER * REMNANT_RS - 36) * refill,
+    ringTemperature: 1800 + (DISK_PEAK_TEMPERATURE - 1800) * refill,
+  };
 }
 
 export const MERGER_STAGES: Record<
   MergerStage,
   { description: string; title: string }
 > = {
+  approach: {
+    description:
+      "Из темноты приходит вторая дыра той же массы. Её притяжение обрезает диск первой.",
+    title: "Вторая дыра",
+  },
   inspiral: {
     description:
-      "Две дыры по половине массы. Излучая волны, пара теряет энергию и сближается.",
+      "Пара излучает гравитационные волны и сближается. Диск разорван, газ ушёл во внешнее кольцо.",
     title: "Сближение",
   },
   plunge: {
@@ -120,15 +193,15 @@ export const MERGER_STAGES: Record<
       "Орбита больше не держит: дыры падают друг на друга, частота волн растёт.",
     title: "Слияние",
   },
+  refill: {
+    description:
+      "Одна вращающаяся дыра, 95% массы пары. Газ кольца стекает к ней и снова собирается в диск (ускорено).",
+    title: "Новый диск",
+  },
   ringdown: {
     description:
       "Общий горизонт звенит и успокаивается. Около 5% массы ушло в волны.",
     title: "Затухание",
-  },
-  settled: {
-    description:
-      "Одна вращающаяся дыра, 95% исходной массы. Волны уходят со скоростью света.",
-    title: "Остаток",
   },
 };
 
