@@ -51,6 +51,7 @@
             >
               <div aria-hidden="true" class="fallback"></div>
               <canvas aria-hidden="true" id="hole"></canvas>
+              <canvas aria-hidden="true" hidden id="merger"></canvas>
               <button
                 aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — ближе к центру. Скролл вверх, сведение пальцев или минус — дальше от центра. Скролл меняет только расстояние; время всегда идёт вперёд. Пробел — начать или приостановить движение камеры. P — физика. M — звуковая атмосфера. F — полный экран. Escape — свернуть сцену."
                 id="observer"
@@ -111,6 +112,24 @@
                     aria-label="Атмосфера и обзор"
                     class="scene-controls"
                   >
+                    <button
+                      aria-keyshortcuts="B"
+                      aria-label="Слияние двух чёрных дыр"
+                      aria-pressed="false"
+                      class="scene-control"
+                      id="merger-toggle"
+                      title="Слияние двух дыр и гравитационные волны · B"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 20 20">
+                        <circle cx="6.5" cy="10" r="2.5"></circle>
+                        <circle cx="13.5" cy="10" r="2.5"></circle>
+                        <path
+                          d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5M10 17.5A7.5 7.5 0 0 1 2.5 10"
+                        ></path>
+                      </svg>
+                      <span>Слияние</span>
+                    </button>
                     <button
                       aria-controls="physics-panel"
                       aria-expanded="false"
