@@ -133,6 +133,7 @@ export function renderHome(
     )
     .replace("<!-- home:news -->", latestBody(issues))
     .replace("<!-- home:posts -->", renderPosts(latestPosts(posts)))
+    .replace("<!-- home:project-count -->", String(HOME_PROJECTS.length))
     .replace("<!-- home:projects -->", renderProjects(HOME_PROJECTS))
     .replace(
       "<!-- home:experience -->",
