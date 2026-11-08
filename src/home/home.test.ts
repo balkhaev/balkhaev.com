@@ -34,11 +34,9 @@ test("prefers the Russian version and falls back to English", () => {
 
 test("lists the chosen projects with summaries", () => {
   expect(HOME_PROJECTS.map((project) => project.url)).toEqual([
+    "https://luv.club/",
     "https://adorely.co/",
     "https://sinly.io/",
-    "https://luv.club/",
-    "https://ggpick.club/",
-    "https://алтайземля.рф/",
   ]);
   for (const project of HOME_PROJECTS) {
     expect(project.text.length).toBeGreaterThan(10);

@@ -87,7 +87,7 @@ export const RESUMES: Record<Lang, Resume> = {
     headline: HEADLINE,
     jobs: [
       {
-        company: "Independent products",
+        company: "Entrepreneurship",
         period: "Mar 2026 – present",
         points: [
           "Founded and built my own AI companion platforms (18+) with image, video and 3D generation, chat and voice: a multi-tenant Hono backend, Redis/BullMQ workers and RunPod GPU jobs with idempotent submission.",
@@ -311,7 +311,7 @@ export const RESUMES: Record<Lang, Resume> = {
     headline: HEADLINE,
     jobs: [
       {
-        company: "Собственные продукты",
+        company: "Предпринимательство",
         period: "Март 2026 – сейчас",
         points: [
           "Основал и разработал собственные платформы AI-компаньонов (18+) с генерацией фото, видео и 3D, чатом и голосом: мультитенантный бэкенд на Hono, воркеры Redis/BullMQ, GPU-задачи на RunPod.",
