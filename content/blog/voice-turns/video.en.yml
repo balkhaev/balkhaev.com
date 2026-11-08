@@ -1,0 +1,48 @@
+context: Voice agent · 3/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 3
+    title: "Live dialogue, *not a walkie-talkie*"
+    subtitle: Pauses, end of turn and interruptions.
+
+  - type: statement
+    label: The problem
+    text: "\"Book me for…\" is *not the end of a sentence*."
+    say: A short silence threshold interrupts people who are thinking, a long one makes the agent sluggish.
+
+  - type: diagram
+    label: Two signals
+    heading: Silence plus meaning
+    nodes:
+      - { id: vad, label: VAD, sub: how long the silence, col: 0, row: 0, w: 4, step: 0 }
+      - { id: eou, label: End-of-turn model, sub: is the thought done, col: 6, row: 0, w: 6, step: 1, accent: true }
+      - { id: dec, label: Wait short or long, col: 3, row: 3, w: 6, step: 2 }
+    edges:
+      - { from: vad, to: dec }
+      - { from: eou, to: dec }
+
+  - type: list
+    label: Interruption
+    heading: Three steps
+    numbered: true
+    items:
+      - "*Go quiet* within a couple hundred ms"
+      - "Keep in history *only what was said*"
+      - "*Listen* to the new turn"
+
+  - type: list
+    label: Not an interruption
+    heading: What to ignore
+    items:
+      - "*Uh-huh*, yeah yeah, okay"
+      - "Coughs and *short sounds*"
+      - "Workshop *noise*"
+    say: If the agent stops for every uh-huh, the conversation gets choppy.
+
+  - type: statement
+    label: Silence
+    text: While looking up data it says *"one moment, checking"*.
+
+  - type: end
+    text: Next we connect *a real phone*.
+    url: balkhaev.com/blog/voice-turns

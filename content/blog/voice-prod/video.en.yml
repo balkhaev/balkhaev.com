@@ -1,0 +1,50 @@
+context: Voice agent · 7/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 7
+    title: "To production: *cheap and careful*"
+    subtitle: Load, the cost of a minute and personal data.
+
+  - type: statement
+    label: Load
+    text: Four hundred calls a day is *a few conversations* at peak.
+    say: Two small machines are enough. The second is not for capacity but so no calls are lost.
+
+  - type: list
+    label: Cost of a minute
+    heading: What it is made of
+    items:
+      - "*Telephony*: same as for people"
+      - "*Recognition*: minutes of caller speech"
+      - "*Model*: cheap with caching"
+      - "*Synthesis*: often the priciest"
+
+  - type: list
+    label: Data
+    heading: Recordings are personal data
+    items:
+      - "Notice *of recording*"
+      - "Audio for *thirty days*"
+      - "Numbers *masked*"
+      - "Access *by list*"
+
+  - type: statement
+    label: The main rule
+    text: On any failure the call goes *to people, not silence*.
+
+  - type: list
+    label: Summary
+    heading: The whole series in seven steps
+    numbered: true
+    items:
+      - Payoff and the latency budget
+      - A streaming cascade
+      - End of turn and interruptions
+      - SIP and a handover with summary
+      - Tools and confirmation
+      - Simulation and review
+      - Production, money and data
+
+  - type: end
+    text: Series done. The agent takes routine, *people the hard part*.
+    url: balkhaev.com/blog/voice-prod

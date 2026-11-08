@@ -1,0 +1,53 @@
+context: Голосовой агент · 2/7
+scenes:
+  - type: title
+    kicker: Голосовой агент · часть 2
+    title: "Каскад: *слышать, думать, говорить*"
+    subtitle: Распознавание, модель и синтез в одном потоке.
+
+  - type: diagram
+    label: Конвейер
+    heading: Никто никого не ждёт
+    nodes:
+      - { id: mic, label: Звук клиента, col: 0, row: 0, w: 3, step: 0 }
+      - { id: stt, label: Распознавание, sub: промежуточный текст, col: 4, row: 0, w: 4, step: 1 }
+      - { id: llm, label: Модель, sub: поток токенов, col: 9, row: 0, w: 3, step: 2, accent: true }
+      - { id: tts, label: Синтез, sub: по предложениям, col: 8, row: 3, w: 4, step: 3 }
+      - { id: out, label: Звук агента, col: 3, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: mic, to: stt }
+      - { from: stt, to: llm }
+      - { from: llm, to: tts }
+      - { from: tts, to: out }
+
+  - type: list
+    label: Распознавание
+    heading: Мерить на своих записях
+    items:
+      - "Сто *телефонных* звонков вручную"
+      - "Ошибки в *именах, марках, номерах*"
+      - "Задержка *финального текста*"
+      - "Словарь *подсказок*"
+    say: Лидер чужого рейтинга может проиграть на вашем звуке с шумом мастерской.
+
+  - type: list
+    label: Модель
+    heading: Быстрые первые токены
+    items:
+      - "*Claude Haiku 5.5*"
+      - "Короткий промпт *с кэшем*"
+      - "Без размышлений *вслух*"
+      - "Одна-две *короткие фразы*"
+
+  - type: statement
+    label: Синтез
+    text: Самая частая ошибка не голос, а *чтение чисел*.
+    say: Между моделью и синтезом стоит слой, который переводит время, даты и номера в слова.
+
+  - type: statement
+    label: Склейка
+    text: LiveKit Agents склеивает, *мы меряем* каждое звено.
+
+  - type: end
+    text: Дальше учим агента *живому диалогу*.
+    url: balkhaev.com/blog/ru/voice-pipeline

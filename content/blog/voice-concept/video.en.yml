@@ -1,0 +1,65 @@
+context: Voice agent · 1/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 1
+    title: "AI picks up *the phone*"
+    subtitle: Where a voice agent pays off and why latency decides everything.
+
+  - type: list
+    label: Car service calls
+    heading: Four in five are routine
+    items:
+      - "*Book* a service or repair"
+      - "*Reschedule* or cancel"
+      - "*Is my car* ready"
+      - "*Address*, hours, price"
+    say: The answer needs fast access to the schedule and work orders, not an advisor's experience.
+
+  - type: compare
+    label: Architecture
+    heading: Cascade or speech-to-speech
+    columns:
+      - title: Cascade
+        pick: true
+        points:
+          - every link replaceable
+          - reliable tools
+          - text log out of the box
+      - title: Speech-to-speech
+        points:
+          - faster and more natural
+          - the provider's voices
+          - swapped only as a whole
+
+  - type: diagram
+    label: Latency budget
+    heading: One second for everything
+    nodes:
+      - { id: eou, label: End of turn, sub: 200–400 ms, col: 0, row: 0, w: 4, step: 0 }
+      - { id: asr, label: Recognition, sub: 50–150 ms, col: 4, row: 0, w: 4, step: 1 }
+      - { id: llm, label: Model, sub: 250–500 ms, col: 8, row: 0, w: 4, step: 2, accent: true }
+      - { id: tts, label: Synthesis, sub: 80–200 ms, col: 8, row: 3, w: 4, step: 3 }
+      - { id: net, label: Network and phone, sub: 100–200 ms, col: 4, row: 3, w: 4, step: 4 }
+    edges:
+      - { from: eou, to: asr }
+      - { from: asr, to: llm }
+      - { from: llm, to: tts }
+      - { from: tts, to: net }
+
+  - type: statement
+    label: The main point
+    text: A pause over a second *breaks the conversation*.
+    say: That is why voice uses fast models, short prompts and streaming at every step.
+
+  - type: list
+    label: Principles
+    heading: What we stick to
+    items:
+      - "Introduces itself *honestly*"
+      - "A human *one sentence away*"
+      - "Confirm *before acting*"
+      - "Latency is *a budget*"
+
+  - type: end
+    text: Next we build *the cascade*.
+    url: balkhaev.com/blog/voice-concept

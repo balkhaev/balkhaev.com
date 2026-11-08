@@ -1,0 +1,46 @@
+context: Voice agent · 5/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 5
+    title: "Actions: *book without mistakes*"
+    subtitle: Tools shaped for voice and confirming before acting.
+
+  - type: list
+    label: Tools
+    heading: They answer briefly
+    items:
+      - "*Two slots*, not the whole schedule"
+      - "Status *in one sentence*"
+      - "Errors *in plain words*"
+
+  - type: statement
+    label: Hold
+    text: A found slot is *held* for two minutes.
+    say: Like cinema tickets. While the caller thinks, the advisor at the desk cannot take it.
+
+  - type: statement
+    label: Before acting
+    text: "\"Thursday, ten thirty, Leninsky. *Is that right?*\""
+
+  - type: list
+    label: Tricky data
+    heading: Where mistakes happen most
+    items:
+      - "*Dates*: from today, as a weekday"
+      - "*Times*: ask what around lunch means"
+      - "*Plates*: by digits and make"
+      - "*Phones*: repeat in groups"
+    say: Confirming by the car's make is more reliable than any spelling.
+
+  - type: list
+    label: Reliability
+    heading: When the system is slow
+    items:
+      - "A phrase *before a slow* tool"
+      - "A *four-second* timeout"
+      - "*Idempotent* bookings"
+      - "Confirmation *by message*"
+
+  - type: end
+    text: Next we check *quality*.
+    url: balkhaev.com/blog/voice-tools
