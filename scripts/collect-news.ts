@@ -109,22 +109,31 @@ async function githubModels(input: string) {
         },
       }),
       headers: {
+        accept: "application/vnd.github+json",
         authorization: `Bearer ${token}`,
         "content-type": "application/json",
+        "x-github-api-version": "2022-11-28",
       },
       method: "POST",
       signal: AbortSignal.timeout(120_000),
     }
   );
+  const body = await response.text();
   if (!response.ok) {
     throw new Error(
-      `GitHub Models HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`
+      `GitHub Models HTTP ${response.status}: ${body.slice(0, 300)}`
     );
   }
-  const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return JSON.parse(data.choices?.[0]?.message?.content ?? "") as unknown;
+  try {
+    const data = JSON.parse(body) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    return JSON.parse(data.choices?.[0]?.message?.content ?? "") as unknown;
+  } catch (error) {
+    throw new Error(`GitHub Models answered: ${body.slice(0, 500)}`, {
+      cause: error,
+    });
+  }
 }
 
 /** Digest editions from Telegram, kept for the days before the site's own. */
