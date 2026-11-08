@@ -7,16 +7,14 @@
  * container polls that file on GitHub (scripts/refresh-news.ts), so a new
  * edition shows up without a redeploy.
  *
- * The editor is Claude (ANTHROPIC_API_KEY). Until the key is set, and on any
- * day the site has no edition of its own, the Telegram digest @bestburyat
- * fills in, so the page never goes stale.
+ * The editor is Claude (ANTHROPIC_API_KEY). On days without an edition of
+ * the site's own, the container fills in from the Telegram digest.
  *
  *   bun scripts/collect-news.ts [--force] [--dry-run]
  */
 import { writeFile } from "node:fs/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import { file } from "bun";
-import { readIssues } from "../src/news/channel";
 import {
   addEdition,
   EDITOR_PROMPT,
@@ -38,10 +36,6 @@ import {
 const EDITIONS = "content/news/editions.json";
 const CLAUDE_MODEL = "claude-opus-5-5";
 const USER_AGENT = "balkhaev.com news collector (+https://balkhaev.com/news/)";
-/** The digest the site showed before it collected news itself. */
-const TELEGRAM =
-  "https://t.me/s/bestburyat?q=AI+%D0%B7%D0%B0+%D0%B4%D0%B2%D0%B0+%D0%B4%D0%BD%D1%8F";
-
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
 const today = new Date().toISOString().slice(0, 10);
@@ -87,23 +81,8 @@ async function claude(input: string) {
   return JSON.parse(text) as unknown;
 }
 
-/** Digest editions from Telegram, for the days without the site's own. */
-async function telegram(): Promise<Issue[]> {
-  try {
-    return await readIssues(await get(TELEGRAM));
-  } catch (error) {
-    console.warn("Telegram:", error instanceof Error ? error.message : error);
-    return [];
-  }
-}
-
 const stored = (await file(EDITIONS).json()) as Issue[];
 let editions = stored;
-for (const issue of await telegram()) {
-  if (!editions.some((known) => known.date === issue.date)) {
-    editions = addEdition(editions, issue);
-  }
-}
 
 async function save() {
   if (editions === stored) {
@@ -117,11 +96,10 @@ async function save() {
   }
 }
 
-// An edition of the site's own has post: null; a Telegram one gives way to it.
-const own = editions.some((issue) => issue.date === today && !issue.post);
+const own = editions.some((issue) => issue.date === today);
 if (!process.env.ANTHROPIC_API_KEY) {
   console.log(
-    "::warning::Add the ANTHROPIC_API_KEY secret to the production environment: until then the site shows the Telegram digest"
+    "::warning::Add the ANTHROPIC_API_KEY secret to the production environment: until then the site shows only the Telegram digest"
   );
 } else if (own && !force) {
   console.log(`Edition ${today} is already there`);
@@ -139,25 +117,16 @@ if (!process.env.ANTHROPIC_API_KEY) {
   const others = editions.filter((issue) => issue.date !== today);
   const candidates = shortlist(bySource, others);
   console.log(`${candidates.length} fresh candidates`);
-  try {
-    if (candidates.length < MIN_STORIES) {
-      throw new Error("Too few fresh items to make an edition");
-    }
-    const stories = toStories(
-      await claude(editorInput(candidates)),
-      candidates
-    );
-    if (stories.length < MIN_STORIES) {
-      throw new Error(`The editor picked ${stories.length} usable stories`);
-    }
-    editions = addEdition(editions, { date: today, post: null, stories });
-    for (const story of stories) {
-      console.log(`· ${story.title} — ${story.source}\n  ${story.url}`);
-    }
-  } catch (error) {
-    // Keep what Telegram gave, then fail the run so it is seen.
-    await save();
-    throw error;
+  if (candidates.length < MIN_STORIES) {
+    throw new Error("Too few fresh items to make an edition");
+  }
+  const stories = toStories(await claude(editorInput(candidates)), candidates);
+  if (stories.length < MIN_STORIES) {
+    throw new Error(`The editor picked ${stories.length} usable stories`);
+  }
+  editions = addEdition(editions, { date: today, post: null, stories });
+  for (const story of stories) {
+    console.log(`· ${story.title} — ${story.source}\n  ${story.url}`);
   }
 }
 await save();
