@@ -1,0 +1,57 @@
+context: Voice agent · 4/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 4
+    title: "The phone: *SIP and a human handover*"
+    subtitle: No new number and no lost calls.
+
+  - type: diagram
+    label: Call path
+    heading: From a mobile to the agent
+    nodes:
+      - { id: ph, label: Caller, col: 0, row: 0, w: 3, step: 0 }
+      - { id: pbx, label: Phone system, col: 4, row: 0, w: 4, step: 1 }
+      - { id: sip, label: LiveKit SIP, sub: trunk and rule, col: 9, row: 0, w: 3, step: 2 }
+      - { id: room, label: Call room, sub: caller and agent, col: 5, row: 3, w: 5, step: 3, accent: true }
+    edges:
+      - { from: ph, to: pbx }
+      - { from: pbx, to: sip }
+      - { from: sip, to: room }
+
+  - type: list
+    label: Phone audio
+    heading: Worse than the browser
+    items:
+      - "Narrowband, *eight kilohertz*"
+      - "Test recordings *from phones only*"
+      - "Hints dictionary *matters more*"
+      - "Read numbers *back*"
+
+  - type: list
+    label: Handover
+    heading: Passing to an advisor
+    numbered: true
+    items:
+      - "The agent *decides* to transfer"
+      - "The advisor gets *a summary*"
+      - "The call is *transferred*"
+      - "No answer: *we call back*"
+    say: After three minutes of explaining, the advisor must not ask what happened.
+
+  - type: statement
+    label: The rule
+    text: "\"Put me through to a person\" works *from the first second*."
+
+  - type: list
+    label: Rollout
+    heading: Where to start
+    numbered: true
+    items:
+      - "*Evenings* and weekends"
+      - "Daytime *overflow*"
+      - "A menu *branch*"
+      - "Agent *first*"
+
+  - type: end
+    text: Next we give the agent *real actions*.
+    url: balkhaev.com/blog/voice-phone

@@ -1,0 +1,56 @@
+context: Voice agent · 6/7
+scenes:
+  - type: title
+    kicker: Voice agent · part 6
+    title: "Quality: *don't learn it from customers*"
+    subtitle: Simulated calls, metrics and reviewing recordings.
+
+  - type: diagram
+    label: Three layers
+    heading: Look top down
+    nodes:
+      - { id: out, label: Outcome, sub: resolved and resolved right, col: 0, row: 0, w: 5, step: 0, accent: true }
+      - { id: talk, label: Conversation, sub: latency and interruptions, col: 7, row: 0, w: 5, step: 1 }
+      - { id: asr, label: Recognition, sub: important words, col: 4, row: 3, w: 5, step: 2 }
+    edges:
+      - { from: out, to: talk }
+      - { from: talk, to: asr }
+
+  - type: statement
+    label: The key metric
+    text: The booking in the schedule *matches* what was agreed.
+    say: An agent that sometimes books the wrong day is worse than one that transfers to a person more often.
+
+  - type: list
+    label: Simulation
+    heading: A model plays the caller
+    items:
+      - "In a hurry, *interrupts*"
+      - "Elderly, *speaks with pauses*"
+      - "*Changes their mind* mid-booking"
+      - "Straight away *demands a person*"
+
+  - type: compare
+    label: Checks
+    heading: Two ways
+    columns:
+      - title: Against the schedule
+        pick: true
+        points:
+          - booked at the right time
+          - no extra bookings
+          - never wrong
+      - title: Judge model
+        points:
+          - confirmed the date
+          - kept sentences short
+          - promised nothing extra
+
+  - type: statement
+    label: Review
+    text: Every new mistake becomes *a new scenario*.
+    say: Once a week we listen to twenty recordings and give every mistake a cause.
+
+  - type: end
+    text: Next we take the agent *to production*.
+    url: balkhaev.com/blog/voice-quality
