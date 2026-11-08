@@ -20,6 +20,7 @@ import {
 } from "./lib/scene-dive";
 import { OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
 import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
+import { createMergerMode } from "./merger-mode";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
@@ -130,6 +131,15 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let last = 0;
   let time = 0;
   const physics = createPhysicsPanel(() => redraw());
+  const mergerCanvas = document.querySelector<HTMLCanvasElement>("#merger");
+  const mergerToggle =
+    document.querySelector<HTMLButtonElement>("#merger-toggle");
+  const unitLabel = document.querySelector<HTMLElement>("#journey-unit");
+  const merger = mergerCanvas ? createMergerMode(mergerCanvas) : null;
+  let mergerOn = false;
+  if (mergerToggle) {
+    mergerToggle.hidden = !merger;
+  }
   let noteStage = "";
   let noteTimer = 0;
   const showNote = (stage: string) => {
@@ -221,7 +231,32 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     renderer?.view(view);
   };
 
+  const frameMerger = () => {
+    if (!merger) {
+      return;
+    }
+    const text = merger.text();
+    updateText(flightStatus, text.status);
+    updateText(flightNote, text.note);
+    showNote(text.note);
+    updateText(radiusLabel, text.readout);
+    updateText(unitLabel, text.unit);
+    updateText(travelLabel, text.action);
+    travelToggle?.toggleAttribute("data-playing", text.playing);
+    if (travelToggle) {
+      travelToggle.disabled = false;
+    }
+    if (journeyProgress) {
+      journeyProgress.style.transform = `scaleX(${text.progress})`;
+    }
+  };
   const draw = () => {
+    if (mergerOn && merger) {
+      diveZoom();
+      frameMerger();
+      merger.draw();
+      return;
+    }
     if (!renderer) {
       return;
     }
@@ -248,6 +283,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       surface.clientHeight,
       devicePixelRatio || 1
     );
+    merger?.resize(
+      surface.clientWidth,
+      surface.clientHeight,
+      devicePixelRatio || 1
+    );
     draw();
   };
 
@@ -259,6 +299,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     const elapsed = last ? (now - last) / 1000 : 0;
     const seconds = Math.min(0.1, elapsed);
     last = now;
+    if (mergerOn && merger) {
+      merger.advance(seconds);
+      draw();
+      return;
+    }
     flight.advance(seconds);
     time += sceneTimeStep(seconds);
     Object.assign(view, look.advance(seconds));
@@ -277,7 +322,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const resume = () => {
     stop();
-    audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
+    audio.setAudible(
+      !document.hidden && Boolean(renderer) && expanded && !mergerOn
+    );
     if (document.hidden || !renderer || !(expanded || visible)) {
       return;
     }
@@ -321,10 +368,57 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     hint?.classList.add("dismissed");
   };
   const travel = (amount: number) => {
+    if (mergerOn && merger) {
+      merger.zoom(amount);
+      return;
+    }
     flight.travel(amount, still.matches || previewStill, false);
+  };
+  const turn = (dx: number, dy: number) => {
+    if (mergerOn && merger) {
+      merger.turn(dx * 1.5, -dy * 1.5);
+      return;
+    }
+    look.turn(dx, dy, still.matches || previewStill);
+  };
+  const setMerger = (on: boolean) => {
+    if (!merger || on === mergerOn) {
+      return;
+    }
+    mergerOn = on;
+    if (scene) {
+      if (on) {
+        scene.dataset.mode = "merger";
+      } else {
+        delete scene.dataset.mode;
+      }
+    }
+    if (mergerCanvas) {
+      mergerCanvas.hidden = !on;
+    }
+    mergerToggle?.setAttribute("aria-pressed", String(on));
+    noteStage = "";
+    if (on) {
+      flight.pause();
+      audio.setAudible(false);
+    } else {
+      merger.pause();
+      updateText(unitLabel, "rₛ");
+      audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
+    }
+    fit();
+  };
+  const toggleMerger = () => {
+    dismissHint();
+    setMerger(!mergerOn);
   };
   const toggleTravel = () => {
     dismissHint();
+    if (mergerOn && merger) {
+      merger.togglePlayback();
+      redraw();
+      return;
+    }
     if (still.matches || previewStill) {
       travel(0.24);
     } else {
@@ -356,6 +450,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
   };
   travelToggle?.addEventListener("click", toggleTravel);
+  mergerToggle?.addEventListener("click", toggleMerger);
   soundToggle?.addEventListener("click", toggleSound);
   fullscreenToggle?.addEventListener("click", toggleFullscreen);
   gazeToggle?.addEventListener("click", () => {
@@ -371,6 +466,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   });
 
   const disturb = (event: PointerEvent, tap = false) => {
+    if (mergerOn) {
+      return;
+    }
     const now = event.timeStamp;
     const box = surface.getBoundingClientRect();
     const x = (event.clientX - box.left) / box.width;
@@ -441,7 +539,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
           dy = event.clientY - gesture.y;
         if (Math.hypot(dx, dy) > 3 || gesture.dragged) {
           gesture.dragged = true;
-          look.turn(-dx * 0.15, dy * 0.15, still.matches || previewStill);
+          turn(-dx * 0.15, dy * 0.15);
           gesture.x = event.clientX;
           gesture.y = event.clientY;
         }
@@ -491,10 +589,10 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     "-": () => travel(-0.24),
     "+": () => travel(0.24),
     "=": () => travel(0.24),
-    ArrowDown: () => look.turn(0, -4, still.matches || previewStill),
-    ArrowLeft: () => look.turn(-4, 0, still.matches || previewStill),
-    ArrowRight: () => look.turn(4, 0, still.matches || previewStill),
-    ArrowUp: () => look.turn(0, 4, still.matches || previewStill),
+    ArrowDown: () => turn(0, -4),
+    ArrowLeft: () => turn(-4, 0),
+    ArrowRight: () => turn(4, 0),
+    ArrowUp: () => turn(0, 4),
   };
   input.addEventListener("keydown", (event) => {
     delete input.dataset.pointerFocused;
@@ -513,6 +611,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   });
   const sceneKeys: Record<string, () => void> = {
     " ": toggleTravel,
+    b: toggleMerger,
     escape: () => openScene(false),
     f: toggleFullscreen,
     m: toggleSound,
@@ -562,6 +661,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     openButton?.setAttribute("aria-expanded", String(open));
     if (!open) {
       flight.pause();
+      merger?.pause();
       gesture = null;
       touches.clear();
       if (document.fullscreenElement) {
@@ -753,6 +853,14 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     location.hash === SCENE_HASH || preview.phase !== null || previewStill;
   applyScene(expanded);
   mount();
+  // Local visual review of the merger at a fixed time: ?preview-merger=<M>.
+  const mergerPreview = previewStill
+    ? new URLSearchParams(location.search).get("preview-merger")
+    : null;
+  if (mergerPreview !== null && merger) {
+    merger.seek(Number(mergerPreview) || 0);
+    setMerger(true);
+  }
 }
 
 if (canvas && control) {
