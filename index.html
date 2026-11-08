@@ -53,7 +53,7 @@
               <canvas aria-hidden="true" id="hole"></canvas>
               <canvas aria-hidden="true" hidden id="merger"></canvas>
               <button
-                aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Скролл вниз, разведение пальцев или плюс — ближе к центру. Скролл вверх, сведение пальцев или минус — дальше от центра. Скролл меняет только расстояние; время всегда идёт вперёд. Пробел — начать или приостановить движение камеры. P — физика. M — звуковая атмосфера. F — полный экран. Escape — свернуть сцену."
+                aria-label="Проведите мышью по диску, чтобы оставить волны. Нажмите на диск для всплеска. Потяните мышью или используйте стрелки, чтобы оглядеться. Сюжет: к дыре приходит вторая, они сливаются, излучая гравитационные волны, затем камера падает в остаток. Скролл вниз, разведение пальцев или плюс — вперёд по сюжету. Скролл вверх, сведение пальцев или минус — назад. Пробел — начать или приостановить. P — физика. M — звуковая атмосфера. F — полный экран. Escape — свернуть сцену."
                 id="observer"
                 type="button"
               ></button>
@@ -77,17 +77,19 @@
                       >На краю тишины</span
                     >
                   </div>
-                  <p id="flight-note">Один путь. Всё ближе к горизонту.</p>
+                  <p id="flight-note">
+                    Дыра, её диск и звезда. Скоро придёт вторая.
+                  </p>
                 </div>
                 <p aria-hidden="true" id="hint">
                   <span class="scroll-mark"></span>
                   <span
                     ><span class="hint-desktop"
                       >Потяните — обзор<span class="hint-divider">/</span>Скролл
-                      ↓ — ближе · ↑ — дальше</span
+                      ↓ — вперёд по сюжету · ↑ — назад</span
                     ><span class="hint-touch"
                       >Коснитесь — волны · Потяните — обзор · Щипок —
-                      расстояние</span
+                      сюжет</span
                     ></span
                   >
                 </p>
@@ -106,30 +108,12 @@
                       <path class="play-shape" d="M5 3.5 12 8l-7 4.5Z"></path>
                       <path class="pause-shape" d="M5 4v8m6-8v8"></path>
                     </svg>
-                    <span id="travel-label">Начать падение</span>
+                    <span id="travel-label">Начать</span>
                   </button>
                   <fieldset
                     aria-label="Атмосфера и обзор"
                     class="scene-controls"
                   >
-                    <button
-                      aria-keyshortcuts="B"
-                      aria-label="Слияние двух чёрных дыр"
-                      aria-pressed="false"
-                      class="scene-control"
-                      id="merger-toggle"
-                      title="Слияние двух дыр и гравитационные волны · B"
-                      type="button"
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 20 20">
-                        <circle cx="6.5" cy="10" r="2.5"></circle>
-                        <circle cx="13.5" cy="10" r="2.5"></circle>
-                        <path
-                          d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5M10 17.5A7.5 7.5 0 0 1 2.5 10"
-                        ></path>
-                      </svg>
-                      <span>Слияние</span>
-                    </button>
                     <button
                       aria-controls="physics-panel"
                       aria-expanded="false"

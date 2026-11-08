@@ -44,7 +44,7 @@ function flightLabel(flight: ReturnType<typeof createFlight>) {
 
 function flightInstruction(flight: ReturnType<typeof createFlight>) {
   if (!flight.active) {
-    return "Один путь. Всё ближе к горизонту.";
+    return "Дыра, её диск и звезда. Скоро придёт вторая.";
   }
   if (flight.playback === "rewinding") {
     return "Скролл ↓ — ближе · ↑ — дальше. Время идёт вперёд.";
@@ -71,7 +71,7 @@ function travelAction(
   if (flight.playback === "playing") {
     return "Пауза";
   }
-  return flight.active ? "Продолжить" : "Начать падение";
+  return flight.active ? "Продолжить" : "Начать";
 }
 
 const SOFTWARE_GL = /swiftshader|llvmpipe|softpipe|software|basic render/i;
@@ -168,7 +168,8 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const signalLabel = document.querySelector<HTMLElement>("#journey-signal");
   const horizonTick = document.querySelector<HTMLElement>(".horizon-tick");
   if (horizonTick) {
-    horizonTick.style.left = `${(HORIZON_PROGRESS / END_PROGRESS) * 100}%`;
+    // The bar holds the whole story: the merger, then the fall.
+    horizonTick.style.left = `${50 + (HORIZON_PROGRESS / END_PROGRESS) * 50}%`;
   }
   const journeyProgress =
     document.querySelector<HTMLElement>("#journey-progress");
@@ -192,14 +193,13 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let time = 0;
   const physics = createPhysicsPanel(() => redraw());
   const mergerCanvas = document.querySelector<HTMLCanvasElement>("#merger");
-  const mergerToggle =
-    document.querySelector<HTMLButtonElement>("#merger-toggle");
   const unitLabel = document.querySelector<HTMLElement>("#journey-unit");
   const merger = mergerCanvas ? createMergerMode(mergerCanvas) : null;
+  // The story: the first hole alone, the companion and the merger, then the
+  // fall into the remnant. `mergerDone` marks that the fall chapter follows.
   let mergerOn = false;
-  if (mergerToggle) {
-    mergerToggle.hidden = !merger;
-  }
+  let mergerDone = false;
+  let fadeTimer = 0;
   let noteStage = "";
   let noteTimer = 0;
   const showNote = (stage: string) => {
@@ -224,6 +224,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     dragged: boolean;
   } | null = null;
 
+  const storyProgress = (share: number) => {
+    if (journeyProgress) {
+      journeyProgress.style.transform = `scaleX(${share})`;
+    }
+  };
   const frameView = () => {
     const { journey } = flight;
     view.distance = journey.radius;
@@ -263,9 +268,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         updateText(signalLabel, `Свет извне · ${rateFormat.format(skyRate)}×`);
       }
     }
-    if (journeyProgress) {
-      journeyProgress.style.transform = `scaleX(${journey.completion})`;
-    }
+    storyProgress(mergerDone ? 0.5 + 0.5 * journey.completion : 0);
     const playing = flight.playback === "playing";
     if (travelToggle) {
       travelToggle.toggleAttribute("data-playing", playing);
@@ -301,14 +304,16 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     showNote(text.note);
     updateText(radiusLabel, text.readout);
     updateText(unitLabel, text.unit);
-    updateText(travelLabel, text.action);
-    travelToggle?.toggleAttribute("data-playing", text.playing);
+    let action = merger.playing ? "Пауза" : "Продолжить";
+    if (still.matches || previewStill) {
+      action = "Дальше";
+    }
+    updateText(travelLabel, action);
+    travelToggle?.toggleAttribute("data-playing", merger.playing);
     if (travelToggle) {
       travelToggle.disabled = false;
     }
-    if (journeyProgress) {
-      journeyProgress.style.transform = `scaleX(${text.progress})`;
-    }
+    storyProgress(0.5 * text.progress);
   };
   const draw = () => {
     if (mergerOn && merger) {
@@ -360,7 +365,11 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     const seconds = Math.min(0.1, elapsed);
     last = now;
     if (mergerOn && merger) {
-      merger.advance(seconds);
+      const { playing } = merger;
+      if (merger.advance(seconds) && playing) {
+        handoff(true);
+        return;
+      }
       draw();
       return;
     }
@@ -425,9 +434,25 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const dismissHint = () => {
     hint?.classList.add("dismissed");
   };
+  // Scroll and keys move along the whole story, in seconds of playback.
+  const STORY_SCRUB = 6;
   const travel = (amount: number) => {
     if (mergerOn && merger) {
-      merger.zoom(amount);
+      merger.scrub(amount * STORY_SCRUB);
+      if (merger.finished && amount > 0) {
+        handoff(false);
+      }
+      return;
+    }
+    const canStart = merger?.available && !flight.active && amount > 0;
+    if (!mergerDone && canStart && merger) {
+      setMerger(true);
+      merger.scrub(amount * STORY_SCRUB);
+      return;
+    }
+    if (mergerDone && merger && amount < 0 && flight.journey.phase <= 0) {
+      setMerger(true);
+      merger.scrub(amount * STORY_SCRUB);
       return;
     }
     flight.travel(amount, still.matches || previewStill, false);
@@ -439,41 +464,69 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
     look.turn(dx, dy, still.matches || previewStill);
   };
+  // The two renderers cross-fade: each keeps its last frame while the other
+  // fades over it, and both frame the same view at the hand-over.
   const setMerger = (on: boolean) => {
     if (!merger || on === mergerOn) {
       return;
     }
     mergerOn = on;
-    if (scene) {
-      if (on) {
-        scene.dataset.mode = "merger";
-      } else {
-        delete scene.dataset.mode;
-      }
-    }
-    if (mergerCanvas) {
-      mergerCanvas.hidden = !on;
-    }
-    mergerToggle?.setAttribute("aria-pressed", String(on));
+    clearTimeout(fadeTimer);
     noteStage = "";
     if (on) {
       flight.pause();
       audio.setAudible(false);
-    } else {
-      merger.pause();
-      updateText(unitLabel, "rₛ");
-      audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
+      if (mergerCanvas) {
+        mergerCanvas.hidden = false;
+      }
+      fit();
+      requestAnimationFrame(() => {
+        if (mergerOn && scene) {
+          scene.dataset.mode = "merger";
+        }
+      });
+      return;
     }
+    merger.pause();
+    updateText(unitLabel, "rₛ");
+    audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
+    if (scene) {
+      delete scene.dataset.mode;
+    }
+    fadeTimer = window.setTimeout(() => {
+      if (!mergerOn && mergerCanvas) {
+        mergerCanvas.hidden = true;
+      }
+    }, 1400);
     fit();
   };
-  const toggleMerger = () => {
-    dismissHint();
-    setMerger(!mergerOn);
-  };
+  // The merger has played out: the fall into the remnant takes over.
+  function handoff(autoplay: boolean) {
+    mergerDone = true;
+    setMerger(false);
+    if (autoplay && flight.playback !== "playing") {
+      flight.togglePlayback();
+    }
+    redraw();
+  }
   const toggleTravel = () => {
     dismissHint();
     if (mergerOn && merger) {
-      merger.togglePlayback();
+      if (still.matches || previewStill) {
+        travel(0.24);
+      } else {
+        merger.togglePlayback();
+      }
+      redraw();
+      return;
+    }
+    if (!(mergerDone || flight.active) && merger?.available) {
+      setMerger(true);
+      if (still.matches || previewStill) {
+        travel(0.24);
+      } else {
+        merger.play();
+      }
       redraw();
       return;
     }
@@ -508,7 +561,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     }
   };
   travelToggle?.addEventListener("click", toggleTravel);
-  mergerToggle?.addEventListener("click", toggleMerger);
   soundToggle?.addEventListener("click", toggleSound);
   fullscreenToggle?.addEventListener("click", toggleFullscreen);
   gazeToggle?.addEventListener("click", () => {
@@ -669,7 +721,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   });
   const sceneKeys: Record<string, () => void> = {
     " ": toggleTravel,
-    b: toggleMerger,
     escape: () => openScene(false),
     f: toggleFullscreen,
     m: toggleSound,
