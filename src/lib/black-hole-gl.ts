@@ -266,12 +266,12 @@ vec4 disk(float r, float psi, float lambda, float angular, float energy, float d
 	float temperature = mix(T_PEAK * pow(flux, 0.25), innerTemperature, feed);
 	float t = temperature * (1.0 + 0.09 * ember * breathing + 0.58 * eddy * flare + 0.18 * wake.y + tracer * (0.04 + wake.y * 0.16)) * g;
 	float edge = 1.0 - smoothstep(7.0, DISK_OUT, r);
-	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.32 * strand;
+	float baseDensity = 0.055 + 0.09 * n + 0.65 * structure + 0.14 * strand;
 	float alpha = edge * clamp(baseDensity * (1.0 + min(0.0, wake.x)) + max(0.0, wake.x) * 0.36 + tracer * wake.y * 0.15 + splashes * 0.3, 0.015, 1.0);
 	// The feed shares the plunge's proper injection column; only its inherited circular g differs by the small launch kick.
 	float incidence = emitterIncidence(r, angular, lambda, g);
 	alpha = mix(alpha, materialOpacity(injectionDepth(injection, 1.0), incidence), feed);
-	vec3 radiance = blackbody(t) * (0.85 + 0.4 * strand + tracer * wake.y * 0.35);
+	vec3 radiance = blackbody(t) * (0.9 + 0.2 * strand + tracer * wake.y * 0.35);
 	radiance += blackbody(T_PEAK * pow(flux, 0.25) * 1.52 * g) * splashes * 0.18;
 	return vec4(frequencyInspection(radiance * uAccretion, g), alpha);
 }
@@ -460,22 +460,24 @@ uniform sampler2D uExposure;
 in vec2 vUv;
 out vec4 outColor;
 
-vec3 aces(vec3 x) {
-	return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
-}
-
+// Exposure key: the adapted mean sits in the bright mid-tones, so warm gas reads as fire, not brown.
+const float KEY = 1.8;
 vec3 encode(vec3 linear) {
 	return mix(linear * 12.92, 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, linear));
 }
 
 void main() {
 	vec4 scene = texture(uScene, vUv);
-	vec3 glow = texture(uGlow0, vUv).rgb * 0.6 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.1 + texture(uGlow3, vUv).rgb * 0.04 + texture(uGlow4, vUv).rgb * 0.01;
-	vec3 light = mix(scene.rgb, glow, 0.012) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0);
-	// Luminance tone mapping preserves the thermal colour in bright filaments.
-	float luminance = dot(light, vec3(0.2126, 0.7152, 0.0722));
-	vec3 mapped = light * (aces(vec3(luminance)).x / max(luminance, 1e-6));
-	mapped /= max(1.0, max(mapped.r, max(mapped.g, mapped.b)));
+	// Bright light spreads in any real optics: a broad, soft point-spread halo around the hot inner disk.
+	vec3 glow = texture(uGlow0, vUv).rgb * 0.3 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.2 + texture(uGlow3, vUv).rgb * 0.15 + texture(uGlow4, vUv).rgb * 0.1;
+	vec3 light = mix(scene.rgb, glow, 0.07) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0) * KEY;
+	// Hue-preserving shoulder: mid-tones keep their thermal colour, and only light far
+	// beyond the sensor's range saturates every channel toward white-hot.
+	float peak = max(light.r, max(light.g, light.b));
+	vec3 hue = light / max(peak, 1e-6);
+	float tone = 1.0 - exp(-peak * 1.2);
+	float white = 1.0 - exp(-max(0.0, peak * 1.2 - 1.0) * 0.25);
+	vec3 mapped = mix(hue, vec3(1.0), white) * tone;
 	vec3 colour = encode(mapped);
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);
