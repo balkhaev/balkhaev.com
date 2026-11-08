@@ -21,8 +21,6 @@ concurrency:
 
 permissions:
   contents: write
-  # GitHub Models is the editor when ANTHROPIC_API_KEY is not set.
-  models: read
 
 jobs:
   collect:
@@ -38,9 +36,9 @@ jobs:
       - name: Collect today's edition
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: bun scripts/collect-news.ts ${{ inputs.force && '--force' || '' }}
       - name: Commit
+        if: always()
         run: |
           git diff --quiet -- content/news && { echo "Nothing new"; exit 0; }
           git config user.name "balkhaev.com news"

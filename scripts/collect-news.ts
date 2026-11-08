@@ -7,8 +7,9 @@
  * container polls that file on GitHub (scripts/refresh-news.ts), so a new
  * edition shows up without a redeploy.
  *
- * The editor is Claude when ANTHROPIC_API_KEY is set, otherwise a model from
- * GitHub Models through the workflow's GITHUB_TOKEN.
+ * The editor is Claude (ANTHROPIC_API_KEY). Until the key is set, and on any
+ * day the site has no edition of its own, the Telegram digest @bestburyat
+ * fills in, so the page never goes stale.
  *
  *   bun scripts/collect-news.ts [--force] [--dry-run]
  */
@@ -36,12 +37,10 @@ import {
 
 const EDITIONS = "content/news/editions.json";
 const CLAUDE_MODEL = "claude-opus-5-5";
-const GITHUB_MODEL = "openai/gpt-4.1";
 const USER_AGENT = "balkhaev.com news collector (+https://balkhaev.com/news/)";
 /** The digest the site showed before it collected news itself. */
 const TELEGRAM =
   "https://t.me/s/bestburyat?q=AI+%D0%B7%D0%B0+%D0%B4%D0%B2%D0%B0+%D0%B4%D0%BD%D1%8F";
-const OWN_SINCE = "2026-11-08";
 
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
@@ -88,59 +87,10 @@ async function claude(input: string) {
   return JSON.parse(text) as unknown;
 }
 
-async function githubModels(input: string) {
-  const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    throw new Error("Set ANTHROPIC_API_KEY or GITHUB_TOKEN");
-  }
-  const response = await fetch(
-    "https://models.github.ai/inference/chat/completions",
-    {
-      body: JSON.stringify({
-        max_tokens: 4000,
-        messages: [
-          { content: EDITOR_PROMPT, role: "system" },
-          { content: input, role: "user" },
-        ],
-        model: GITHUB_MODEL,
-        response_format: {
-          json_schema: { name: "edition", schema: EDITOR_SCHEMA, strict: true },
-          type: "json_schema",
-        },
-      }),
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${token}`,
-        "content-type": "application/json",
-        "x-github-api-version": "2022-11-28",
-      },
-      method: "POST",
-      signal: AbortSignal.timeout(120_000),
-    }
-  );
-  const body = await response.text();
-  if (!response.ok) {
-    throw new Error(
-      `GitHub Models HTTP ${response.status}: ${body.slice(0, 300)}`
-    );
-  }
-  try {
-    const data = JSON.parse(body) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    return JSON.parse(data.choices?.[0]?.message?.content ?? "") as unknown;
-  } catch (error) {
-    throw new Error(`GitHub Models answered: ${body.slice(0, 500)}`, {
-      cause: error,
-    });
-  }
-}
-
-/** Digest editions from Telegram, kept for the days before the site's own. */
+/** Digest editions from Telegram, for the days without the site's own. */
 async function telegram(): Promise<Issue[]> {
   try {
-    const issues = await readIssues(await get(TELEGRAM));
-    return issues.filter((issue) => issue.date < OWN_SINCE);
+    return await readIssues(await get(TELEGRAM));
   } catch (error) {
     console.warn("Telegram:", error instanceof Error ? error.message : error);
     return [];
@@ -155,7 +105,25 @@ for (const issue of await telegram()) {
   }
 }
 
-if (editions.some((issue) => issue.date === today) && !force) {
+async function save() {
+  if (editions === stored) {
+    return;
+  }
+  const json = `${JSON.stringify(editions, null, 2)}\n`;
+  if (dryRun) {
+    console.log(json.slice(0, 4000));
+  } else {
+    await writeFile(EDITIONS, json);
+  }
+}
+
+// An edition of the site's own has post: null; a Telegram one gives way to it.
+const own = editions.some((issue) => issue.date === today && !issue.post);
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.log(
+    "::warning::Add the ANTHROPIC_API_KEY secret to the production environment: until then the site shows the Telegram digest"
+  );
+} else if (own && !force) {
   console.log(`Edition ${today} is already there`);
 } else {
   const results = await Promise.allSettled(SOURCES.map(read));
@@ -171,28 +139,25 @@ if (editions.some((issue) => issue.date === today) && !force) {
   const others = editions.filter((issue) => issue.date !== today);
   const candidates = shortlist(bySource, others);
   console.log(`${candidates.length} fresh candidates`);
-  if (candidates.length < MIN_STORIES) {
-    throw new Error("Too few fresh items to make an edition");
-  }
-  const input = editorInput(candidates);
-  const answer = process.env.ANTHROPIC_API_KEY
-    ? await claude(input)
-    : await githubModels(input);
-  const stories = toStories(answer, candidates);
-  if (stories.length < MIN_STORIES) {
-    throw new Error(`The editor picked ${stories.length} usable stories`);
-  }
-  editions = addEdition(editions, { date: today, post: null, stories });
-  for (const story of stories) {
-    console.log(`· ${story.title} — ${story.source}\n  ${story.url}`);
-  }
-}
-
-if (editions !== stored) {
-  const json = `${JSON.stringify(editions, null, 2)}\n`;
-  if (dryRun) {
-    console.log(json.slice(0, 4000));
-  } else {
-    await writeFile(EDITIONS, json);
+  try {
+    if (candidates.length < MIN_STORIES) {
+      throw new Error("Too few fresh items to make an edition");
+    }
+    const stories = toStories(
+      await claude(editorInput(candidates)),
+      candidates
+    );
+    if (stories.length < MIN_STORIES) {
+      throw new Error(`The editor picked ${stories.length} usable stories`);
+    }
+    editions = addEdition(editions, { date: today, post: null, stories });
+    for (const story of stories) {
+      console.log(`· ${story.title} — ${story.source}\n  ${story.url}`);
+    }
+  } catch (error) {
+    // Keep what Telegram gave, then fail the run so it is seen.
+    await save();
+    throw error;
   }
 }
+await save();
