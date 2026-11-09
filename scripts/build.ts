@@ -123,6 +123,7 @@ await cp("node_modules/katex/dist/fonts", `${katex}fonts`, {
 const urls = [
   "/",
   "/news/",
+  "/land/",
   ...Object.values(CV_PATHS),
   ...blogUrls(posts, series),
 ];
