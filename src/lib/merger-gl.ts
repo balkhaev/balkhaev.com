@@ -344,12 +344,9 @@ void main() {
 	// A ray still winding near the photon spheres after all steps is treated as lost.
 	vec3 light = captured || !escaped ? vec3(0.0) : sky(dir, pixel);
 	light = light * through + overlay;
-	// The main scene's tone curve: hue kept, very bright light drifts to white.
-	float peak = max(max(light.r, light.g), light.b);
-	float tone = 1.0 - exp(-peak * 1.5);
-	float white = 1.0 - exp(-max(0.0, peak * 1.5 - 1.0) * 0.25);
-	vec3 hue = peak > 0.0 ? light / peak : vec3(0.0);
-	vec3 mapped = mix(hue, vec3(1.0), white) * tone;
+	// The main scene's film-like response per channel: warm gas stays saturated, only the hottest goes white.
+	vec3 film = light * 1.6;
+	vec3 mapped = clamp((film * (2.51 * film + 0.03)) / (film * (2.43 * film + 0.59) + 0.14), 0.0, 1.0);
 	color = vec4(pow(mapped, vec3(1.0 / 2.2)), 1.0);
 }`;
 

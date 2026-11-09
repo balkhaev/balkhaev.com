@@ -313,8 +313,8 @@ vec3 distantGalaxy(vec3 dir, vec3 dx, vec3 dy, float shift) {
     * filteredGaussian(latitude, 0.022, variance) * smoothstep(0.0, 0.65, dot(dir, center));
   float obscuredBulge = max(0.0, bulge - bulge * (absorbed / max(band, 1e-6)) * 0.86);
   float young = density * smoothstep(0.55, 0.85, detail) * (0.2 + 0.8 * knots);
-  return shiftedSpectrum(4300.0, shift) * (density + obscuredBulge * 0.6) * 0.0038
-    + shiftedSpectrum(9000.0, shift) * young * 0.00022;
+  return shiftedSpectrum(4300.0, shift) * (density + obscuredBulge * 0.6) * 0.0012
+    + shiftedSpectrum(9000.0, shift) * young * 0.00011;
 }
 
 const int VOLUME_SAMPLES = 9;
@@ -535,14 +535,13 @@ void main() {
 	vec4 scene = texture(uScene, vUv);
 	// Bright light spreads in any real optics: a broad, soft point-spread halo around the hot inner disk.
 	vec3 glow = texture(uGlow0, vUv).rgb * 0.3 + texture(uGlow1, vUv).rgb * 0.25 + texture(uGlow2, vUv).rgb * 0.2 + texture(uGlow3, vUv).rgb * 0.15 + texture(uGlow4, vUv).rgb * 0.1;
-	vec3 light = mix(scene.rgb, glow, 0.07) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0) * KEY;
-	// Hue-preserving shoulder: mid-tones keep their thermal colour, and only light far
-	// beyond the sensor's range saturates every channel toward white-hot.
+	vec3 light = mix(scene.rgb, glow, 0.03) * exp(texelFetch(uExposure, ivec2(0), 0).r * 28.0 - 24.0) * KEY;
+	// The eye compresses brightness roughly logarithmically: a gentle power on the peak keeps the
+	// cool outer gas visible as deep orange beside the hot inner rim. Then a film-like curve per
+	// channel: red saturates first, so only the hottest, blueshifted gas climbs through gold to white.
 	float peak = max(light.r, max(light.g, light.b));
-	vec3 hue = light / max(peak, 1e-6);
-	float tone = 1.0 - exp(-peak * 1.2);
-	float white = 1.0 - exp(-max(0.0, peak * 1.2 - 1.0) * 0.25);
-	vec3 mapped = mix(hue, vec3(1.0), white) * tone;
+	vec3 x = light / max(peak, 1e-6) * pow(peak, 0.6) * 1.3;
+	vec3 mapped = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 	vec3 colour = encode(mapped);
 	float noise = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	colour = max(colour + noise / 255.0, 0.0);

@@ -1092,3 +1092,83 @@ summary:focus-visible {
 .prose .news-widget[hidden] {
   display: none;
 }
+
+/* Motion: headers assemble on arrival, a reading line tracks the post */
+.post-head > *,
+.masthead h1,
+.lead > * {
+  animation: blog-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.post-head > :nth-child(2),
+.lead > :nth-child(1) {
+  animation-delay: 0.08s;
+}
+.post-head > :nth-child(3),
+.lead > :nth-child(2) {
+  animation-delay: 0.16s;
+}
+.post-head > :nth-child(4) {
+  animation-delay: 0.24s;
+}
+@keyframes blog-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+.masthead .stop {
+  animation: stop-land 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.35s both;
+}
+@keyframes stop-land {
+  from {
+    transform: translateY(-1.2em) scale(0.2);
+  }
+}
+@supports (animation-timeline: scroll()) {
+  body:has(.post-body)::before {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    width: 100%;
+    height: 3px;
+    pointer-events: none;
+    content: "";
+    background: var(--signal);
+    transform-origin: left;
+    animation: read-line linear both;
+    animation-timeline: scroll(root);
+  }
+  @keyframes read-line {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  /* Section marks grow as their heading enters the screen. */
+  .prose h2::before {
+    transform-origin: left;
+    animation: mark-grow linear both;
+    animation-range: entry 0% cover 30%;
+    animation-timeline: view();
+  }
+  @keyframes mark-grow {
+    from {
+      transform: scaleX(0.15);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .post-head > *,
+  .masthead h1,
+  .lead > *,
+  .masthead .stop,
+  .prose h2::before {
+    animation: none !important;
+  }
+}
