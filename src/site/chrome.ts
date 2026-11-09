@@ -17,7 +17,7 @@ export function siteHeader(
   }[section];
   return `<header class="topbar">
     <a class="topbar-site" href="/">balkhaev.com</a>
-    ${section === "blog" ? `<a class="topbar-role" href="${blog}">${role}</a>` : `<span class="topbar-role">${role}</span>`}
+    ${section === "blog" ? `<a class="topbar-role" href="${blog}">${role}</a>` : `<span class="topbar-role">${role}${section === "home" ? ' <time class="topbar-clock" data-clock hidden></time>' : ""}</span>`}
     <nav aria-label="${ru ? "Разделы" : "Sections"}" class="topbar-nav">
       <a href="${blog}"${section === "blog" ? ' aria-current="location"' : ""}>${ru ? "Блог" : "Blog"}</a>
       <a href="/news/"${section === "news" ? ' aria-current="page"' : ""}${ru ? "" : ' hreflang="ru"'}>${ru ? "Новости" : "News"}</a>

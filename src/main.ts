@@ -1,3 +1,4 @@
+import { startHomeMotion } from "./home/motion";
 import {
   createHoleRenderer,
   type HoleRenderer,
@@ -983,6 +984,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   }
 }
 
+startHomeMotion();
 if (canvas && control) {
   start(canvas, control);
 }
