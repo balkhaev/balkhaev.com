@@ -16,6 +16,7 @@
     >
     <link href="/site.css" rel="stylesheet">
     <link href="/blog/blog.css" rel="stylesheet">
+    <link href="/russ/cases.css" rel="stylesheet">
     <title>Русс-маркет · контекст компании</title>
     <style>
     [hidden] {
@@ -250,28 +251,6 @@
     }
     .prose .sec {
       scroll-margin-top: 64px;
-    }
-    .prose .russ-case {
-      margin: 0;
-      border-bottom: 1px solid var(--hair);
-    }
-    .russ-case > summary {
-      padding: 0.75em 0;
-      font-family: var(--sans);
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .russ-case > summary:where(:hover),
-    .russ-case:where(:target) > summary {
-      color: var(--signal);
-    }
-    .russ-case .case-content {
-      padding: 0 0 0.85em 1.2em;
-      overflow-wrap: anywhere;
-    }
-    .case-part > summary {
-      margin: 0.55em 0;
-      cursor: pointer;
     }
     .prose .group-label + .sec > h2:first-child {
       margin-top: 0.8em;
@@ -948,8 +927,10 @@
           document.title = `${view.querySelector("h1").textContent} · Русс-маркет`;
         }
         if (target && target !== view) {
-          if (target instanceof HTMLDetailsElement) {
-            target.open = true;
+          let details = target.closest("details");
+          while (details) {
+            details.open = true;
+            details = details.parentElement.closest("details");
           }
           target.scrollIntoView();
         } else {
@@ -1003,7 +984,7 @@
         lb.s = next;
         apply();
       }
-      function openViewer(fig) {
+      function openViewer(fig, trigger = fig) {
         const svg = fig.querySelector("svg").cloneNode(true);
         const vb = svg.viewBox.baseVal;
         lb.w = vb.width;
@@ -1013,7 +994,7 @@
         svg.style.maxWidth = "none";
         lb.canvas.replaceChildren(svg);
         $("lb-title").textContent = fig.dataset.title || "";
-        lb.returnTo = fig;
+        lb.returnTo = trigger;
         lb.el.hidden = false;
         document.body.style.overflow = "hidden";
         fit();
@@ -1101,6 +1082,11 @@
       });
 
       function wireDiagrams(root) {
+        for (const button of root.querySelectorAll("[data-flow-zoom]")) {
+          button.addEventListener("click", () => {
+            openViewer(button.closest("figure"), button);
+          });
+        }
         for (const fig of root.querySelectorAll("figure.zoomable")) {
           const links = new Map(
             (fig.dataset.links || "")
@@ -1135,7 +1121,7 @@
       let active = -1;
       function plainText(el) {
         const c = el.cloneNode(true);
-        for (const st of c.querySelectorAll("style, script")) {
+        for (const st of c.querySelectorAll("style, script, .flow-svg")) {
           st.remove();
         }
         return c.textContent.replace(SPACES_G, " ").toLowerCase();
