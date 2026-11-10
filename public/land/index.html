@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
+    <meta content="#0c0d0b" name="theme-color">
     <title>Сайт, ролик и CRM для продажи участков · Михаил Балхаев</title>
     <meta
       content="Делаю для застройщиков коттеджных посёлков и продавцов земли сайт с 3D-генпланом, AI-ролик и CRM, которая не теряет лиды. Кейс: Алтай, 568 участков."
@@ -14,42 +15,78 @@
       content="3D-генплан, AI-ролик и CRM для коттеджных посёлков. Кейс: Алтай, 568 участков."
       property="og:description"
     >
-    <meta content="https://balkhaev.com/land/valley.webp" property="og:image">
+    <meta content="https://balkhaev.com/land/og.jpg" property="og:image">
     <meta content="website" property="og:type">
     <link href="/icon.svg" rel="icon" type="image/svg+xml">
+    <link
+      as="font"
+      crossorigin
+      href="/cv/fonts/plex-cyrillic.woff2"
+      rel="preload"
+      type="font/woff2"
+    >
     <link href="/land/land.css" rel="stylesheet">
   </head>
   <body>
-    <header class="hero">
-      <img
-        alt="Долина с посёлком, рекой и горами"
-        class="hero-img"
-        fetchpriority="high"
-        height="1013"
-        src="/land/valley.webp"
-        width="1800"
-      >
-      <div class="hero-text">
-        <p class="kicker">
-          Для застройщиков коттеджных посёлков и продавцов земли
-        </p>
-        <h1>Сайт, ролик и CRM, которые продают участки</h1>
-        <p class="lead">
-          Покупатель выбирает участок на 3D-генплане, видит посёлок в ролике до
-          того, как там появились дома, а каждая заявка с Авито, ЦИАН и сайта
-          попадает в CRM и получает ответ за минуту.
-        </p>
-        <p class="cta">
-          <a class="button" href="https://t.me/balkhaev">Написать в Telegram</a>
-          <a class="link" href="#prices">Цены и сроки</a>
-        </p>
-      </div>
+    <header class="top">
+      <a class="brand" href="/">balkhaev.com</a>
+      <nav aria-label="Разделы">
+        <a href="#case">Кейс</a>
+        <a href="#film">Фильм</a>
+        <a href="#prices">Цены</a>
+        <a href="#contact">Контакты</a>
+      </nav>
+      <a class="btn btn-small" href="https://t.me/balkhaev">Telegram ↗</a>
     </header>
 
+    <section class="hero">
+      <video
+        aria-hidden="true"
+        autoplay
+        class="hero-video"
+        loop
+        muted
+        playsinline
+        poster="/land/hero.webp"
+        preload="auto"
+      >
+        <source
+          media="(max-aspect-ratio: 3/4)"
+          src="/land/hero-portrait.mp4"
+          type="video/mp4"
+        >
+        <source src="/land/hero.mp4" type="video/mp4">
+      </video>
+      <div class="hero-inner">
+        <p class="label">
+          <span class="dot"></span>Для застройщиков коттеджных посёлков и
+          продавцов земли
+        </p>
+        <h1>Продаём участки до&nbsp;того, как появились дома</h1>
+        <p class="lead">
+          Сайт с 3D-посёлком, кино о месте и CRM, которая отвечает на заявку за
+          минуту. Как для посёлка «Алтай. Живая земля» на 568 участков.
+        </p>
+        <p class="actions">
+          <a class="btn" href="https://t.me/balkhaev">Обсудить посёлок ↗</a>
+          <a class="btn btn-ghost" href="#film">▶ Смотреть фильм · 1:49</a>
+        </p>
+      </div>
+      <ul aria-label="Кейс в цифрах" class="stats">
+        <li><b>568</b><span>участков на 3D-генплане</span></li>
+        <li><b>79 125</b><span>деревьев в 3D-долине</span></li>
+        <li><b>3,7 МБ</b><span>первая загрузка на телефоне</span></li>
+        <li><b>31</b><span>страница для поиска</span></li>
+      </ul>
+    </section>
+
     <main>
-      <section class="pains">
-        <h2>Где посёлки теряют покупателей</h2>
-        <ul class="grid3">
+      <section class="block" id="pains">
+        <div class="head">
+          <p class="index">01 · Проблема</p>
+          <h2>Где посёлки теряют покупателей</h2>
+        </div>
+        <ol class="cols">
           <li>
             <h3>Сайт как у всех</h3>
             <p>
@@ -67,46 +104,50 @@
           <li>
             <h3>Лиды остывают</h3>
             <p>
-              Заявки приходят с Авито, ЦИАН и сайта в разные места, менеджер
+              Заявки с Авито, ЦИАН и сайта приходят в разные места, менеджер
               перезванивает через день, звонки никто не слушает.
             </p>
           </li>
-        </ul>
+        </ol>
       </section>
 
-      <section class="case">
-        <p class="kicker">Кейс</p>
-        <h2>«Алтай. Живая земля»: посёлок на 568 участков</h2>
-        <p>
-          Сделал для застройщика в Республике Алтай сайт
-          <a href="https://алтайземля.рф/">алтайземля.рф</a>, ролик и CRM отдела
-          продаж. Всё в одних руках, от генплана до обработки звонков.
-        </p>
+      <section class="block" id="case">
+        <div class="head">
+          <p class="index">02 · Кейс</p>
+          <h2>«Алтай. Живая земля»</h2>
+          <p class="sub">
+            Посёлок на 568 участков в Республике Алтай. Сайт
+            <a href="https://алтайземля.рф/">алтайземля.рф</a>, фильм и CRM
+            отдела продаж: всё в одних руках, от генплана до обработки звонков.
+          </p>
+        </div>
 
-        <figure class="wide">
+        <figure class="browser">
+          <div aria-hidden="true" class="chrome">
+            <i></i><i></i><i></i><span>алтайземля.рф</span>
+          </div>
           <img
-            alt="Территория посёлка сверху: луг, лес и река"
-            height="788"
+            alt="Сайт алтайземля.рф: 3D-долина Катуни с подписями Анос, Поляна, Катунь"
+            height="900"
             loading="lazy"
-            src="/land/aerial.webp"
-            width="1400"
+            src="/land/site-valley.webp"
+            width="1440"
           >
-          <figcaption>
-            Территория сверху: так покупатель видит долину на сайте.
-          </figcaption>
         </figure>
 
-        <div class="split">
+        <div class="feature">
           <div>
-            <h3>Сайт с 3D-долиной</h3>
+            <p class="index">Сайт</p>
+            <h3>Камера летит через долину к вашему участку</h3>
             <ul class="facts">
               <li>
-                Прокрутка ведёт камеру через долину, реку и посёлок к выбору
-                участка.
+                Прокрутка ведёт одну камеру через долину, реку и посёлок к
+                выбору участка. Это настоящая 3D-модель по рельефу и снимкам, а
+                не видео.
               </li>
               <li>
-                Генплан на 568 участков общий для 2D- и 3D-вида: участок можно
-                найти на плане, в 3D или по номеру.
+                Генплан на 568 участков общий для 2D- и 3D-вида: участок находят
+                на плане, в 3D или по номеру.
               </li>
               <li>
                 Работает на телефоне: первая загрузка 3,7 МБ вместо 7,2, лес из
@@ -117,118 +158,178 @@
               </li>
             </ul>
           </div>
-          <figure>
+          <figure class="phone">
             <img
-              alt="Генплан посёлка по очередям с номерами участков"
-              height="1173"
+              alt="Сайт алтайземля.рф на телефоне: заголовок и фильм о месте"
+              height="996"
               loading="lazy"
-              src="/land/plan.webp"
-              width="1100"
+              src="/land/site-phone.webp"
+              width="585"
             >
-            <figcaption>
-              Генплан по очередям, из которого собраны 2D- и 3D-вид.
-            </figcaption>
           </figure>
         </div>
 
-        <div class="grid2">
-          <div>
-            <h3>AI-ролик посёлка</h3>
-            <p>
-              Фильм о месте, где ещё нет домов: долина, свет, будущая жизнь
-              посёлка. Кадры генерируются и монтируются на собственном
-              конвейере, поэтому ролик стоит как обычная съёмка, а не как
-              студия.
-              <a href="https://film.balkhaev.com/">Посмотреть</a>.
-            </p>
+        <figure class="browser">
+          <div aria-hidden="true" class="chrome">
+            <i></i><i></i><i></i><span>алтайземля.рф · генплан</span>
           </div>
-          <div>
-            <h3>CRM отдела продаж</h3>
-            <p>
-              Лиды из amoCRM, Авито и ЦИАН в одной воронке. Каждый звонок
-              расшифровывается и оценивается AI, бот отвечает на заявку сразу,
-              руководитель получает в Telegram новые лиды и просроченные ответы.
-            </p>
-          </div>
-        </div>
-        <p class="note">
-          Изображения на этой странице сделаны AI по реальному рельефу и
-          генплану.
-        </p>
+          <img
+            alt="Выбор участка на сайте: генплан посёлка в 3D, поиск по номеру участка"
+            height="900"
+            loading="lazy"
+            src="/land/site-plots.webp"
+            width="1440"
+          >
+          <figcaption>
+            Последняя глава сайта: 568 участков на 3D-генплане, поиск по номеру,
+            примерка дома и панорама 360°.
+          </figcaption>
+        </figure>
       </section>
 
-      <section class="prices" id="prices">
-        <h2>Что могу сделать для вашего посёлка</h2>
-        <ul class="grid2 cards">
+      <section class="film" id="film">
+        <div class="head">
+          <p class="index">03 · Фильм</p>
+          <h2>Кино о месте, где ещё нет домов</h2>
+          <p class="sub">
+            Долина, свет, будущая жизнь посёлка. Кадры сгенерированы и
+            смонтированы на собственном конвейере, поэтому ролик стоит как
+            обычная съёмка, а не как студия.
+          </p>
+        </div>
+        <figure>
+          <!-- biome-ignore lint/a11y/useMediaCaption: the film has no subtitles yet; its on-screen titles carry the text -->
+          <video
+            controls
+            playsinline
+            poster="/land/film.webp"
+            preload="none"
+            src="/land/film.mp4"
+          ></video>
+          <figcaption>«Алтай. Живая земля», 1:49. Включите звук.</figcaption>
+        </figure>
+      </section>
+
+      <section class="block" id="crm">
+        <div class="split">
+          <div class="head">
+            <p class="index">04 · CRM</p>
+            <h2>Ни одна заявка не остывает</h2>
+          </div>
+          <ul class="checks">
+            <li>Лиды из amoCRM, Авито, ЦИАН и сайта в одной воронке.</li>
+            <li>Бот отвечает на заявку сразу, днём и ночью.</li>
+            <li>Каждый звонок расшифровывается и оценивается AI.</li>
+            <li>
+              Руководитель получает в Telegram новые лиды и просроченные ответы.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="block" id="prices">
+        <div class="head">
+          <p class="index">05 · Цены</p>
+          <h2>Что сделаю для вашего посёлка</h2>
+        </div>
+        <ul class="price-list">
           <li>
-            <h3>AI-ролик</h3>
-            <p class="price">от 30 000 ₽ · 5–7 дней</p>
-            <p>
-              30–60 секунд для сайта, Авито и рекламы. Ваш рельеф и генплан,
-              будущие дома, сезоны и закат. Две итерации правок.
-            </p>
+            <span class="num">A</span>
+            <div>
+              <h3>AI-ролик</h3>
+              <p>
+                30–60 секунд для сайта, Авито и рекламы. Ваш рельеф и генплан,
+                будущие дома, сезоны и закат. Две итерации правок.
+              </p>
+            </div>
+            <p class="cost"><b>от 30 000 ₽</b><span>5–7 дней</span></p>
           </li>
           <li>
-            <h3>Сайт посёлка с генпланом</h3>
-            <p class="price">от 90 000 ₽ · 2 недели</p>
-            <p>
-              Интерактивный план: свободные, забронированные и проданные
-              участки, цены и заявка на конкретный участок. Быстро открывается с
-              телефона.
-            </p>
+            <span class="num">B</span>
+            <div>
+              <h3>Сайт посёлка с генпланом</h3>
+              <p>
+                Интерактивный план: свободные, забронированные и проданные
+                участки, цены и заявка на конкретный участок. Быстро открывается
+                с телефона.
+              </p>
+            </div>
+            <p class="cost"><b>от 90 000 ₽</b><span>2 недели</span></p>
+          </li>
+          <li class="hit">
+            <span class="num">C</span>
+            <div>
+              <h3>Сайт с 3D-посёлком <em>как в кейсе</em></h3>
+              <p>
+                Камера летит через вашу территорию, участок выбирают прямо в 3D.
+                Плюс страницы для поиска.
+              </p>
+            </div>
+            <p class="cost"><b>от 200 000 ₽</b><span>4–6 недель</span></p>
           </li>
           <li>
-            <h3>Сайт с 3D-посёлком</h3>
-            <p class="price">от 200 000 ₽ · 4–6 недель</p>
-            <p>
-              Как в кейсе: камера летит через вашу территорию, участок выбирают
-              прямо в 3D. Плюс страницы для поиска.
-            </p>
-          </li>
-          <li>
-            <h3>CRM и AI для отдела продаж</h3>
-            <p class="price">от 120 000 ₽ · 3–4 недели</p>
-            <p>
-              Все заявки в одном месте, мгновенный первый ответ, расшифровка и
-              оценка звонков, отчёт руководителю. Можно поверх вашей amoCRM.
-            </p>
+            <span class="num">D</span>
+            <div>
+              <h3>CRM и AI для отдела продаж</h3>
+              <p>
+                Все заявки в одном месте, мгновенный первый ответ, расшифровка и
+                оценка звонков, отчёт руководителю. Можно поверх вашей amoCRM.
+              </p>
+            </div>
+            <p class="cost"><b>от 120 000 ₽</b><span>3–4 недели</span></p>
           </li>
         </ul>
-        <p class="offer">
-          Бесплатно: разберу ваш сайт и путь заявки за 15 минут созвона и скажу,
-          где вы теряете покупателей. Даже если ничего не закажете.
-        </p>
       </section>
 
-      <section class="steps">
-        <h2>Как работаем</h2>
-        <ol>
+      <section class="block" id="steps">
+        <div class="head">
+          <p class="index">06 · Как работаем</p>
+          <h2>Четыре шага до запуска</h2>
+        </div>
+        <ol class="steps">
           <li>
-            Созвон на 15 минут: смотрю сайт, генплан и как обрабатываются
-            заявки.
+            <b>Созвон 15 минут</b>
+            <span>Смотрю сайт, генплан и как обрабатываются заявки.</span>
           </li>
-          <li>Фиксированная цена и срок письменно. Предоплата 50%.</li>
           <li>
-            Первый вариант через несколько дней, дальше правки до результата.
+            <b>Цена и срок письменно</b>
+            <span>Фиксированная сумма, предоплата 50%.</span>
           </li>
-          <li>Запуск, передача доступов и месяц поддержки.</li>
+          <li>
+            <b>Первый вариант</b>
+            <span>Через несколько дней, дальше правки до результата.</span>
+          </li>
+          <li>
+            <b>Запуск</b>
+            <span>Передача доступов и месяц поддержки.</span>
+          </li>
         </ol>
       </section>
+    </main>
 
-      <section class="contact" id="contact">
-        <h2>Михаил Балхаев</h2>
-        <p>
-          Разработчик: веб, 3D, AI-генерация видео и CRM. Делаю сам, без
-          агентских наценок.
-          <a href="/cv/ru/">Резюме</a>.
+    <footer class="contact" id="contact">
+      <div class="contact-inner">
+        <p class="label"><span class="dot"></span>Бесплатный разбор</p>
+        <h2>Покажу за 15 минут, где ваш посёлок теряет покупателей</h2>
+        <p class="sub">
+          Разберу сайт и путь заявки на созвоне, даже если ничего не закажете.
+          Делаю сам: веб, 3D, AI-видео и CRM, без агентских наценок.
         </p>
-        <p class="cta">
-          <a class="button" href="https://t.me/balkhaev">Telegram</a>
-          <a class="link" href="mailto:m.balkhaev@gmail.com"
+        <p class="actions">
+          <a class="btn" href="https://t.me/balkhaev">Написать в Telegram ↗</a>
+          <a class="btn btn-ghost" href="mailto:m.balkhaev@gmail.com"
             >m.balkhaev@gmail.com</a
           >
         </p>
-      </section>
-    </main>
+      </div>
+      <div class="foot">
+        <span>Михаил Балхаев</span>
+        <a href="/cv/ru/">Резюме</a>
+        <span class="muted"
+          >Кадры фильма и пейзажи на сайте сделаны AI по реальному рельефу и
+          генплану.</span
+        >
+      </div>
+    </footer>
   </body>
 </html>
