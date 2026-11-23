@@ -6,6 +6,7 @@
       "!.devhub",
       "!devhub.json",
       "!examples",
+      "!public/land/model",
       "!.video",
       "!video"
     ]

@@ -26,6 +26,7 @@
       type="font/woff2"
     >
     <link href="/land/land.css" rel="stylesheet">
+    <script src="/land/preview.js" type="module"></script>
   </head>
   <body>
     <header class="top">
@@ -116,23 +117,70 @@
           <p class="index">02 · Кейс</p>
           <h2>«Алтай. Живая земля»</h2>
           <p class="sub">
-            Посёлок на 568 участков в Республике Алтай. Сайт
-            <a href="https://алтайземля.рф/">алтайземля.рф</a>, фильм и CRM
-            отдела продаж: всё в одних руках, от генплана до обработки звонков.
+            Проект посёлка у Аноса в Республике Алтай. Мы собрали 3D-модель
+            долины Катуни, спроектировали генплан на 568 участков, сделали
+            <a href="https://алтайземля.рф/">сайт</a>, фильмы и CRM для отдела
+            продаж.
           </p>
         </div>
 
-        <figure class="browser">
-          <div aria-hidden="true" class="chrome">
-            <i></i><i></i><i></i><span>алтайземля.рф</span>
+        <figure class="browser model" id="altay-3d">
+          <div class="model-bar">
+            <h3>Долина Катуни в 3D</h3>
+            <fieldset
+              aria-label="Управление моделью"
+              class="model-controls"
+              hidden
+              id="model-controls"
+            >
+              <button
+                aria-pressed="true"
+                data-model-view="valley"
+                type="button"
+              >
+                Долина
+              </button>
+              <button aria-pressed="false" data-model-view="plan" type="button">
+                Генплан
+              </button>
+              <button
+                aria-label="Закрыть 3D"
+                id="model-close"
+                title="Закрыть 3D"
+                type="button"
+              >
+                ×
+              </button>
+            </fieldset>
           </div>
-          <img
-            alt="Сайт алтайземля.рф: 3D-долина Катуни с подписями Анос, Поляна, Катунь"
-            height="900"
-            loading="lazy"
-            src="/land/site-valley.webp"
-            width="1440"
-          >
+          <div class="model-stage" id="model-stage">
+            <div class="model-canvas" id="model-canvas" inert></div>
+            <div
+              class="model-labels"
+              data-valley-labels
+              id="model-labels"
+              inert
+            ></div>
+            <img
+              alt="3D-модель долины Катуни и окрестностей Аноса"
+              decoding="async"
+              height="1000"
+              id="model-poster"
+              loading="lazy"
+              src="/land/model/story-valley.webp"
+              width="1600"
+            >
+            <button class="btn" hidden id="model-open" type="button">
+              Открыть 3D
+            </button>
+          </div>
+          <figcaption>
+            <p id="model-status" role="status"></p>
+            <p>
+              Рельеф, река, лес и застройка Аноса. Источники модели —
+              OpenStreetMap, Яндекс, Copernicus Sentinel, Mapzen, USGS и NOAA.
+            </p>
+          </figcaption>
         </figure>
 
         <div class="feature">
@@ -141,20 +189,23 @@
             <h3>Камера летит через долину к вашему участку</h3>
             <ul class="facts">
               <li>
-                Прокрутка ведёт одну камеру через долину, реку и посёлок к
-                выбору участка. Это настоящая 3D-модель по рельефу и снимкам, а
-                не видео.
+                На сайте прокрутка ведёт камеру от гор и Аноса через Катунь к
+                участкам. Модель собрана по данным высот, спутниковым снимкам,
+                картографическим контурам и топосъёмке.
               </li>
               <li>
-                Генплан на 568 участков общий для 2D- и 3D-вида: участок находят
-                на плане, в 3D или по номеру.
+                Генплан на 94,3 га разбит на три очереди. В нём 568 участков,
+                жилые улицы, общественные площадки и панорамный парк. В 2D и 3D
+                можно найти участок по номеру, примерить дом и открыть панораму.
               </li>
               <li>
-                Работает на телефоне: первая загрузка 3,7 МБ вместо 7,2, лес из
-                79 125 деревьев без потери кадров.
+                Для телефона подготовили компактные версии сцен. Геометрия
+                генплана весит 3,7 МБ, исходная модель леса содержит 79 125
+                деревьев.
               </li>
               <li>
-                31 страница путеводителя по региону приводит людей из поиска.
+                Подготовили 31 страницу для поиска, включая 22 статьи о местах,
+                людях и маршрутах Алтая.
               </li>
             </ul>
           </div>
@@ -190,34 +241,49 @@
       <section class="film" id="film">
         <div class="head">
           <p class="index">03 · Фильм</p>
-          <h2>Кино о месте, где ещё нет домов</h2>
+          <h2>Два фильма об Алтае</h2>
           <p class="sub">
-            Долина, свет, будущая жизнь посёлка. Кадры сгенерированы и
-            смонтированы на собственном конвейере, поэтому ролик стоит как
-            обычная съёмка, а не как студия.
+            Для «Алтая. Живой земли» собрали AI-ролик о будущем посёлке. «Алтай
+            с высоты» показывает долину в аэросъёмке.
           </p>
         </div>
-        <figure>
-          <!-- biome-ignore lint/a11y/useMediaCaption: the film has no subtitles yet; its on-screen titles carry the text -->
-          <video
-            controls
-            playsinline
-            poster="/land/film.webp"
-            preload="none"
-            src="/land/film.mp4"
-          ></video>
-          <figcaption>«Алтай. Живая земля», 1:49. Включите звук.</figcaption>
-        </figure>
+        <div class="film-grid">
+          <figure>
+            <!-- biome-ignore lint/a11y/useMediaCaption: the film has no subtitles yet; its on-screen titles carry the text -->
+            <video
+              controls
+              playsinline
+              poster="/land/film.webp"
+              preload="none"
+              src="/land/film.mp4"
+            ></video>
+            <figcaption>«Алтай. Живая земля», 1:49. Включите звук.</figcaption>
+          </figure>
+          <figure>
+            <!-- biome-ignore lint/a11y/useMediaCaption: the aerial film has a music soundtrack -->
+            <video
+              controls
+              playsinline
+              poster="/land/aerial.webp"
+              preload="none"
+              src="/land/aerial.mp4"
+            ></video>
+            <figcaption>«Алтай с высоты», 2:43.</figcaption>
+          </figure>
+        </div>
       </section>
 
       <section class="block" id="crm">
         <div class="split">
           <div class="head">
             <p class="index">04 · CRM</p>
-            <h2>Ни одна заявка не остывает</h2>
+            <h2>ZemCRM для отдела продаж</h2>
           </div>
           <ul class="checks">
             <li>Лиды из amoCRM, Авито, ЦИАН и сайта в одной воронке.</li>
+            <li>
+              Генплан можно загрузить в CRM вместе с участками и очередями.
+            </li>
             <li>Бот отвечает на заявку сразу, днём и ночью.</li>
             <li>Каждый звонок расшифровывается и оценивается AI.</li>
             <li>

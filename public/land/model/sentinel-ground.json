@@ -1,0 +1,19 @@
+{
+  "image": "/land/model/sentinel-ground.webp",
+  "boundsWgs84": [
+    85.925,
+    51.465,
+    86.005,
+    51.52
+  ],
+  "width": 565,
+  "height": 621,
+  "nativeResolutionMetres": 10,
+  "acquiredAt": "2026-06-21",
+  "source": "assets/sources/anos-research-2026-09-24/satellite/S2A_45UVT_20260621_0_L2A.tif",
+  "sourceUrl": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/45/U/VT/2026/6/S2A_45UVT_20260621_0_L2A/TCI.tif",
+  "attribution": "Contains modified Copernicus Sentinel data (2026), processed by ESA; Element 84 Earth Search / AWS.",
+  "processing": "Bilinear geographic reprojection; luminance (median gain, soft shoulder above 150) and chroma (mean/spread) matched to the Yandex satellite captures over 53008 shared land pixels (gain 2.251, chroma scale [0.722, 0.424]); 24566 bright roof, tent and gravel pixels (under 10 m, where the model has its own buildings) filled from the surrounding ground; WebP. No sharpening, no generative enhancement.",
+  "sha256": "721732d78e4460b68e30757a219bb193ff4b5901a606dc925290c37efde323c3",
+  "colourReference": "assets/sources/zemcrm/manifest.json"
+}

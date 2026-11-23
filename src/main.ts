@@ -21,7 +21,6 @@ import {
 } from "./lib/scene-dive";
 import { OBSERVER_RADIUS, opticsAt } from "./lib/scene-geometry";
 import { scenePreview, sceneTimeStep } from "./lib/scene-playback";
-import { createMergerMode } from "./merger-mode";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#hole");
 const control = document.querySelector<HTMLButtonElement>("#observer");
@@ -45,7 +44,7 @@ function flightLabel(flight: ReturnType<typeof createFlight>) {
 
 function flightInstruction(flight: ReturnType<typeof createFlight>) {
   if (!flight.active) {
-    return "Дыра, её диск и звезда. Скоро придёт вторая.";
+    return "Перед вами чёрная дыра. Начните погружение или осмотритесь.";
   }
   if (flight.playback === "rewinding") {
     return "Скролл ↓ — ближе · ↑ — дальше. Время идёт вперёд.";
@@ -169,8 +168,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const signalLabel = document.querySelector<HTMLElement>("#journey-signal");
   const horizonTick = document.querySelector<HTMLElement>(".horizon-tick");
   if (horizonTick) {
-    // The bar holds the whole story: the merger, then the fall.
-    horizonTick.style.left = `${50 + (HORIZON_PROGRESS / END_PROGRESS) * 50}%`;
+    horizonTick.style.left = `${(HORIZON_PROGRESS / END_PROGRESS) * 100}%`;
   }
   const journeyProgress =
     document.querySelector<HTMLElement>("#journey-progress");
@@ -193,14 +191,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   let last = 0;
   let time = 0;
   const physics = createPhysicsPanel(() => redraw());
-  const mergerCanvas = document.querySelector<HTMLCanvasElement>("#merger");
-  const unitLabel = document.querySelector<HTMLElement>("#journey-unit");
-  const merger = mergerCanvas ? createMergerMode(mergerCanvas) : null;
-  // The story: the first hole alone, the companion and the merger, then the
-  // fall into the remnant. `mergerDone` marks that the fall chapter follows.
-  let mergerOn = false;
-  let mergerDone = false;
-  let fadeTimer = 0;
   let noteStage = "";
   let noteTimer = 0;
   const showNote = (stage: string) => {
@@ -225,11 +215,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     dragged: boolean;
   } | null = null;
 
-  const storyProgress = (share: number) => {
-    if (journeyProgress) {
-      journeyProgress.style.transform = `scaleX(${share})`;
-    }
-  };
   const frameView = () => {
     const { journey } = flight;
     view.distance = journey.radius;
@@ -269,7 +254,9 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         updateText(signalLabel, `Свет извне · ${rateFormat.format(skyRate)}×`);
       }
     }
-    storyProgress(mergerDone ? 0.5 + 0.5 * journey.completion : 0);
+    if (journeyProgress) {
+      journeyProgress.style.transform = `scaleX(${journey.completion})`;
+    }
     const playing = flight.playback === "playing";
     if (travelToggle) {
       travelToggle.toggleAttribute("data-playing", playing);
@@ -295,34 +282,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     renderer?.view(view);
   };
 
-  const frameMerger = () => {
-    if (!merger) {
-      return;
-    }
-    const text = merger.text();
-    updateText(flightStatus, text.status);
-    updateText(flightNote, text.note);
-    showNote(text.note);
-    updateText(radiusLabel, text.readout);
-    updateText(unitLabel, text.unit);
-    let action = merger.playing ? "Пауза" : "Продолжить";
-    if (still.matches || previewStill) {
-      action = "Дальше";
-    }
-    updateText(travelLabel, action);
-    travelToggle?.toggleAttribute("data-playing", merger.playing);
-    if (travelToggle) {
-      travelToggle.disabled = false;
-    }
-    storyProgress(0.5 * text.progress);
-  };
   const draw = () => {
-    if (mergerOn && merger) {
-      diveZoom();
-      frameMerger();
-      merger.draw();
-      return;
-    }
     if (!renderer) {
       return;
     }
@@ -349,11 +309,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
       surface.clientHeight,
       devicePixelRatio || 1
     );
-    merger?.resize(
-      surface.clientWidth,
-      surface.clientHeight,
-      devicePixelRatio || 1
-    );
     draw();
   };
 
@@ -365,15 +320,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     const elapsed = last ? (now - last) / 1000 : 0;
     const seconds = Math.min(0.1, elapsed);
     last = now;
-    if (mergerOn && merger) {
-      const { playing } = merger;
-      if (merger.advance(seconds) && playing) {
-        handoff(true);
-        return;
-      }
-      draw();
-      return;
-    }
     flight.advance(seconds);
     time += sceneTimeStep(seconds);
     Object.assign(view, look.advance(seconds));
@@ -392,9 +338,7 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   };
   const resume = () => {
     stop();
-    audio.setAudible(
-      !document.hidden && Boolean(renderer) && expanded && !mergerOn
-    );
+    audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
     if (!(renderer || attempted) && expanded) {
       // Opened before the deferred start: build the scene now.
       mount();
@@ -435,102 +379,14 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   const dismissHint = () => {
     hint?.classList.add("dismissed");
   };
-  // Scroll and keys move along the whole story, in seconds of playback.
-  const STORY_SCRUB = 6;
   const travel = (amount: number) => {
-    if (mergerOn && merger) {
-      merger.scrub(amount * STORY_SCRUB);
-      if (merger.finished && amount > 0) {
-        handoff(false);
-      }
-      return;
-    }
-    const canStart = merger?.available && !flight.active && amount > 0;
-    if (!mergerDone && canStart && merger) {
-      setMerger(true);
-      merger.scrub(amount * STORY_SCRUB);
-      return;
-    }
-    if (mergerDone && merger && amount < 0 && flight.journey.phase <= 0) {
-      setMerger(true);
-      merger.scrub(amount * STORY_SCRUB);
-      return;
-    }
     flight.travel(amount, still.matches || previewStill, false);
   };
   const turn = (dx: number, dy: number) => {
-    if (mergerOn && merger) {
-      merger.turn(dx * 1.5, -dy * 1.5);
-      return;
-    }
     look.turn(dx, dy, still.matches || previewStill);
   };
-  // The two renderers cross-fade: each keeps its last frame while the other
-  // fades over it, and both frame the same view at the hand-over.
-  const setMerger = (on: boolean) => {
-    if (!merger || on === mergerOn) {
-      return;
-    }
-    mergerOn = on;
-    clearTimeout(fadeTimer);
-    noteStage = "";
-    if (on) {
-      flight.pause();
-      audio.setAudible(false);
-      if (mergerCanvas) {
-        mergerCanvas.hidden = false;
-      }
-      fit();
-      requestAnimationFrame(() => {
-        if (mergerOn && scene) {
-          scene.dataset.mode = "merger";
-        }
-      });
-      return;
-    }
-    merger.pause();
-    updateText(unitLabel, "rₛ");
-    audio.setAudible(!document.hidden && Boolean(renderer) && expanded);
-    if (scene) {
-      delete scene.dataset.mode;
-    }
-    fadeTimer = window.setTimeout(() => {
-      if (!mergerOn && mergerCanvas) {
-        mergerCanvas.hidden = true;
-      }
-    }, 1400);
-    fit();
-  };
-  // The merger has played out: the fall into the remnant takes over.
-  function handoff(autoplay: boolean) {
-    mergerDone = true;
-    setMerger(false);
-    if (autoplay && flight.playback !== "playing") {
-      flight.togglePlayback();
-    }
-    redraw();
-  }
   const toggleTravel = () => {
     dismissHint();
-    if (mergerOn && merger) {
-      if (still.matches || previewStill) {
-        travel(0.24);
-      } else {
-        merger.togglePlayback();
-      }
-      redraw();
-      return;
-    }
-    if (!(mergerDone || flight.active) && merger?.available) {
-      setMerger(true);
-      if (still.matches || previewStill) {
-        travel(0.24);
-      } else {
-        merger.play();
-      }
-      redraw();
-      return;
-    }
     if (still.matches || previewStill) {
       travel(0.24);
     } else {
@@ -577,9 +433,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
   });
 
   const disturb = (event: PointerEvent, tap = false) => {
-    if (mergerOn) {
-      return;
-    }
     const now = event.timeStamp;
     const box = surface.getBoundingClientRect();
     const x = (event.clientX - box.left) / box.width;
@@ -771,7 +624,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
     openButton?.setAttribute("aria-expanded", String(open));
     if (!open) {
       flight.pause();
-      merger?.pause();
       gesture = null;
       touches.clear();
       if (document.fullscreenElement) {
@@ -973,14 +825,6 @@ function start(surface: HTMLCanvasElement, input: HTMLButtonElement) {
         mount();
       }
     });
-  }
-  // Local visual review of the merger at a fixed time: ?preview-merger=<M>.
-  const mergerPreview = previewStill
-    ? new URLSearchParams(location.search).get("preview-merger")
-    : null;
-  if (mergerPreview !== null && merger) {
-    merger.seek(Number(mergerPreview) || 0);
-    setMerger(true);
   }
 }
 

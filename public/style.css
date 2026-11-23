@@ -258,6 +258,25 @@ a.row:hover::before {
   opacity: 1;
   transform: translate(-2px, -50%);
 }
+a.project-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+a.project-preview:hover {
+  padding-left: 0;
+}
+a.project-preview::before {
+  display: none;
+}
+.project-image {
+  display: block;
+  grid-column: 1 / -1;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2;
+  object-fit: cover;
+}
 .empty {
   margin: 12px 0;
   color: var(--muted);
@@ -542,19 +561,6 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
 }
 .rendered #hole {
   opacity: 1;
-}
-#merger {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  opacity: 0;
-  transition: opacity 1.2s ease;
-}
-#merger[hidden] {
-  display: none;
 }
 #observer {
   position: absolute;
@@ -1175,12 +1181,6 @@ html.scene-diving :is(.scene-bar, .flight-info, .physics-panel) {
 .scene[data-state="compact"] .flight-info,
 .scene[data-state="compact"] .physics-panel {
   display: none !important;
-}
-.scene[data-mode="merger"] #merger {
-  opacity: 1;
-}
-.scene[data-mode="merger"] #journey-signal {
-  visibility: hidden;
 }
 
 /* biome-ignore-start lint/style/noDescendingSpecificity: the motion layer restates delays per element, after the base styles it animates */

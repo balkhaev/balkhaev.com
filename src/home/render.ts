@@ -42,8 +42,16 @@ export function latestPosts(posts: Post[], count = LATEST) {
     .slice(0, count);
 }
 
+type HomeProject = Project & { url: string; preview?: string };
+
 /** Projects Mikhail chose for the homepage, in his order. */
-export const HOME_PROJECTS: Project[] = [
+export const HOME_PROJECTS: HomeProject[] = [
+  {
+    name: "Алтай. Живая земля",
+    preview: "/land/model/story-valley.webp",
+    text: "3D-долина Катуни, генплан на 568 участков, фильмы и CRM",
+    url: "/land/#case",
+  },
   {
     name: "Luv Club",
     text: "AI-компаньоны со студией: фото, видео и 3D-сцены",
@@ -86,17 +94,19 @@ const renderPosts = (posts: Post[]) =>
             </ol>`
     : '<p class="empty">Первые записи скоро появятся.</p>';
 
-const renderProjects = (projects: Project[]) =>
+const renderProjects = (projects: HomeProject[]) =>
   `<ul class="rows">${projects
     .map((project) => {
-      const host = (project.url ?? "")
-        .replace(SCHEME, "")
-        .replace(TRAILING_SLASH, "");
+      const external = SCHEME.test(project.url);
+      const label = external
+        ? project.url.replace(SCHEME, "").replace(TRAILING_SLASH, "")
+        : "Кейс · 3D";
       return `
               <li>
-                <a class="row project-row" href="${html(project.url ?? "")}" rel="noopener noreferrer" target="_blank" title="${html(project.text)}">
+                <a class="row project-row${project.preview ? " project-preview" : ""}" href="${html(project.url)}"${external ? ' rel="noopener noreferrer" target="_blank"' : ""} title="${html(project.text)}">
+                  ${project.preview ? `<img alt="" class="project-image" decoding="async" height="1000" loading="lazy" src="${html(project.preview)}" width="1600">` : ""}
                   <span class="row-title">${html(project.name)}</span>
-                  <span class="row-meta">${html(host)} <span aria-hidden="true" class="row-arrow">↗</span></span>
+                  <span class="row-meta">${html(label)} <span aria-hidden="true" class="row-arrow">${external ? "↗" : "→"}</span></span>
                 </a>
               </li>`;
     })

@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "encoding": "RGB, value / 127.5 = ratio of the ground to its own 30-45 m average (linear light); 1.0 keeps the colour",
+  "textures": {
+    "forest": {
+      "image": "/land/model/ground-detail-forest.webp",
+      "metresPerPixel": 1.49,
+      "size": 256,
+      "tileMetres": 381.4,
+      "source": "assets/sources/zemcrm/overview.png",
+      "window": [
+        248,
+        452,
+        256,
+        256
+      ],
+      "forestShare": 0.868,
+      "lineCoherence": 0.259,
+      "blurSigmaPixels": 24,
+      "avoidedMarks": [
+        [
+          780,
+          1061,
+          834,
+          1092
+        ],
+        [
+          1198,
+          5,
+          1252,
+          36
+        ],
+        [
+          1225,
+          463,
+          1279,
+          494
+        ],
+        [
+          641,
+          109,
+          695,
+          140
+        ],
+        [
+          777,
+          1492,
+          831,
+          1523
+        ],
+        [
+          1193,
+          1494,
+          1247,
+          1525
+        ],
+        [
+          1252,
+          1113,
+          1306,
+          1144
+        ],
+        [
+          159,
+          615,
+          213,
+          646
+        ],
+        [
+          207,
+          1049,
+          261,
+          1080
+        ],
+        [
+          785,
+          564,
+          839,
+          595
+        ]
+      ],
+      "sha256": "3d11fd8e321620148351fa48f5d32a0c5ad82d2262a412d1fa2a9d67e6b3a6fa"
+    },
+    "meadow": {
+      "image": "/land/model/ground-detail-meadow.webp",
+      "metresPerPixel": 0.745,
+      "size": 240,
+      "tileMetres": 178.8,
+      "source": "assets/sources/zemcrm/meadow.png",
+      "window": [
+        276,
+        1044,
+        240,
+        240
+      ],
+      "forestShare": 0.0,
+      "lineCoherence": 0.263,
+      "blurSigmaPixels": 30,
+      "avoidedMarks": [
+        [
+          52,
+          73,
+          106,
+          104
+        ],
+        [
+          954,
+          620,
+          1008,
+          651
+        ],
+        [
+          439,
+          988,
+          493,
+          1019
+        ],
+        [
+          514,
+          538,
+          568,
+          569
+        ],
+        [
+          57,
+          1019,
+          111,
+          1050
+        ],
+        [
+          514,
+          1510,
+          568,
+          1541
+        ],
+        [
+          1063,
+          68,
+          1117,
+          99
+        ],
+        [
+          991,
+          1082,
+          1045,
+          1113
+        ]
+      ],
+      "sha256": "05d3796978be505f8a7a2615b87413be5331858b2e7d7ee26102e8d1912adf88"
+    }
+  },
+  "attribution": "© Яндекс — satellite captures via ZemCRM (assets/sources/zemcrm); detail only, colour comes from Sentinel-2."
+}

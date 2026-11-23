@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "heights": "/land/model/horizon-heights.bin",
+  "texture": "/land/model/horizon-ground.webp",
+  "grid": 225,
+  "halfExtent": 140,
+  "units": "100 metres per scene unit, origin at the model origin",
+  "encoding": "little-endian int16 decimetres above the 350 m model datum, rows north to south",
+  "boundsWgs84": [
+    85.757578,
+    51.360131,
+    86.161504,
+    51.611659
+  ],
+  "heightRangeMetres": [
+    345.7,
+    1837.7
+  ],
+  "textureMissingShare": 0.0,
+  "sources": {
+    "elevation": {
+      "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+      "zoom": 11,
+      "attribution": "Mapzen / Tilezen Terrarium elevation: USGS, NOAA and others",
+      "tiles": [
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1511-680.png",
+          "sha256": "99e49fdaead6e42b51259bb698490edc11ca65d5f4b38eb367cd3ee8468adbd5"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1512-680.png",
+          "sha256": "369121a104a2527b949eadcfba1a1a5b7e817246fe3f9a6fc90b97ffc3f7bf89"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1513-680.png",
+          "sha256": "eed9636da0a21013da70ab3fee68b34f577863777a7213ba44ee91be0beb933f"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1514-680.png",
+          "sha256": "70696aee7c1d67a2b74644f93441de7ebda1d5d5de45522d4394d9894665c9cd"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1511-681.png",
+          "sha256": "4ce74b804144cde69a319bb69f15ad62ad20b30efb5f18a5eaf88828c914455f"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1512-681.png",
+          "sha256": "d929de6c038b012b318d7f9dbfd5ce75ff383bb9ea26373b7a883c8b540c2976"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1513-681.png",
+          "sha256": "095000578ece1ee5df2d81a710a56367823052c0d05540638a9d9c39405cb4e4"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1514-681.png",
+          "sha256": "b1d77c3297efcb811e3ab4867ad3e5c0de410fdf75d03d7bd16c62bad39c3eed"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1511-682.png",
+          "sha256": "7690e98a30293c03f8d41b230258331e9d8f667b10d674bc708fb888b390880a"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1512-682.png",
+          "sha256": "98fc21849f7191d0d7417b5a4b3088f65c70cb8f76ce13f55b80d466dc0453ff"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1513-682.png",
+          "sha256": "19e519225a480b2e9988beef5c1b0b57f7edcbfbb93129f652fd8189de5cc679"
+        },
+        {
+          "path": "assets/sources/anos-horizon-2026-09-25/terrarium/11-1514-682.png",
+          "sha256": "6434b8a38ab5284ad197690e6145a9e61613cf4de2708620c8a2aa8d56ee6e95"
+        }
+      ]
+    },
+    "ground": {
+      "url": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/45/U/VT/2026/6/S2A_45UVT_20260621_0_L2A/TCI.tif",
+      "acquiredAt": "2026-06-21",
+      "attribution": "Contains modified Copernicus Sentinel data (2026), processed by ESA; Element 84 Earth Search / AWS."
+    }
+  },
+  "processing": "Bilinear sampling of Terrarium heights onto a 125 m local grid; Sentinel-2 TCI read from the 20 m overview, reprojected once. No generative enhancement.",
+  "sha256": {
+    "heights": "9a57be8506cd5da510824e86c95aa0008eb86c08fe3ebebf8362d0497ebf2cd3",
+    "texture": "29a46b8158aa43ed1a22b33279a01b2b46d00754c2937ee7d1b9238f71ca5a1e"
+  },
+  "groundProcessing": "Colour matched to the valley ground by scripts/prepare_valley_ground.py (same luminance and chroma transfer)."
+}

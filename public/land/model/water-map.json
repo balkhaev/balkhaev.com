@@ -1,0 +1,16 @@
+{
+  "image": "/land/model/water-map.png",
+  "width": 1024,
+  "height": 1131,
+  "bounds": {
+    "x0": -23.943599700927734,
+    "z0": -37.96549987792969,
+    "width": 55.45549964904785,
+    "depth": 61.22570037841797
+  },
+  "metresPerPixel": 5.416,
+  "encoding": "8-bit RGB, rows north to south. R: metres to the nearest bank or rock (0 = land, capped at 255); G, B: downstream direction x and z, mapped from -1…1 to 0…255 (land 128).",
+  "source": "Water triangles of models/anos-v3 (OpenStreetMap water outline) and DRAGON_TEETH in public/valley-bridge.mjs; exact Euclidean distance transform.",
+  "waterPixels": 53942,
+  "sha256": "2a21ecea4d1fa0516ccbe938fbaf86467bbaef69469d1281303ed6c490d7475b"
+}
