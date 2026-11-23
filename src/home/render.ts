@@ -50,7 +50,7 @@ export const HOME_PROJECTS: HomeProject[] = [
     name: "Алтай. Живая земля",
     preview: "/land/model/story-valley.webp",
     text: "3D-долина Катуни, генплан на 568 участков, фильмы и CRM",
-    url: "/land/#case",
+    url: "/land/",
   },
   {
     name: "Luv Club",

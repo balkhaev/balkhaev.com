@@ -34,7 +34,7 @@ test("prefers the Russian version and falls back to English", () => {
 
 test("lists the chosen projects with summaries", () => {
   expect(HOME_PROJECTS.map((project) => project.url)).toEqual([
-    "/land/#case",
+    "/land/",
     "https://luv.club/",
     "https://adorely.co/",
     "https://sinly.io/",
@@ -51,7 +51,7 @@ test("fills both placeholders", () => {
   );
   expect(page).toContain('href="/blog/ru/a/"');
   expect(page).toContain("project-row");
-  expect(page).toContain('href="/land/#case" title="3D-долина');
+  expect(page).toContain('href="/land/" title="3D-долина');
   expect(page).toContain('src="/land/model/story-valley.webp"');
   expect(page).toContain("job-row");
   expect(page).not.toContain("home:");
