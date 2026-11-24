@@ -53,86 +53,116 @@
 
     <main>
       <section aria-labelledby="project-title" class="hero">
-        <picture aria-hidden="true" class="hero-picture">
-          <source media="(max-width: 720px)" srcset="/land/hero-portrait.webp">
-          <img
-            alt=""
-            fetchpriority="high"
-            height="900"
-            src="/land/hero.webp"
-            width="1600"
-          >
-        </picture>
-        <video
-          aria-hidden="true"
-          class="hero-motion"
-          id="hero-motion"
-          muted
-          playsinline
-          preload="none"
-        ></video>
         <div class="shell hero-inner">
-          <div class="hero-copy">
-            <p class="eyebrow hero-tag">3D-генпланы и сайты для девелоперов</p>
+          <div class="hero-intro">
+            <p class="eyebrow hero-tag">
+              <span aria-hidden="true"></span>
+              3D-генпланы для девелоперов
+            </p>
             <h1 id="project-title">
-              Покажите посёлок<br>
-              <em>до стройки</em>
+              Сначала долина.<br><em>Потом посёлок.</em>
             </h1>
             <p class="hero-lead">
-              Покупатель видит рельеф и окружение, находит свой участок и
-              примеряет дом прямо на сайте.
+              Рельеф Катуни и 568 участков в одной 3D-сцене. Потяните границу,
+              чтобы увидеть генплан.
             </p>
-            <div class="actions">
-              <a
-                class="button button-accent"
-                data-start-model="valley"
-                href="#altay-3d"
-                >Открыть долину в 3D
-                <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
-                  <path d="M4 12 12 4M5 4h7v7"></path>
-                </svg></a
+          </div>
+          <figure aria-labelledby="atlas-title" class="atlas" id="hero-atlas">
+            <div class="atlas-header">
+              <span id="atlas-title">Алтай. Живая земля</span>
+              <span class="eyebrow atlas-index">01 / Анос, Катунь</span>
+            </div>
+            <div class="atlas-stage" id="atlas-stage">
+              <img
+                alt="3D-модель долины Катуни с проектной площадкой в Аносе"
+                fetchpriority="high"
+                height="920"
+                src="/land/atlas/terrain.webp"
+                width="1480"
               >
-              <a class="button button-light" href="#genplan"
-                >Попробовать генплан</a
+              <div class="atlas-proposal">
+                <img
+                  alt=""
+                  fetchpriority="high"
+                  height="920"
+                  src="/land/atlas/proposal.webp"
+                  width="1480"
+                >
+                <img
+                  alt=""
+                  decoding="async"
+                  height="920"
+                  src="/land/atlas/parcels.svg"
+                  width="1480"
+                >
+              </div>
+              <span aria-hidden="true" class="atlas-layer atlas-layer-base"
+                >Рельеф</span
+              >
+              <span aria-hidden="true" class="atlas-layer atlas-layer-plan"
+                >Генплан</span
+              >
+              <div aria-hidden="true" class="atlas-divider">
+                <span>
+                  <svg aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="m8 8-4 4 4 4m8-8 4 4-4 4"></path>
+                  </svg>
+                </span>
+              </div>
+              <input
+                aria-label="Сравнить рельеф и генплан"
+                class="atlas-range"
+                hidden
+                id="atlas-range"
+                max="100"
+                min="0"
+                type="range"
+                value="43"
+              >
+              <a
+                aria-label="Найти участок №42 в генплане"
+                class="atlas-marker"
+                data-preview-plot="42"
+                href="#genplan"
+                >№42</a
               >
             </div>
-          </div>
-          <a class="hero-preview" href="#genplan">
-            <img
-              alt=""
-              decoding="async"
-              height="1000"
-              src="/land/model/plots.webp"
-              width="1600"
+            <figcaption class="atlas-caption">
+              <div class="atlas-buttons" hidden id="atlas-buttons">
+                <button
+                  aria-pressed="false"
+                  data-atlas-view="100"
+                  type="button"
+                >
+                  Рельеф
+                </button>
+                <button aria-pressed="false" data-atlas-view="0" type="button">
+                  Генплан
+                </button>
+                <button aria-pressed="true" data-atlas-view="43" type="button">
+                  Сравнить
+                </button>
+              </div>
+              <span class="atlas-scale">568 участков · 94,3 га</span>
+            </figcaption>
+          </figure>
+          <div class="actions">
+            <a
+              class="button button-accent"
+              data-start-model="plan"
+              href="#altay-3d"
             >
-            <span class="hero-preview-label">
-              <span
-                ><strong>Алтай. Живая земля</strong
-                ><small>Кейс · Анос, долина Катуни</small></span
-              >
-              <svg
-                aria-hidden="true"
-                class="link-arrow preview-arrow"
-                viewBox="0 0 16 16"
-              >
-                <path d="m4 4 8 8m-7 0h7V5"></path>
+              Открыть модель в 3D
+              <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
+                <path d="M4 12 12 4M5 4h7v7"></path>
               </svg>
-            </span>
-          </a>
-          <div class="hero-meta">
-            <a class="hero-location" href="#case">
-              <span aria-hidden="true" class="location-dot"></span>
-              Кейс: Алтай. Живая земля
             </a>
-            <button
-              class="motion-toggle"
-              hidden
-              id="hero-motion-toggle"
-              type="button"
+            <a
+              class="button button-light"
+              data-preview-plot="42"
+              href="#genplan"
+              >Найти участок №42</a
             >
-              <span aria-hidden="true" class="motion-icon">▷</span>
-              <span id="hero-motion-label">Включить полёт</span>
-            </button>
           </div>
         </div>
       </section>

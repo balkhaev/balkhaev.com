@@ -1,65 +1,86 @@
-const video = document.querySelector("#hero-motion");
-const toggle = document.querySelector("#hero-motion-toggle");
-const label = document.querySelector("#hero-motion-label");
-const narrow = matchMedia("(max-width: 720px)");
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const stage = document.querySelector("#atlas-stage");
+const range = document.querySelector("#atlas-range");
+const controls = document.querySelector("#atlas-buttons");
+const buttons = [...controls.querySelectorAll("[data-atlas-view]")];
+const motion = matchMedia("(prefers-reduced-motion: reduce)");
+let frame;
+let used = false;
 
-function updateControl() {
-  label.textContent = video.paused ? "Включить полёт" : "Остановить полёт";
+function render(value) {
+  const edge = Math.round(value * 10) / 10;
+  stage.style.setProperty("--atlas-edge", `${edge}%`);
+  stage.dataset.hideBase = String(edge <= 7);
+  stage.dataset.hidePlan = String(edge >= 93);
+  stage.dataset.showMarker = String(edge < 69);
 }
 
-async function play() {
-  if (!video.getAttribute("src")) {
-    video.src = narrow.matches ? "/land/hero-portrait.mp4" : "/land/hero.mp4";
-  }
-  try {
-    await video.play();
-  } catch {
-    updateControl();
+function apply(value) {
+  range.value = String(value);
+  render(value);
+  const split = Number(range.value);
+  range.setAttribute(
+    "aria-valuetext",
+    `${split}% рельефа, ${100 - split}% генплана`
+  );
+  for (const button of buttons) {
+    const view = Number(button.dataset.atlasView);
+    const isSelected = view === 43 ? split > 0 && split < 100 : split === view;
+    button.setAttribute("aria-pressed", String(isSelected));
   }
 }
 
-toggle.hidden = false;
-toggle.addEventListener("click", () => {
-  if (video.paused) {
-    play();
-  } else {
-    video.pause();
-  }
-});
-video.addEventListener("playing", () => {
-  video.classList.add("has-frame");
-  updateControl();
-});
-video.addEventListener("pause", updateControl);
-video.addEventListener("ended", updateControl);
-video.addEventListener("error", () => {
-  video.classList.remove("has-frame");
-  toggle.hidden = true;
-});
-reducedMotion.addEventListener("change", () => {
-  if (reducedMotion.matches) {
-    video.pause();
-    video.classList.remove("has-frame");
-  }
-});
-new IntersectionObserver(([entry]) => {
-  if (!entry.isIntersecting) {
-    video.pause();
-  }
-}).observe(video);
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    video.pause();
-  }
-});
+function stopIntro() {
+  used = true;
+  cancelAnimationFrame(frame);
+}
 
-if (
-  !(narrow.matches || reducedMotion.matches || navigator.connection?.saveData)
-) {
-  if (document.readyState === "complete") {
-    play();
-  } else {
-    window.addEventListener("load", play, { once: true });
-  }
+range.hidden = false;
+controls.hidden = false;
+apply(43);
+range.addEventListener("input", () => {
+  stopIntro();
+  apply(Number(range.value));
+});
+range.addEventListener("pointerdown", stopIntro);
+range.addEventListener("keydown", stopIntro);
+for (const button of buttons) {
+  button.addEventListener("click", () => {
+    stopIntro();
+    apply(Number(button.dataset.atlasView));
+  });
+}
+
+const images = [...stage.querySelectorAll("img")];
+if (!(motion.matches || navigator.connection?.saveData)) {
+  render(92);
+  Promise.all(images.map((image) => image.decode()))
+    .then(() => {
+      if (used || motion.matches) {
+        return;
+      }
+      const start = performance.now();
+      const intro = (now) => {
+        if (used) {
+          return;
+        }
+        if (motion.matches || document.hidden) {
+          apply(43);
+          return;
+        }
+        const progress = Math.min(1, Math.max(0, (now - start - 140) / 1250));
+        const eased = 1 - (1 - progress) ** 3;
+        render(92 - 49 * eased);
+        if (progress < 1) {
+          frame = requestAnimationFrame(intro);
+        } else {
+          apply(43);
+        }
+      };
+      frame = requestAnimationFrame(intro);
+    })
+    .catch(() => {
+      if (!used) {
+        apply(43);
+      }
+    });
 }
