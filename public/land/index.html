@@ -4,15 +4,18 @@
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta content="#17231c" name="theme-color">
-    <title>Алтай. Живая земля · Михаил Бальхаев</title>
+    <title>3D-генпланы и сайты для девелоперов · Михаил Бальхаев</title>
     <meta
-      content="Интерактивный проект посёлка у Аноса. Исследуйте 3D-долину Катуни, генплан на 568 участков, фильмы и сайт «Алтай. Живая земля»."
+      content="Интерактивные 3D-генпланы и сайты для девелоперов. Кейс «Алтай. Живая земля»: долина Катуни, поиск по 568 участкам и примерка дома."
       name="description"
     >
     <link href="https://balkhaev.com/land/" rel="canonical">
-    <meta content="Алтай. Живая земля" property="og:title">
     <meta
-      content="3D-долина Катуни, генплан посёлка на 568 участков, сайт и фильмы."
+      content="3D-генпланы для девелоперов · Алтай. Живая земля"
+      property="og:title"
+    >
+    <meta
+      content="От реального рельефа до выбора участка: интерактивный генплан и сайт посёлка на Алтае."
       property="og:description"
     >
     <meta content="https://balkhaev.com/land/og.jpg" property="og:image">
@@ -27,17 +30,23 @@
     >
     <link href="/land/land.css" rel="stylesheet">
     <script src="/land/preview.js" type="module"></script>
+    <script src="/land/hero.js" type="module"></script>
     <script src="/land/plan.js" type="module"></script>
   </head>
   <body>
+    <a class="skip-link" href="#project-title">К содержанию</a>
     <header class="top">
       <div class="top-inner">
         <a class="brand" href="/">← Михаил Бальхаев</a>
         <nav aria-label="Разделы проекта">
-          <a href="#case">Долина</a>
           <a href="#genplan">Генплан</a>
-          <a href="#film">Фильмы</a>
-          <a href="#site">Сайт</a>
+          <a href="#services">Для девелоперов</a>
+          <a class="nav-contact" href="#contact"
+            >Обсудить проект
+            <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
+              <path d="M4 12 12 4M5 4h7v7"></path>
+            </svg></a
+          >
         </nav>
       </div>
     </header>
@@ -45,7 +54,7 @@
     <main>
       <section aria-labelledby="project-title" class="hero">
         <picture aria-hidden="true" class="hero-picture">
-          <source media="(max-width: 600px)" srcset="/land/hero-portrait.webp">
+          <source media="(max-width: 720px)" srcset="/land/hero-portrait.webp">
           <img
             alt=""
             fetchpriority="high"
@@ -54,22 +63,76 @@
             width="1600"
           >
         </picture>
+        <video
+          aria-hidden="true"
+          class="hero-motion"
+          id="hero-motion"
+          muted
+          playsinline
+          preload="none"
+        ></video>
         <div class="shell hero-inner">
-          <p class="eyebrow">Республика Алтай · село Анос</p>
-          <h1 id="project-title">Алтай.<br>Живая земля</h1>
-          <p class="hero-lead">
-            Долина Катуни в 3D и проект посёлка на 568 участков.
-          </p>
-          <div class="actions">
-            <a
-              class="button button-accent"
-              data-start-model="valley"
-              href="#altay-3d"
-              >Открыть 3D <span aria-hidden="true">↘</span></a
+          <div class="hero-copy">
+            <p class="eyebrow hero-tag">3D-генпланы и сайты для девелоперов</p>
+            <h1 id="project-title">
+              Покажите посёлок<br>
+              <em>до стройки</em>
+            </h1>
+            <p class="hero-lead">
+              Покупатель видит рельеф и окружение, находит свой участок и
+              примеряет дом прямо на сайте.
+            </p>
+            <div class="actions">
+              <a
+                class="button button-accent"
+                data-start-model="valley"
+                href="#altay-3d"
+                >Открыть долину в 3D
+                <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
+                  <path d="M4 12 12 4M5 4h7v7"></path>
+                </svg></a
+              >
+              <a class="button button-light" href="#genplan"
+                >Попробовать генплан</a
+              >
+            </div>
+          </div>
+          <a class="hero-preview" href="#genplan">
+            <img
+              alt=""
+              decoding="async"
+              height="1000"
+              src="/land/model/plots.webp"
+              width="1600"
             >
-            <a class="button button-light" href="#genplan"
-              >Посмотреть генплан</a
+            <span class="hero-preview-label">
+              <span
+                ><strong>Алтай. Живая земля</strong
+                ><small>Кейс · Анос, долина Катуни</small></span
+              >
+              <svg
+                aria-hidden="true"
+                class="link-arrow preview-arrow"
+                viewBox="0 0 16 16"
+              >
+                <path d="m4 4 8 8m-7 0h7V5"></path>
+              </svg>
+            </span>
+          </a>
+          <div class="hero-meta">
+            <a class="hero-location" href="#case">
+              <span aria-hidden="true" class="location-dot"></span>
+              Кейс: Алтай. Живая земля
+            </a>
+            <button
+              class="motion-toggle"
+              hidden
+              id="hero-motion-toggle"
+              type="button"
             >
+              <span aria-hidden="true" class="motion-icon">▷</span>
+              <span id="hero-motion-label">Включить полёт</span>
+            </button>
           </div>
         </div>
       </section>
@@ -78,7 +141,7 @@
         <div class="shell">
           <div class="section-head">
             <div>
-              <p class="eyebrow">3D-модель</p>
+              <p class="eyebrow">01 / Исследуйте местность</p>
               <h2 id="valley-title">Долина Катуни</h2>
             </div>
             <p>
@@ -189,7 +252,7 @@
         <div class="shell">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Планировка территории</p>
+              <p class="eyebrow">02 / Найдите участок</p>
               <h2 id="plan-title">Генплан посёлка</h2>
             </div>
             <p>
@@ -235,7 +298,9 @@
             </div>
             <div class="plan-side">
               <h3>Участки и очереди</h3>
-              <p id="plan-hint">Границы и застройка на исходном генплане.</p>
+              <p id="plan-hint">
+                Выберите очередь, нажмите на участок или найдите его по номеру.
+              </p>
               <form class="plan-search" hidden id="plan-search">
                 <label for="plot-number">Номер участка</label>
                 <div>
@@ -273,60 +338,12 @@
               </fieldset>
               <p class="plan-result" id="plan-result" role="status"></p>
               <a class="text-link" data-start-model="plan" href="#altay-3d"
-                >Посмотреть посёлок в 3D <span aria-hidden="true">↗</span></a
+                >Посмотреть посёлок в 3D
+                <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
+                  <path d="M4 12 12 4M5 4h7v7"></path>
+                </svg></a
               >
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="film-title"
-        class="section film-section"
-        id="film"
-      >
-        <div class="shell">
-          <div class="section-head">
-            <div>
-              <p class="eyebrow">Кино</p>
-              <h2 id="film-title">Два фильма об Алтае</h2>
-            </div>
-            <p>
-              Короткий фильм показывает, каким может стать посёлок. Аэросъёмка
-              даёт увидеть саму долину и её масштаб.
-            </p>
-          </div>
-          <div class="films">
-            <figure>
-              <!-- biome-ignore lint/a11y/useMediaCaption: the film's text is shown in its on-screen titles -->
-              <video
-                aria-label="Алтай. Живая земля"
-                controls
-                playsinline
-                poster="/land/film.webp"
-                preload="none"
-                src="/land/film.mp4"
-              ></video>
-              <figcaption>
-                <h3>Алтай. Живая земля</h3>
-                <span class="eyebrow">1:49</span>
-              </figcaption>
-            </figure>
-            <figure>
-              <!-- biome-ignore lint/a11y/useMediaCaption: the aerial film has a music soundtrack -->
-              <video
-                aria-label="Алтай с высоты"
-                controls
-                playsinline
-                poster="/land/aerial.webp"
-                preload="none"
-                src="/land/aerial.mp4"
-              ></video>
-              <figcaption>
-                <h3>Алтай с высоты</h3>
-                <span class="eyebrow">2:43</span>
-              </figcaption>
-            </figure>
           </div>
         </div>
       </section>
@@ -335,7 +352,7 @@
         <div class="shell">
           <div class="section-head">
             <div>
-              <p class="eyebrow">Веб-сайт проекта</p>
+              <p class="eyebrow">03 / Посмотрите глазами покупателя</p>
               <h2 id="site-title">От первого кадра до выбора участка</h2>
             </div>
             <p>
@@ -388,12 +405,126 @@
           </div>
         </div>
       </section>
+      <section
+        aria-labelledby="film-title"
+        class="section film-section"
+        id="film"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">04 / Фильмы</p>
+              <h2 id="film-title">Два фильма об Алтае</h2>
+            </div>
+            <p>
+              Короткий фильм показывает, каким может стать посёлок. Аэросъёмка
+              даёт увидеть саму долину и её масштаб.
+            </p>
+          </div>
+          <div class="films">
+            <figure>
+              <!-- biome-ignore lint/a11y/useMediaCaption: the film's text is shown in its on-screen titles -->
+              <video
+                aria-label="Алтай. Живая земля"
+                controls
+                playsinline
+                poster="/land/film.webp"
+                preload="none"
+                src="/land/film.mp4"
+              ></video>
+              <figcaption>
+                <h3>Алтай. Живая земля</h3>
+                <span class="eyebrow">1:49</span>
+              </figcaption>
+            </figure>
+            <figure>
+              <!-- biome-ignore lint/a11y/useMediaCaption: the aerial film has a music soundtrack -->
+              <video
+                aria-label="Алтай с высоты"
+                controls
+                playsinline
+                poster="/land/aerial.webp"
+                preload="none"
+                src="/land/aerial.mp4"
+              ></video>
+              <figcaption>
+                <h3>Алтай с высоты</h3>
+                <span class="eyebrow">2:43</span>
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="services-title"
+        class="section services"
+        id="services"
+      >
+        <div class="shell">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Для девелоперов</p>
+              <h2 id="services-title">Что можно сделать для вашего проекта</h2>
+            </div>
+            <p>
+              Можно начать с одной очереди или встроить генплан в действующий
+              сайт. Для старта достаточно схемы территории и примера того, что
+              вы хотите показать.
+            </p>
+          </div>
+          <div class="service-grid">
+            <article>
+              <span class="eyebrow">01 / Местность</span>
+              <h3>3D-модель территории</h3>
+              <p>
+                Виды с разных точек, рельеф, подъезды и окружение. По съёмке,
+                картам и вашим материалам.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">02 / Выбор</span>
+              <h3>Интерактивный генплан</h3>
+              <p>
+                Очереди, границы и карточки участков. Покупатель может найти
+                участок по номеру и посмотреть его на рельефе.
+              </p>
+            </article>
+            <article>
+              <span class="eyebrow">03 / Сайт</span>
+              <h3>Страница проекта</h3>
+              <p>
+                От первого кадра до заявки: фильмы, 3D, выбор дома и форма связи
+                в одном месте.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="foot" id="contact">
-      <div class="shell foot-inner">
-        <a href="/#projects-title">← Все проекты Михаила Бальхаева</a>
-        <a href="https://t.me/balkhaev">Telegram ↗</a>
+      <div class="shell">
+        <div class="contact-layout">
+          <div>
+            <p class="eyebrow">Михаил Бальхаев</p>
+            <h2>Покажите мне ваш проект</h2>
+            <p>
+              Пришлите ссылку или схему посёлка. Скажу, что стоит показать в 3D
+              и с чего проще начать.
+            </p>
+          </div>
+          <a class="button button-accent" href="https://t.me/balkhaev"
+            >Написать в Telegram
+            <svg aria-hidden="true" class="link-arrow" viewBox="0 0 16 16">
+              <path d="M4 12 12 4M5 4h7v7"></path>
+            </svg></a
+          >
+        </div>
+        <div class="foot-inner">
+          <a href="/#projects-title">← Все проекты Михаила Бальхаева</a>
+          <a href="#project-title">К началу ↑</a>
+        </div>
       </div>
     </footer>
   </body>
