@@ -7,6 +7,8 @@ const filters = document.querySelector("#plan-filters");
 const numberInput = document.querySelector("#plot-number");
 const hint = document.querySelector("#plan-hint");
 const result = document.querySelector("#plan-result");
+let pendingPreview;
+let previewPlot;
 
 const shades = ["", "#7b9f76", "#6a9295", "#b88a50"];
 const phaseNames = [
@@ -167,6 +169,14 @@ function startPlan(data, context) {
     paint();
   }
 
+  previewPlot = (number) => {
+    const lot = lotByNumber.get(number);
+    if (lot) {
+      numberInput.value = String(lot.number);
+      selectPhase(lot.phase, lot);
+    }
+  };
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const value = numberInput.value.trim();
@@ -210,7 +220,11 @@ function startPlan(data, context) {
   form.hidden = false;
   filters.hidden = false;
   hint.textContent = "Выберите участок на схеме или найдите его по номеру.";
-  paint();
+  if (pendingPreview) {
+    previewPlot(pendingPreview);
+  } else {
+    paint();
+  }
   new ResizeObserver(paint).observe(stage);
 }
 
@@ -240,3 +254,10 @@ const observer = new IntersectionObserver(
   { rootMargin: "240px" }
 );
 observer.observe(stage);
+
+for (const link of document.querySelectorAll("[data-preview-plot]")) {
+  link.addEventListener("click", () => {
+    pendingPreview = Number(link.dataset.previewPlot);
+    previewPlot?.(pendingPreview);
+  });
+}
